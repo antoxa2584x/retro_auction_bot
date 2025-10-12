@@ -1,0 +1,17 @@
+{
+  "name": "tg-auction-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.0",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.4.5",
+    "node-schedule": "^2.1.1",
+    "telegraf": "^4.16.3"
+  }
+}
