@@ -37,7 +37,7 @@ export function registerChannelPostHandler(bot) {
             discussion_chat_id: discussionId
         });
 
-        const finalKb = makeKb(post.chat.id, post.message_id, minBid, 0);
+        const finalKb = makeKb(post.chat.id, post.message_id, minBid);
         await attachKbToMedia(ctx, post, finalKb);
 
         scheduleClose(ctx, post.chat.id, post.message_id, end);

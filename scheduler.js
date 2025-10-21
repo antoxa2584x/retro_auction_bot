@@ -20,9 +20,10 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 chat_id,
                 message_id,
                 null,
-                winnerKeyboard(row.leader_id, row.leader_name, row.current_price)
+                winnerKeyboard(row.leader_id, row.leader_name, row.current_price, chat_id, message_id)
             );
-        } catch {}
+        } catch(e) {
+            console.log(e)}
     } else {
         await ctx.telegram.editMessageReplyMarkup(
             chat_id,
