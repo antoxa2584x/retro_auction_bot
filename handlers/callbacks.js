@@ -1,5 +1,6 @@
 import { q } from '../db.js';
 import { makeKb } from '../keyboards.js';
+import {closeAuction} from "../scheduler.js";
 
 export function registerCallbackHandler(bot) {
     bot.on('callback_query', async ctx => {
@@ -51,7 +52,10 @@ export function registerCallbackHandler(bot) {
 
         const row = q.getAuction.get(chat_id, message_id);
         if (!row) return ctx.answerCbQuery('Аукціон не знайдено', { show_alert: true });
-        if (row.status !== 'active') return ctx.answerCbQuery('Аукціон завершено', { show_alert: true });
+        if (row.status !== 'active') {
+            await closeAuction(ctx, chat_id, message_id)
+            return ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
+        }
 
         const now = new Date();
         const end = new Date(row.end_at);
