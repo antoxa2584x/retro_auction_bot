@@ -10,7 +10,6 @@ export function scheduleClose(ctx, chat_id, message_id, when) {
 
 export async function closeAuction(ctx, chat_id, message_id) {
     const row = q.getAuction.get(chat_id, message_id);
-    if (!row || row.status !== 'active') return;
 
     q.finish.run(chat_id, message_id);
 
