@@ -3,3 +3,4 @@
 /yarn.lock
 /package-lock.json
 /auction.sqlite3
+.env
