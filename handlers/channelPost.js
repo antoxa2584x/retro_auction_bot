@@ -1,8 +1,9 @@
-import { CHANNEL_ID, COMMENTS_ID, TZ } from '../env.js';
-import { q } from '../db.js';
-import { makeKb } from '../keyboards.js';
-import { parsePost } from '../parse.js';
-import { scheduleClose } from '../scheduler.js';
+import {CHANNEL_ID, COMMENTS_ID, TZ} from '../env.js';
+import {q} from '../db.js';
+import {makeKb} from '../keyboards.js';
+import {parsePost} from '../parse.js';
+import {scheduleClose} from '../scheduler.js';
+import {handleUndoMessage} from "./admin.js";
 
 export function registerChannelPostHandler(bot) {
     bot.on('channel_post', async (ctx) => {
@@ -10,6 +11,12 @@ export function registerChannelPostHandler(bot) {
         if (!post || post.chat.id !== CHANNEL_ID) return;
 
         const text = post.text || post.caption || '';
+
+        const txt = ctx.message.text.trim();
+        if (/^\/undo(@\w+)?$/i.test(txt)) {
+            await handleUndoMessage(ctx)
+        }
+
         let parsed;
         try {
             parsed = parsePost(text, TZ);
@@ -17,7 +24,7 @@ export function registerChannelPostHandler(bot) {
             return; // пост не у форматі аукціону — ігноруємо
         }
 
-        const { minBid, step, end } = parsed;
+        const {minBid, step, end} = parsed;
         const discussionId = COMMENTS_ID;
         if (!discussionId) {
             console.warn('No linked discussion group.');

@@ -2,8 +2,7 @@ import { q } from '../db.js';
 import { makeKb } from '../keyboards.js';
 import {ADMIN_ID} from "../env.js";
 
-export function registerAdminHandlers(bot) {
-    bot.on('message', async (ctx) => {
+export async function handleUndoMessage(ctx) {
         console.log('Auction bot message', ctx.message);
         console.log('Auction bot text', ctx.text);
 
@@ -25,13 +24,6 @@ export function registerAdminHandlers(bot) {
 
         if (!replied) return;
 
-        // must match command "/undo" or "/undo@YourBot"
-        const txt = msg.text.trim();
-
-        console.log('Auction txt', txt);
-        console.log('Auction txt', /^\/undo(@\w+)?$/i.test(txt));
-
-        if (!/^\/undo(@\w+)?$/i.test(txt)) return;
 
         const chatId = msg.chat.id;
         const auctionMsgId = replied.message_id;
@@ -138,5 +130,4 @@ export function registerAdminHandlers(bot) {
             `⏪ Останню ставку скасовано.\nНовий лідер: ${leaderName}\nЦіна: ${newLeader.amount} грн`,
             { reply_to_message_id: auctionMsgId }
         );
-    });
 }
