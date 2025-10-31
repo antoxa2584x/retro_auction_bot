@@ -4,18 +4,33 @@ import {ADMIN_ID} from "../env.js";
 
 export function registerAdminHandlers(bot) {
     bot.on('message', async (ctx) => {
+        console.log('Auction bot message', ctx.message);
+        console.log('Auction bot text', ctx.text);
+
         const msg = ctx.message;
         if (!msg || !msg.text) return;
 
+
+        console.log('From', msg.from?.id);
+
+        console.log('ADMIN_ID', ADMIN_ID);
+
         // must be admin
-        if (msg.from?.id !== Number(ADMIN_ID)) return;
+        if (msg.from?.id !== ADMIN_ID) return;
 
         // must be reply
         const replied = msg.reply_to_message;
+
+        console.log('Auction replied', replied);
+
         if (!replied) return;
 
         // must match command "/undo" or "/undo@YourBot"
         const txt = msg.text.trim();
+
+        console.log('Auction txt', txt);
+        console.log('Auction txt', /^\/undo(@\w+)?$/i.test(txt));
+
         if (!/^\/undo(@\w+)?$/i.test(txt)) return;
 
         const chatId = msg.chat.id;
