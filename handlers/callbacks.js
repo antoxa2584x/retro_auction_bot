@@ -47,7 +47,6 @@ export function registerCallbackHandler(bot) {
             return;
         }
 
-        // --- bid ---
         if (!data.startsWith('bid:')) return;
 
         const row = q.getAuction.get(chat_id, message_id);
@@ -61,7 +60,6 @@ export function registerCallbackHandler(bot) {
         const end = new Date(row.end_at);
         if (now >= end) {
             await ctx.answerCbQuery('Аукціон завершено', { show_alert: true });
-            // завдання на закриття вже існує/буде виконане окремо
             return;
         }
 
@@ -73,17 +71,8 @@ export function registerCallbackHandler(bot) {
             chat_id, message_id, user.id,
             user.username || null, user.first_name || null, user.last_name || null
         );
+
         if (ins.changes > 0) participants += 1;
-
-        q.updateState.run(
-            newPrice,
-            user.id,
-            user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
-            participants,
-            chat_id, message_id
-        );
-
-        q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
 
         try {
             await ctx.telegram.editMessageReplyMarkup(
@@ -92,8 +81,20 @@ export function registerCallbackHandler(bot) {
                 null,
                 makeKb(chat_id, message_id, newPrice, participants)
             );
-        } catch {}
 
-        await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
+            q.updateState.run(
+                newPrice,
+                user.id,
+                user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
+                participants,
+                chat_id, message_id
+            );
+
+            q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
+
+            await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
+        } catch {
+            await ctx.answerCbQuery(`Забагато ставок, спробуй ще раз`);
+        }
     });
 }
