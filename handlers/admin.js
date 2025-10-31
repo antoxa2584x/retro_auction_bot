@@ -3,19 +3,14 @@ import { makeKb } from '../keyboards.js';
 import {ADMIN_ID} from "../env.js";
 
 export async function handleUndoMessage(ctx) {
-        console.log('Auction bot message', ctx.message);
-        console.log('Auction bot text', ctx.text);
+        const post = ctx.channelPost;
 
-        const msg = ctx.message;
-        if (!msg || !msg.text) return;
-
-
-        console.log('From', msg.from?.id);
+        console.log('From', JSON.stringify(post));
 
         console.log('ADMIN_ID', ADMIN_ID);
 
         // must be admin
-        if (msg.from?.id !== ADMIN_ID) return;
+        if (post.from?.id !== ADMIN_ID) return;
 
         // must be reply
         const replied = msg.reply_to_message;
