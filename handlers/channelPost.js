@@ -12,10 +12,10 @@ export function registerChannelPostHandler(bot) {
 
         const text = post.text || post.caption || '';
 
-        const txt = post.text.trim();
-        if (/^\/undo(@\w+)?$/i.test(txt)) {
-            await handleUndoMessage(ctx)
-        }
+        // const txt = post.text.trim();
+        // if (/^\/undo(@\w+)?$/i.test(txt)) {
+        //     await handleUndoMessage(ctx)
+        // }
 
         let parsed;
         try {
