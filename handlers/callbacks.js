@@ -1,5 +1,5 @@
-import { q } from '../db.js';
-import { makeKb } from '../keyboards.js';
+import {q} from '../db.js';
+import {makeKb} from '../keyboards.js';
 import {closeAuction} from "../scheduler.js";
 
 export function registerCallbackHandler(bot) {
@@ -12,10 +12,10 @@ export function registerCallbackHandler(bot) {
         // --- info ---
         if (data.startsWith('info:')) {
             const row = q.getAuction.get(chat_id, message_id);
-            if (!row) return ctx.answerCbQuery('Аукціон не знайдено', { show_alert: true });
+            if (!row) return ctx.answerCbQuery('Аукціон не знайдено', {show_alert: true});
 
             const allBids = q.selectBidsForInfo.all(chat_id, message_id);
-            if (allBids.length === 0) return ctx.answerCbQuery('Ще немає ставок.', { show_alert: true });
+            if (allBids.length === 0) return ctx.answerCbQuery('Ще немає ставок.', {show_alert: true});
 
             // Згортаємо послідовні ставки одного користувача в останню
             const coalesced = [];
@@ -24,7 +24,7 @@ export function registerCallbackHandler(bot) {
                 if (last && last.user_id === b.user_id) coalesced[coalesced.length - 1] = b;
                 else coalesced.push(b);
             }
-            if (coalesced.length === 0) return ctx.answerCbQuery('Ще немає ставок.', { show_alert: true });
+            if (coalesced.length === 0) return ctx.answerCbQuery('Ще немає ставок.', {show_alert: true});
 
             const nameOf = (b) => b.first_name ? (b.last_name ? `${b.first_name} ${b.last_name}` : b.first_name)
                 : (b.username ? `@${b.username}` : `ID ${b.user_id}`);
@@ -38,19 +38,20 @@ export function registerCallbackHandler(bot) {
                 const b = take[i];
                 const line = `${i + 1}. ${nameOf(b)} — ${b.amount} грн\n`;
                 if ((text + line).length > 190) break;
-                text += line; shown++;
+                text += line;
+                shown++;
             }
             const hidden = coalesced.length - shown;
             if (hidden > 0 && (text + `…та ще ${hidden}`).length <= 200) text += `…та ще ${hidden}`;
 
-            await ctx.answerCbQuery(text, { show_alert: true });
+            await ctx.answerCbQuery(text, {show_alert: true});
             return;
         }
 
         if (!data.startsWith('bid:')) return;
 
         const row = q.getAuction.get(chat_id, message_id);
-        if (!row) return ctx.answerCbQuery('Аукціон не знайдено', { show_alert: true });
+        if (!row) return ctx.answerCbQuery('Аукціон не знайдено', {show_alert: true});
         if (row.status !== 'active') {
             await closeAuction(ctx, chat_id, message_id)
             return ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
@@ -59,13 +60,29 @@ export function registerCallbackHandler(bot) {
         const now = new Date();
         const end = new Date(row.end_at);
         if (now >= end) {
-            await ctx.answerCbQuery('Аукціон завершено', { show_alert: true });
+            await ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
             return;
         }
 
         const user = ctx.from;
         const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
         let participants = row.participants_count;
+
+        let removeBid = false;
+
+        const lastBid = q.getLastBid.get(chat_id, message_id);
+
+        // ⏱ обмеження в 5 хвилин
+        const bidTime = new Date(lastBid.ts);
+        const diffMs = Date.now() - bidTime.getTime();
+        const FIVE_MINUTES = 5 * 60 * 1000;
+
+        if (diffMs < FIVE_MINUTES) {
+            if (lastBid && lastBid.user_id === user.id) {
+                q.deleteBidByRowId.run(lastBid.rid);
+                removeBid = true
+            }
+        }
 
         const ins = q.upsertParticipant.run(
             chat_id, message_id, user.id,
@@ -90,9 +107,14 @@ export function registerCallbackHandler(bot) {
                 chat_id, message_id
             );
 
+            // вставляем только актуальную ставку (предыдущую от этого юзера уже удалили выше)
             q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
 
-            await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
+            if (removeBid) {
+                await ctx.answerCbQuery(`Ставка відмінена`);
+            } else {
+                await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
+            }
         } catch {
             await ctx.answerCbQuery(`Забагато ставок, спробуй ще раз`);
         }
