@@ -31,7 +31,7 @@ export function registerCallbackHandler(bot) {
 
             const limit = 15;
             const take = coalesced.slice(-limit).reverse();
-            const header = 'Учасники (останні серії):\n\n';
+            const header = 'Останні ставки:\n\n';
             let text = header, shown = 0;
 
             for (let i = 0; i < take.length; i++) {
