@@ -93,7 +93,11 @@ export function registerCallbackHandler(bot) {
             user.username || null, user.first_name || null, user.last_name || null
         );
 
-        if (ins.changes > 0) participants += 1;
+        if (removeBid) {
+            if (ins.changes > 0) participants -= 1;
+        } else {
+            if (ins.changes > 0) participants += 1;
+        }
 
         try {
             await ctx.telegram.editMessageReplyMarkup(
