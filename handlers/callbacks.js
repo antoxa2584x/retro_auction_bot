@@ -72,13 +72,13 @@ export function registerCallbackHandler(bot) {
 
         const lastBid = q.getLastBid.get(chat_id, message_id);
 
-        // ⏱ обмеження в 5 хвилин
-        const bidTime = new Date(lastBid.ts);
-        const diffMs = Date.now() - bidTime.getTime();
-        const FIVE_MINUTES = 5 * 60 * 1000;
+        if (lastBid && lastBid.user_id === user.id) {
+            // ⏱ обмеження в 5 хвилин
+            const bidTime = new Date(lastBid.ts);
+            const diffMs = Date.now() - bidTime.getTime();
+            const FIVE_MINUTES = 5 * 60 * 1000;
 
-        if (diffMs < FIVE_MINUTES) {
-            if (lastBid && lastBid.user_id === user.id) {
+            if (diffMs < FIVE_MINUTES) {
                 q.deleteBidByRowId.run(lastBid.rid);
                 removeBid = true
             }
