@@ -65,7 +65,7 @@ export function registerCallbackHandler(bot) {
         }
 
         const user = ctx.from;
-        const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
+        let newPrice = 0
         let participants = row.participants_count;
 
         let removeBid = false;
@@ -81,7 +81,11 @@ export function registerCallbackHandler(bot) {
             if (diffMs < FIVE_MINUTES) {
                 q.deleteBidByRowId.run(lastBid.rid);
                 removeBid = true
+
+                newPrice = row.current_price - row.step
             }
+        } else {
+            newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
         }
 
         const ins = q.upsertParticipant.run(
@@ -107,12 +111,11 @@ export function registerCallbackHandler(bot) {
                 chat_id, message_id
             );
 
-            // вставляем только актуальную ставку (предыдущую от этого юзера уже удалили выше)
-            q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
-
             if (removeBid) {
                 await ctx.answerCbQuery(`Ставка відмінена`);
             } else {
+                // вставляем только актуальную ставку (предыдущую от этого юзера уже удалили выше)
+                q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
                 await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
             }
         } catch {
