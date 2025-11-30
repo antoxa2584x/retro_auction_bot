@@ -88,7 +88,7 @@ export function registerCallbackHandler(bot) {
                 q.deleteBidByRowId.run(lastBid.rid);
                 removeBid = true
 
-                newPrice = Math.max(row.start_price, row.current_price - row.step);
+                newPrice = Math.max(row.min_bid, row.current_price - row.step);
                 console.log('removeBid newPrice', newPrice);
             }
         }
