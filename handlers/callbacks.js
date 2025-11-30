@@ -109,17 +109,16 @@ export function registerCallbackHandler(bot) {
                 makeKb(chat_id, message_id, newPrice, participants)
             );
 
-            q.updateState.run(
-                newPrice,
-                user.id,
-                user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
-                participants,
-                chat_id, message_id
-            );
-
             if (removeBid) {
                 await ctx.answerCbQuery(`Ставка відмінена`);
             } else {
+                q.updateState.run(
+                    newPrice,
+                    user.id,
+                    user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
+                    participants,
+                    chat_id, message_id
+                );
                 // вставляем только актуальную ставку (предыдущую от этого юзера уже удалили выше)
                 q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
                 await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
