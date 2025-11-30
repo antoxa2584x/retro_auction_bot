@@ -107,17 +107,17 @@ export function registerCallbackHandler(bot) {
         console.log('participants', participants);
 
         try {
+            q.updateState.run(
+                newPrice,
+                user.id,
+                user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
+                participants,
+                chat_id, message_id
+            );
+
             if (removeBid) {
                 await ctx.answerCbQuery(`Ставка відмінена`);
             } else {
-                q.updateState.run(
-                    newPrice,
-                    user.id,
-                    user.first_name + (user.last_name ? ` ${user.last_name}` : ''),
-                    participants,
-                    chat_id, message_id
-                );
-
                 q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
 
                 await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
