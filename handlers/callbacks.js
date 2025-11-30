@@ -68,9 +68,15 @@ export function registerCallbackHandler(bot) {
         let newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
         let participants = row.participants_count;
 
+        console.log('newPrice', newPrice);
+        console.log('current_price', current_price);
+        console.log('step', step);
+
         let removeBid = false;
 
         const lastBid = q.getLastBid.get(chat_id, message_id);
+
+        console.log('newPrice', JSON.stringify(lastBid));
 
         if (lastBid && lastBid.user_id === user.id) {
             // ⏱ обмеження в 5 хвилин
@@ -83,6 +89,7 @@ export function registerCallbackHandler(bot) {
                 removeBid = true
 
                 newPrice = Math.max(row.start_price, row.current_price - row.step);
+                console.log('removeBid newPrice', newPrice);
             }
         }
 
@@ -96,6 +103,8 @@ export function registerCallbackHandler(bot) {
         } else {
             if (ins.changes > 0) participants += 1;
         }
+
+        console.log('participants', participants);
 
         try {
             if (removeBid) {
@@ -121,6 +130,7 @@ export function registerCallbackHandler(bot) {
                 makeKb(chat_id, message_id, newPrice, participants)
             );
         } catch {
+            console.log('too many requests');
             await ctx.answerCbQuery(`Забагато ставок, спробуй ще раз`);
         }
     });
