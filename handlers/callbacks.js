@@ -65,7 +65,7 @@ export function registerCallbackHandler(bot) {
         }
 
         const user = ctx.from;
-        let newPrice = 0
+        let newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
         let participants = row.participants_count;
 
         let removeBid = false;
@@ -84,10 +84,6 @@ export function registerCallbackHandler(bot) {
 
                 newPrice = Math.max(row.start_price, row.current_price - row.step);
             }
-        } else {
-            newPrice = row.leader_id
-                ? row.current_price + row.step
-                : row.start_price;
         }
 
         const ins = q.upsertParticipant.run(
@@ -102,13 +98,6 @@ export function registerCallbackHandler(bot) {
         }
 
         try {
-            await ctx.telegram.editMessageReplyMarkup(
-                chat_id,
-                message_id,
-                null,
-                makeKb(chat_id, message_id, newPrice, participants)
-            );
-
             if (removeBid) {
                 await ctx.answerCbQuery(`Ставка відмінена`);
             } else {
@@ -119,10 +108,18 @@ export function registerCallbackHandler(bot) {
                     participants,
                     chat_id, message_id
                 );
-                // вставляем только актуальную ставку (предыдущую от этого юзера уже удалили выше)
+
                 q.insertBid.run(chat_id, message_id, user.id, newPrice, new Date().toISOString());
+
                 await ctx.answerCbQuery(`Ваша ставка: ${newPrice} грн`);
             }
+
+            await ctx.telegram.editMessageReplyMarkup(
+                chat_id,
+                message_id,
+                null,
+                makeKb(chat_id, message_id, newPrice, participants)
+            );
         } catch {
             await ctx.answerCbQuery(`Забагато ставок, спробуй ще раз`);
         }
