@@ -69,8 +69,8 @@ export function registerCallbackHandler(bot) {
         let participants = row.participants_count;
 
         console.log('newPrice', newPrice);
-        console.log('current_price', current_price);
-        console.log('step', step);
+        console.log('current_price', row.current_price);
+        console.log('step', row.step);
 
         let removeBid = false;
 
