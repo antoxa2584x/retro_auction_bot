@@ -82,10 +82,10 @@ export function registerCallbackHandler(bot) {
                 q.deleteBidByRowId.run(lastBid.rid);
                 removeBid = true
 
-                newPrice = row.current_price - row.step
+                newPrice = Math.max(row.start_price, row.current_price - row.step);
             }
         } else {
-            newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
+            newPrice = row.leader_id ? row.start_price + (row.step * (participants - 1)) : row.current_price;
         }
 
         const ins = q.upsertParticipant.run(
