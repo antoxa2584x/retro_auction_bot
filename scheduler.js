@@ -27,7 +27,7 @@ export async function closeAuction(ctx, chat_id, message_id) {
             chat_id,
             message_id,
             null,
-            makeEmptyFinishKb(chat_id, message_id)
+            makeEmptyFinishKb()
         );
     }
 }

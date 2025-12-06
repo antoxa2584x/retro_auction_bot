@@ -16,10 +16,10 @@ export function makeKb(chatId, msgId, price, participants) {
     };
 }
 
-export function makeEmptyFinishKb(chatId, msgId) {
+export function makeEmptyFinishKb() {
     return {
         inline_keyboard: [[
-            {text: '🏁 Ставок не було.', callback_data: `bid:${chatId}:${msgId}`}
+            {text: '🏁 Ставок не було', callback_data: `none`}
         ]]
     };
 }
