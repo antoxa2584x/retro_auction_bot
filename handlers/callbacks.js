@@ -9,6 +9,11 @@ export function registerCallbackHandler(bot) {
         const chat_id = Number(chatIdStr);
         const message_id = Number(msgIdStr);
 
+        if (data.startsWith('none')) {
+            await ctx.answerCbQuery('Ставок не було', {show_alert: true});
+            return;
+        }
+
         // --- info ---
         if (data.startsWith('info:')) {
             const row = q.getAuction.get(chat_id, message_id);
@@ -52,14 +57,11 @@ export function registerCallbackHandler(bot) {
 
         const row = q.getAuction.get(chat_id, message_id);
         if (!row) return ctx.answerCbQuery('Аукціон не знайдено', {show_alert: true});
-        if (row.status !== 'active') {
-            await closeAuction(ctx, chat_id, message_id)
-            return ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
-        }
 
         const now = new Date();
         const end = new Date(row.end_at);
-        if (now >= end) {
+        if (now >= end || row.status !== 'active') {
+            await closeAuction(ctx, chat_id, message_id)
             await ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
             return;
         }
