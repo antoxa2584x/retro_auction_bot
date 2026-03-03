@@ -6,77 +6,61 @@ db.pragma('journal_mode = WAL');
 db.exec(`
     CREATE TABLE IF NOT EXISTS auctions
     (
-        chat_id
-        INTEGER,
-        message_id
-        INTEGER,
-        title
-        TEXT,
-        min_bid
-        INTEGER,
-        step
-        INTEGER,
-        current_price
-        INTEGER,
-        leader_id
-        INTEGER,
-        leader_name
-        TEXT,
-        end_at
-        TEXT,
-        status
-        TEXT
-        DEFAULT
-        'active',
-        participants_count
-        INTEGER
-        DEFAULT
-        0,
-        discussion_chat_id
-        INTEGER,
-        PRIMARY
-        KEY
-    (
-        chat_id,
-        message_id
-    )
-        );
+        chat_id INTEGER,
+        message_id INTEGER,
+        title TEXT,
+        full_text TEXT,
+        photo_id TEXT,
+        min_bid INTEGER,
+        step INTEGER,
+        current_price INTEGER,
+        leader_id INTEGER,
+        leader_name TEXT,
+        end_at TEXT,
+        status TEXT DEFAULT 'active',
+        participants_count INTEGER DEFAULT 0,
+        discussion_chat_id INTEGER,
+        PRIMARY KEY (chat_id, message_id)
+    );
+
     CREATE TABLE IF NOT EXISTS bids
     (
-        chat_id
-        INTEGER,
-        message_id
-        INTEGER,
-        user_id
-        INTEGER,
-        amount
-        INTEGER,
-        ts
-        TEXT
+        chat_id INTEGER,
+        message_id INTEGER,
+        user_id INTEGER,
+        amount INTEGER,
+        ts TEXT
     );
+
     CREATE TABLE IF NOT EXISTS participants
     (
-        chat_id
-        INTEGER,
-        message_id
-        INTEGER,
-        user_id
-        INTEGER,
-        username
-        TEXT,
-        first_name
-        TEXT,
-        last_name
-        TEXT,
-        PRIMARY
-        KEY
-    (
-        chat_id,
-        message_id,
-        user_id
-    )
-        );
+        chat_id INTEGER,
+        message_id INTEGER,
+        user_id INTEGER,
+        username TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        PRIMARY KEY (chat_id, message_id, user_id)
+    );
 `);
+
+// Migration: add missing columns to auctions table if they don't exist
+const columns = db.prepare("PRAGMA table_info(auctions)").all();
+const columnNames = columns.map(c => c.name);
+
+const migrations = [
+    { name: 'full_text', type: 'TEXT' },
+    { name: 'photo_id', type: 'TEXT' },
+    { name: 'participants_count', type: 'INTEGER DEFAULT 0' },
+    { name: 'discussion_chat_id', type: 'INTEGER' }
+];
+
+for (const m of migrations) {
+    if (!columnNames.includes(m.name)) {
+        console.log(`Migrating: Adding column ${m.name} to auctions table`);
+        db.exec(`ALTER TABLE auctions ADD COLUMN ${m.name} ${m.type}`);
+    }
+}
 
 //
 // Helpers for undo-last-bid
@@ -109,9 +93,9 @@ const getNewLeader = db.prepare(`
    LIMIT 1
 `); // NEW
 
-// 4) count unique participants still having at least one bid
-const countUniqueParticipants = db.prepare(`
-  SELECT COUNT(DISTINCT user_id) AS cnt
+// 4) count total bids
+const countBids = db.prepare(`
+  SELECT COUNT(*) AS cnt
     FROM bids
    WHERE chat_id=? AND message_id=?
 `); // NEW
@@ -129,8 +113,8 @@ const resetAuctionNoBids = db.prepare(`
 export const q = {
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count, discussion_chat_id)
-    VALUES (@chat_id, @message_id, @title, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0, @discussion_chat_id)
+      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count, discussion_chat_id)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0, @discussion_chat_id)
   `),
   getAuction: db.prepare(`SELECT * FROM auctions WHERE chat_id=? AND message_id=?`),
   updateState: db.prepare(`
@@ -160,6 +144,6 @@ export const q = {
   getLastBid,
   deleteBidByRowId,
   getNewLeader,
-  countUniqueParticipants,
+  countBids,
   resetAuctionNoBids
 };

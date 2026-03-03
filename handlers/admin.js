@@ -13,21 +13,21 @@ export async function handleUndoMessage(ctx) {
         if (post.from?.id !== ADMIN_ID) return;
 
         // must be reply
-        const replied = msg.reply_to_message;
+        const replied = post.reply_to_message;
 
         console.log('Auction replied', replied);
 
         if (!replied) return;
 
 
-        const chatId = msg.chat.id;
+        const chatId = post.chat.id;
         const auctionMsgId = replied.message_id;
 
         // load auction
         const auction = q.getAuction.get(chatId, auctionMsgId);
         if (!auction) {
             // clean up admin cmd
-            try { await ctx.deleteMessage(msg.message_id); } catch {}
+            try { await ctx.deleteMessage(post.message_id); } catch {}
             await ctx.reply('Аукціон не знайдено ❌', {
                 reply_to_message_id: auctionMsgId
             });
@@ -36,7 +36,7 @@ export async function handleUndoMessage(ctx) {
 
         // only allow undo if still active
         if (auction.status !== 'active') {
-            try { await ctx.deleteMessage(msg.message_id); } catch {}
+            try { await ctx.deleteMessage(post.message_id); } catch {}
             await ctx.reply('Аукціон вже завершений 🔒', {
                 reply_to_message_id: auctionMsgId
             });
@@ -47,7 +47,7 @@ export async function handleUndoMessage(ctx) {
         const lastBid = q.getLastBid.get(chatId, auctionMsgId);
         if (!lastBid) {
             // nothing to undo
-            try { await ctx.deleteMessage(msg.message_id); } catch {}
+            try { await ctx.deleteMessage(post.message_id); } catch {}
             await ctx.reply('Немає ставок для скасування 💤', {
                 reply_to_message_id: auctionMsgId
             });
@@ -59,8 +59,8 @@ export async function handleUndoMessage(ctx) {
 
         // now see what's the new leader after removal
         const newLeader = q.getNewLeader.get(chatId, auctionMsgId);
-        const uniqueCount = q.countUniqueParticipants.get(chatId, auctionMsgId);
-        const participantsCount = uniqueCount?.cnt ?? 0;
+        const bidsCount = q.countBids.get(chatId, auctionMsgId);
+        const participantsCount = bidsCount?.cnt ?? 0;
 
         if (!newLeader) {
             // no bids left at all -> reset auction to min_bid and clear leader
@@ -79,7 +79,7 @@ export async function handleUndoMessage(ctx) {
             }
 
             // delete admin command message to keep chat clean
-            try { await ctx.deleteMessage(msg.message_id); } catch {}
+            try { await ctx.deleteMessage(post.message_id); } catch {}
 
             // public info message
             await ctx.reply(
@@ -118,7 +118,7 @@ export async function handleUndoMessage(ctx) {
         }
 
         // delete admin command message
-        try { await ctx.deleteMessage(msg.message_id); } catch {}
+        try { await ctx.deleteMessage(post.message_id); } catch {}
 
         // send public "undo" notification
         await ctx.reply(
