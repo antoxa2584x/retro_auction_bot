@@ -151,6 +151,8 @@ export const q = {
     SELECT *
       FROM auctions
      WHERE status='finished' AND leader_id=?
+     ORDER BY end_at DESC
+     LIMIT 10
   `),
 
   // NEW:
