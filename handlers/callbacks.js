@@ -50,8 +50,43 @@ export function registerCallbackHandler(bot) {
                 }
             }
         } else {
-            await ctx.reply('Привіт! Я бот для аукціонів. Ви можете робити ставки в каналі.');
+            await ctx.reply('Привіт! Я бот для аукціонів. Ви можете робити ставки в каналі.\n\nКоманди:\n/my - Мої активні аукціони\n/won - Мої виграні аукціони');
         }
+    });
+
+    bot.command('my', async (ctx) => {
+        const userId = ctx.from.id;
+        const auctions = q.getParticipatingAuctions.all(userId);
+
+        if (auctions.length === 0) {
+            return ctx.reply('Ви ще не брали участі в активних аукціонах.');
+        }
+
+        let text = '<b>Ваші активні аукціони:</b>\n\n';
+        for (const a of auctions) {
+            const link = getAuctionLink(a.chat_id, a.message_id);
+            const status = a.leader_id === userId ? '✅ Ви лідируєте' : '❌ Вашу ставку перебито';
+            text += `🔹 <a href="${link}">${a.title}</a>\nПоточна ціна: <b>${a.current_price} грн</b>\nСтатус: ${status}\n\n`;
+        }
+
+        await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+    });
+
+    bot.command('won', async (ctx) => {
+        const userId = ctx.from.id;
+        const auctions = q.getWonAuctions.all(userId);
+
+        if (auctions.length === 0) {
+            return ctx.reply('Ви ще не виграли жодного аукціону.');
+        }
+
+        let text = '<b>Ваші виграні аукціони:</b>\n\n';
+        for (const a of auctions) {
+            const link = getAuctionLink(a.chat_id, a.message_id);
+            text += `🏆 <a href="${link}">${a.title}</a>\nЦіна викупу: <b>${a.current_price} грн</b>\n\n`;
+        }
+
+        await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
     });
 
     bot.on('callback_query', async ctx => {

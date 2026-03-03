@@ -141,6 +141,19 @@ export const q = {
   selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active'`),
 
   // NEW:
+  getParticipatingAuctions: db.prepare(`
+    SELECT DISTINCT a.*
+      FROM auctions a
+      JOIN bids b ON a.chat_id=b.chat_id AND a.message_id=b.message_id
+     WHERE b.user_id=? AND a.status='active'
+  `),
+  getWonAuctions: db.prepare(`
+    SELECT *
+      FROM auctions
+     WHERE status='finished' AND leader_id=?
+  `),
+
+  // NEW:
   getLastBid,
   deleteBidByRowId,
   getNewLeader,
