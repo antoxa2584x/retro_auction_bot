@@ -12,10 +12,11 @@ export function registerChannelPostHandler(bot) {
 
         const text = post.text || post.caption || '';
 
-        // const txt = post.text.trim();
-        // if (/^\/undo(@\w+)?$/i.test(txt)) {
-        //     await handleUndoMessage(ctx)
-        // }
+        const txt = text.trim();
+        if (/^\/undo(@\w+)?$/i.test(txt)) {
+            await handleUndoMessage(ctx);
+            return;
+        }
 
         let parsed;
         try {
@@ -31,12 +32,30 @@ export function registerChannelPostHandler(bot) {
             return;
         }
 
-        const title = text.split('\n')[0] || 'Аукціон';
+        const photoId = post.photo ? post.photo[post.photo.length - 1].file_id : null;
+
+        // Extract title: find the first line between "🎮 Аукціон!" and "Мінімальна ставка"
+        let title = text.split('\n')[0] || 'Аукціон';
+        const auctionMarker = '🎮 Аукціон!';
+        const minBidMarker = 'Мінімальна ставка';
+        
+        const auctionIdx = text.indexOf(auctionMarker);
+        const minBidIdx = text.indexOf(minBidMarker);
+
+        if (auctionIdx !== -1 && minBidIdx !== -1 && minBidIdx > auctionIdx) {
+            const between = text.substring(auctionIdx + auctionMarker.length, minBidIdx);
+            const lines = between.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length > 0) {
+                title = lines[0];
+            }
+        }
 
         q.insertAuction.run({
             chat_id: post.chat.id,
             message_id: post.message_id,
             title,
+            full_text: text,
+            photo_id: photoId,
             min_bid: minBid,
             step,
             current_price: minBid,

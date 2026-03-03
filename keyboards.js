@@ -1,17 +1,31 @@
-export function makeKb(chatId, msgId, price, participants) {
+import { BOT_USERNAME } from './env.js';
+
+export function makeKb(chatId, msgId, price, bidsCount) {
     let t;
-    if (participants === 0) {
+    if (bidsCount === 0) {
         t = `🟡 ${price} грн`;
-    } else if (participants < 10) {
+    } else if (bidsCount < 10) {
         t = `🟢 ${price} грн`;
     } else {
         t = `🔥 ${price} грн`;
     }
 
+    const absChatId = Math.abs(chatId);
+    const url = `https://t.me/${BOT_USERNAME}?start=bid_${absChatId}_${msgId}`;
+
     return {
         inline_keyboard: [[
-            {text: t, callback_data: `bid:${chatId}:${msgId}`},
-            {text: `👥 Ставки (${participants})`, callback_data: `info:${chatId}:${msgId}`}
+            {text: t, url: url},
+            {text: `💬 Ставки (${bidsCount})`, callback_data: `info:${chatId}:${msgId}`}
+        ]]
+    };
+}
+
+export function confirmBidKb(chatId, msgId, price) {
+    return {
+        inline_keyboard: [[
+            {text: `✅ Підтвердити ${price} грн`, callback_data: `confbid:${chatId}:${msgId}:${price}`},
+            {text: `❌ Відміна`, callback_data: `cancelbid`}
         ]]
     };
 }
