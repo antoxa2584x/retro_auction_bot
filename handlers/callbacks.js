@@ -1,7 +1,8 @@
 import {q} from '../db.js';
 import {confirmBidKb, makeKb} from '../keyboards.js';
 import {closeAuction} from "../scheduler.js";
-import {CHANNEL_USERNAME} from "../env.js";
+import {CHANNEL_USERNAME, TZ} from "../env.js";
+import {formatInTimeZone} from 'date-fns-tz';
 
 function getAuctionLink(chatId, messageId) {
     if (CHANNEL_USERNAME) {
@@ -62,14 +63,31 @@ export function registerCallbackHandler(bot) {
             return ctx.reply('Ви ще не брали участі в активних аукціонах.');
         }
 
-        let text = '<b>Ваші активні аукціони:</b>\n\n';
+        await ctx.reply('<b>Ваші активні аукціони:</b>', { parse_mode: 'HTML' });
+
         for (const a of auctions) {
             const link = getAuctionLink(a.chat_id, a.message_id);
             const status = a.leader_id === userId ? '✅ Ви лідируєте' : '❌ Вашу ставку перебито';
-            text += `🔹 <a href="${link}">${a.title}</a>\nПоточна ціна: <b>${a.current_price} грн</b>\nСтатус: ${status}\n\n`;
-        }
+            const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+            
+            const caption = `🔹 <a href="${link}">${a.title}</a>\n` +
+                          `Поточна ціна: <b>${a.current_price} грн</b>\n` +
+                          `Завершення: <b>${endDate}</b>\n` +
+                          `Статус: ${status}`;
 
-        await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+            if (a.photo_id) {
+                await ctx.replyWithPhoto(a.photo_id, {
+                    caption,
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true
+                });
+            } else {
+                await ctx.reply(caption, {
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true
+                });
+            }
+        }
     });
 
     bot.command('won', async (ctx) => {
@@ -80,10 +98,11 @@ export function registerCallbackHandler(bot) {
             return ctx.reply('Ви ще не виграли жодного аукціону.');
         }
 
-        let text = '<b>Ваші виграні аукціони:</b>\n\n';
+        let text = '<b>Ваші виграні аукціони (останні 10):</b>\n\n';
         for (const a of auctions) {
             const link = getAuctionLink(a.chat_id, a.message_id);
-            text += `🏆 <a href="${link}">${a.title}</a>\nЦіна викупу: <b>${a.current_price} грн</b>\n\n`;
+            const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+            text += `🏆 <a href="${link}">${a.title}</a>\nЦіна викупу: <b>${a.current_price} грн</b>\nДата: <b>${endDate}</b>\n\n`;
         }
 
         await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
