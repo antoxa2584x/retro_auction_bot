@@ -19,7 +19,6 @@ db.exec(`
         end_at TEXT,
         status TEXT DEFAULT 'active',
         participants_count INTEGER DEFAULT 0,
-        discussion_chat_id INTEGER,
         PRIMARY KEY (chat_id, message_id)
     );
 
@@ -42,6 +41,20 @@ db.exec(`
         last_name TEXT,
         PRIMARY KEY (chat_id, message_id, user_id)
     );
+
+    CREATE TABLE IF NOT EXISTS admins
+    (
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        otp_code TEXT,
+        otp_expires_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS settings
+    (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    );
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -51,8 +64,7 @@ const columnNames = columns.map(c => c.name);
 const migrations = [
     { name: 'full_text', type: 'TEXT' },
     { name: 'photo_id', type: 'TEXT' },
-    { name: 'participants_count', type: 'INTEGER DEFAULT 0' },
-    { name: 'discussion_chat_id', type: 'INTEGER' }
+    { name: 'participants_count', type: 'INTEGER DEFAULT 0' }
 ];
 
 for (const m of migrations) {
@@ -113,8 +125,8 @@ const resetAuctionNoBids = db.prepare(`
 export const q = {
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count, discussion_chat_id)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0, @discussion_chat_id)
+      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0)
   `),
   getAuction: db.prepare(`SELECT * FROM auctions WHERE chat_id=? AND message_id=?`),
   updateState: db.prepare(`
@@ -139,6 +151,7 @@ export const q = {
      ORDER BY b.ts ASC
   `),
   selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active'`),
+  checkBidExists: db.prepare(`SELECT 1 FROM bids WHERE chat_id=? AND message_id=? AND amount=? LIMIT 1`),
 
   // NEW:
   getParticipatingAuctions: db.prepare(`
@@ -155,6 +168,37 @@ export const q = {
      LIMIT 10
   `),
 
+  // Admin related
+  getAdmin: db.prepare(`SELECT * FROM admins WHERE user_id=?`),
+  upsertAdminOtp: db.prepare(`
+    INSERT INTO admins (user_id, username, otp_code, otp_expires_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      username=excluded.username, otp_code=excluded.otp_code, otp_expires_at=excluded.otp_expires_at
+  `),
+  verifyOtp: db.prepare(`
+    UPDATE admins 
+       SET otp_code=NULL, otp_expires_at=NULL 
+     WHERE user_id=? AND otp_code=? AND otp_expires_at > ?
+  `),
+  setAdmin: db.prepare(`
+    INSERT INTO admins (user_id, username)
+    VALUES (?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET username=excluded.username
+  `),
+  getAllAdmins: db.prepare(`SELECT user_id FROM admins WHERE otp_code IS NULL`),
+  getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY end_at ASC`),
+  getRecentlyFinishedAuctions: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY end_at DESC LIMIT 10`),
+  restartAuction: db.prepare(`
+    UPDATE auctions 
+       SET status='active', end_at=?, current_price=min_bid, leader_id=NULL, leader_name=NULL, participants_count=0
+     WHERE chat_id=? AND message_id=?
+  `),
+
+  // Settings related
+  getSetting: db.prepare(`SELECT value FROM settings WHERE key=?`),
+  setSetting: db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`),
+
   // NEW:
   getLastBid,
   deleteBidByRowId,
@@ -162,3 +206,63 @@ export const q = {
   countBids,
   resetAuctionNoBids
 };
+
+/**
+ * Places a bid atomically.
+ * Checks if the auction is still active and if the price is still the expected one.
+ * Returns { success: true, ... } or { success: false, reason: '...' }
+ */
+export const placeBidTransaction = db.transaction((chat_id, message_id, user, price) => {
+    // 1. Get current auction state with a lock (SQLite's WAL mode and transactions handle this)
+    const auction = q.getAuction.get(chat_id, message_id);
+    if (!auction) return { success: false, reason: 'not_found' };
+
+    // 2. Check if active
+    const now = new Date();
+    const end = new Date(auction.end_at);
+    if (now >= end || auction.status !== 'active') {
+        return { success: false, reason: 'finished' };
+    }
+
+    // 3. Check if price is still correct
+    const expectedPrice = auction.leader_id ? auction.current_price + auction.step : auction.current_price;
+    
+    // Check if bid with this amount already exists from ANY user
+    const bidExists = q.checkBidExists.get(chat_id, message_id, price);
+    if (bidExists) {
+        return { success: false, reason: 'bid_exists', expectedPrice };
+    }
+
+    if (price !== expectedPrice) {
+        return { success: false, reason: 'price_changed', expectedPrice };
+    }
+
+    // 4. Upsert participant
+    q.upsertParticipant.run(
+        chat_id, message_id, user.id,
+        user.username || null, user.first_name || null, user.last_name || null
+    );
+
+    // 5. Insert bid
+    q.insertBid.run(chat_id, message_id, user.id, price, now.toISOString());
+
+    // 6. Update auction state
+    const bidsCount = q.countBids.get(chat_id, message_id);
+    const finalParticipants = bidsCount?.cnt ?? 0;
+    const leaderName = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
+
+    q.updateState.run(
+        price,
+        user.id,
+        leaderName,
+        finalParticipants,
+        chat_id, message_id
+    );
+
+    return { 
+        success: true, 
+        previousLeaderId: auction.leader_id,
+        auctionTitle: auction.title,
+        participantsCount: finalParticipants
+    };
+});

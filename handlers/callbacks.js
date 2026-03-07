@@ -1,18 +1,9 @@
-import {q} from '../db.js';
-import {confirmBidKb, makeKb} from '../keyboards.js';
-import {closeAuction} from "../scheduler.js";
-import {CHANNEL_USERNAME, TZ} from "../env.js";
-import {formatInTimeZone} from 'date-fns-tz';
-
-function getAuctionLink(chatId, messageId) {
-    if (CHANNEL_USERNAME) {
-        return `https://t.me/${CHANNEL_USERNAME.replace('@', '')}/${messageId}`;
-    }
-    // For private channels, we use c/ID format. 
-    // Telegram IDs usually start with -100, we need to remove it for the link.
-    const cleanId = Math.abs(chatId).toString().replace(/^100/, '');
-    return `https://t.me/c/${cleanId}/${messageId}`;
-}
+import {q, placeBidTransaction} from '../db.js';
+import { confirmBidKb, makeKb } from '../keyboards.js';
+import { closeAuction } from "../scheduler.js";
+import { CHANNEL_USERNAME, TZ } from "../env.js";
+import { formatInTimeZone } from 'date-fns-tz';
+import { getAuctionLink, escapeHtml } from '../utils.js';
 
 export function registerCallbackHandler(bot) {
     bot.start(async (ctx) => {
@@ -108,7 +99,7 @@ export function registerCallbackHandler(bot) {
         await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
     });
 
-    bot.on('callback_query', async ctx => {
+    bot.on('callback_query', async (ctx, next) => {
         const data = ctx.callbackQuery.data || '';
 
         if (data === 'cancelbid') {
@@ -123,107 +114,82 @@ export function registerCallbackHandler(bot) {
             const message_id = Number(msgIdStr);
             const price = Number(priceStr);
 
-            const row = q.getAuction.get(chat_id, message_id);
-            if (!row) return ctx.answerCbQuery('Аукціон не знайдено', {show_alert: true});
-
-            const now = new Date();
-            const end = new Date(row.end_at);
-            if (now >= end || row.status !== 'active') {
-                await closeAuction(ctx, chat_id, message_id);
-                await ctx.answerCbQuery('Аукціон завершено', {show_alert: true});
-                await ctx.deleteMessage().catch(() => {});
-                return;
-            }
-
-            // check if current price hasn't changed
-            const expectedPrice = row.leader_id ? row.current_price + row.step : row.current_price;
-            if (price !== expectedPrice) {
-                await ctx.answerCbQuery(`Ціна змінилася! Нова ціна: ${expectedPrice} грн`, {show_alert: true});
-                const newText = `Ціна змінилася! Ви збираєтесь зробити ставку на аукціон:\n\n${row.full_text || row.title}\n\nНова сума ставки: <b>${expectedPrice} грн</b>`;
-                const newKb = confirmBidKb(chat_id, message_id, expectedPrice);
-
-                if (ctx.callbackQuery.message.photo) {
-                    await ctx.editMessageCaption(newText, {
-                        parse_mode: 'HTML',
-                        reply_markup: newKb
-                    });
-                } else {
-                    await ctx.editMessageText(newText, {
-                        parse_mode: 'HTML',
-                        reply_markup: newKb
-                    });
-                }
-                return;
-            }
-
             const user = ctx.from;
-            q.upsertParticipant.run(
-                chat_id, message_id, user.id,
-                user.username || null, user.first_name || null, user.last_name || null
-            );
+            const res = placeBidTransaction(chat_id, message_id, user, price);
 
-            try {
-                const previousLeaderId = row.leader_id;
-                const previousPrice = row.current_price;
+            if (!res.success) {
+                if (res.reason === 'not_found') {
+                    return ctx.answerCbQuery('Аукціон не знайдено', { show_alert: true });
+                }
+                if (res.reason === 'finished') {
+                    await closeAuction(ctx, chat_id, message_id);
+                    await ctx.answerCbQuery('Аукціон завершено', { show_alert: true });
+                    await ctx.deleteMessage().catch(() => {});
+                    return;
+                }
+                if (res.reason === 'price_changed' || res.reason === 'bid_exists') {
+                    const expectedPrice = res.expectedPrice;
+                    const alertText = res.reason === 'bid_exists' 
+                        ? `Ставка ${price} грн вже існує! Спробуйте зробити ставку ${expectedPrice} грн`
+                        : `Ціна змінилася! Нова ціна: ${expectedPrice} грн`;
 
-                q.insertBid.run(chat_id, message_id, user.id, price, new Date().toISOString());
-                const finalBidsCount = q.countBids.get(chat_id, message_id);
-                const finalParticipants = finalBidsCount?.cnt ?? 0;
+                    await ctx.answerCbQuery(alertText, { show_alert: true });
+                    
+                    const row = q.getAuction.get(chat_id, message_id);
+                    const newText = `${alertText}\n\n${row.full_text || row.title}\n\nНова сума ставки: <b>${expectedPrice} грн</b>`;
+                    const newKb = confirmBidKb(chat_id, message_id, expectedPrice);
 
-                const leaderName = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
-
-                q.updateState.run(
-                    price,
-                    user.id,
-                    leaderName,
-                    finalParticipants,
-                    chat_id, message_id
-                );
-
-                await ctx.answerCbQuery(`Ставка ${price} грн прийнята!`, {show_alert: true});
-
-                // Notify previous leader if overbidden
-                if (previousLeaderId && previousLeaderId !== user.id) {
-                    try {
-                        const auctionLink = getAuctionLink(chat_id, message_id);
-                        const overbidText = `🔔 Вашу ставку в аукціоні <a href="${auctionLink}">"${row.title}"</a> перебито!\nНова ціна: <b>${price} грн</b>`;
-                        await ctx.telegram.sendMessage(previousLeaderId, overbidText, { parse_mode: 'HTML' });
-                    } catch (err) {
-                        console.error(`Failed to notify previous leader ${previousLeaderId}:`, err.message);
+                    if (ctx.callbackQuery.message.photo) {
+                        await ctx.editMessageCaption(newText, { parse_mode: 'HTML', reply_markup: newKb });
+                    } else {
+                        await ctx.editMessageText(newText, { parse_mode: 'HTML', reply_markup: newKb });
                     }
+                    return;
                 }
-
-                const successText = `✅ Ваша ставка <b>${price} грн</b> прийнята!`;
-                if (ctx.callbackQuery.message.photo) {
-                    await ctx.editMessageCaption(successText, { parse_mode: 'HTML' });
-                } else {
-                    await ctx.editMessageText(successText, { parse_mode: 'HTML' });
-                }
-
-                await ctx.telegram.editMessageReplyMarkup(
-                    chat_id,
-                    message_id,
-                    null,
-                    makeKb(chat_id, message_id, price, finalParticipants)
-                );
-            } catch (e) {
-                console.error('Bid error:', e);
-                await ctx.answerCbQuery(`Помилка, спробуй ще раз`);
+                return ctx.answerCbQuery('Помилка, спробуй ще раз');
             }
+
+            // Success
+            await ctx.answerCbQuery(`Ставка ${price} грн прийнята!`, { show_alert: true });
+
+            // Notify previous leader if overbidden
+            if (res.previousLeaderId && res.previousLeaderId !== user.id) {
+                try {
+                    const auctionLink = getAuctionLink(chat_id, message_id);
+                    const overbidText = `🔔 Вашу ставку в аукціоні <a href="${auctionLink}">"${res.auctionTitle}"</a> перебито!\nНова ціна: <b>${price} грн</b>`;
+                    await ctx.telegram.sendMessage(res.previousLeaderId, overbidText, { parse_mode: 'HTML' });
+                } catch (err) {
+                    console.error(`Failed to notify previous leader ${res.previousLeaderId}:`, err.message);
+                }
+            }
+
+            const successText = `✅ Ваша ставка <b>${price} грн</b> прийнята!`;
+            if (ctx.callbackQuery.message.photo) {
+                await ctx.editMessageCaption(successText, { parse_mode: 'HTML' });
+            } else {
+                await ctx.editMessageText(successText, { parse_mode: 'HTML' });
+            }
+
+            await ctx.telegram.editMessageReplyMarkup(
+                chat_id,
+                message_id,
+                null,
+                makeKb(chat_id, message_id, price, res.participantsCount)
+            );
             return;
         }
 
-        const [, chatIdStr, msgIdStr] = data.split(':');
-        const chat_id = Number(chatIdStr);
-        const message_id = Number(msgIdStr);
-
-        if (data.startsWith('none')) {
+        if (data === 'none') {
             await ctx.answerCbQuery('Ставок не було', {show_alert: true});
             return;
         }
 
         // --- info ---
         if (data.startsWith('info:')) {
+            const [, chatIdStr, msgIdStr] = data.split(':');
+            const chat_id = Number(chatIdStr);
+            const message_id = Number(msgIdStr);
+
             const row = q.getAuction.get(chat_id, message_id);
             if (!row) return ctx.answerCbQuery('Аукціон не знайдено', {show_alert: true});
 
@@ -237,7 +203,7 @@ export function registerCallbackHandler(bot) {
             const allBids = q.selectBidsForInfo.all(chat_id, message_id);
             if (allBids.length === 0) return ctx.answerCbQuery('Ще немає ставок.', {show_alert: true});
 
-            // Згортаємо послідовні ставки одного користувача в останню
+            // Coalesce consecutive bids from the same user into the last one
             const coalesced = [];
             for (const b of allBids) {
                 const last = coalesced[coalesced.length - 1];
@@ -246,26 +212,33 @@ export function registerCallbackHandler(bot) {
             }
             if (coalesced.length === 0) return ctx.answerCbQuery('Ще немає ставок.', {show_alert: true});
 
-            const nameOf = (b) => b.first_name ? (b.last_name ? `${b.first_name} ${b.last_name}` : b.first_name)
-                : (b.username ? `@${b.username}` : `ID ${b.user_id}`);
+            const totalBids = allBids.length;
+
+            const nameOf = (b) => {
+                const name = b.first_name ? (b.last_name ? `${b.first_name} ${b.last_name}` : b.first_name)
+                    : (b.username ? `@${b.username}` : `ID ${b.user_id}`);
+                return escapeHtml(name);
+            };
 
             const limit = 15;
             const take = coalesced.slice(-limit).reverse();
-            const header = 'Останні ставки:\n\n';
+            const header = `Останні ставки (всього: ${totalBids}):\n\n`;
             let text = header, shown = 0;
 
             for (let i = 0; i < take.length; i++) {
                 const b = take[i];
                 const line = `${i + 1}. ${nameOf(b)} — ${b.amount} грн\n`;
-                if ((text + line).length > 190) break;
+                if ((text + line).length > 1000) break; // Increased limit for HTML
                 text += line;
                 shown++;
             }
             const hidden = coalesced.length - shown;
-            if (hidden > 0 && (text + `…та ще ${hidden}`).length <= 200) text += `…та ще ${hidden}`;
+            if (hidden > 0) text += `…та ще ${hidden}`;
 
-            await ctx.answerCbQuery(text, {show_alert: true});
+            await ctx.answerCbQuery(text, {show_alert: true, parse_mode: 'HTML'});
             return;
         }
+
+        return next();
     });
 }
