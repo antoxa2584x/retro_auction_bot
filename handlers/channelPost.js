@@ -1,4 +1,4 @@
-import {CHANNEL_ID, COMMENTS_ID, TZ} from '../env.js';
+import {getChannelId, TZ} from '../env.js';
 import {q} from '../db.js';
 import {makeKb} from '../keyboards.js';
 import {parsePost} from '../parse.js';
@@ -8,7 +8,8 @@ import {handleUndoMessage} from "./admin.js";
 export function registerChannelPostHandler(bot) {
     bot.on('channel_post', async (ctx) => {
         const post = ctx.channelPost;
-        if (!post || post.chat.id !== CHANNEL_ID) return;
+        const currentChannelId = getChannelId();
+        if (!post || post.chat.id !== currentChannelId) return;
 
         const text = post.text || post.caption || '';
 
@@ -26,11 +27,6 @@ export function registerChannelPostHandler(bot) {
         }
 
         const {minBid, step, end} = parsed;
-        const discussionId = COMMENTS_ID;
-        if (!discussionId) {
-            console.warn('No linked discussion group.');
-            return;
-        }
 
         const photoId = post.photo ? post.photo[post.photo.length - 1].file_id : null;
 
@@ -59,8 +55,7 @@ export function registerChannelPostHandler(bot) {
             min_bid: minBid,
             step,
             current_price: minBid,
-            end_at: end.toISOString(),
-            discussion_chat_id: discussionId
+            end_at: end.toISOString()
         });
 
         const finalKb = makeKb(post.chat.id, post.message_id, minBid, 0);
