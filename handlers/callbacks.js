@@ -121,12 +121,14 @@ export function registerCallbackHandler(bot) {
                 if (res.reason === 'not_found') {
                     return ctx.answerCbQuery('Аукціон не знайдено', { show_alert: true });
                 }
+
                 if (res.reason === 'finished') {
                     await closeAuction(ctx, chat_id, message_id);
                     await ctx.answerCbQuery('Аукціон завершено', { show_alert: true });
                     await ctx.deleteMessage().catch(() => {});
                     return;
                 }
+
                 if (res.reason === 'price_changed' || res.reason === 'bid_exists') {
                     const expectedPrice = res.expectedPrice;
                     const alertText = res.reason === 'bid_exists' 
@@ -146,6 +148,7 @@ export function registerCallbackHandler(bot) {
                     }
                     return;
                 }
+
                 return ctx.answerCbQuery('Помилка, спробуй ще раз');
             }
 
