@@ -1,5 +1,12 @@
 import { CHANNEL_USERNAME } from '../config/env.js';
 
+/**
+ * Generates a direct link to a Telegram channel post.
+ * 
+ * @param {number} chatId - Chat ID (can be -100...).
+ * @param {number} messageId - Message ID in the channel.
+ * @returns {string} URL link to the message.
+ */
 export function getAuctionLink(chatId, messageId) {
     if (CHANNEL_USERNAME) {
         return `https://t.me/${CHANNEL_USERNAME.replace('@', '')}/${messageId}`;
@@ -10,6 +17,12 @@ export function getAuctionLink(chatId, messageId) {
     return `https://t.me/c/${cleanId}/${messageId}`;
 }
 
+/**
+ * Escapes HTML special characters to prevent injection when using HTML parse mode.
+ * 
+ * @param {string} str - String to escape.
+ * @returns {string} Escaped string.
+ */
 export function escapeHtml(str) {
     if (!str) return '';
     return str

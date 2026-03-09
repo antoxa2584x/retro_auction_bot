@@ -17,8 +17,10 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
 * **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
-* **Smart Parsing** — extracts lot name, min bid, step, and end time from natural-language posts.
-* **Advanced Admin Panel** — OTP-authenticated private panel to manage all auctions, with features like "Finish Immediately", "Restart", and dynamic configuration of Channel ID, Admin ID, Admin Nickname, Language, and Currency.
+* **Customizable Auction Templates** — admins can edit the auction post header, footer, and all field labels (e.g., "Min bid", "Bid step") directly from the bot.
+* **Auction Posting Wizard** — create and post new auctions to the channel directly via a step-by-step bot interface (upload photo, set title, price, step, and end date).
+* **Smart Parsing** — extracts lot name, min bid, step, and end time from channel posts, with dynamic regex that adapts to your custom template labels.
+* **Advanced Admin Panel** — OTP-authenticated private panel to manage auctions, post new ones, and configure all bot settings (IDs, Language, Currency, Default End Times, and Post Templates).
 
 ---
 
@@ -43,14 +45,15 @@ To access the admin panel:
 3. Use `/admin_panel` to open the management interface.
 
 **Features:**
-* **Active Auctions List**: View all currently running auctions.
-* **Finished Auctions List**: View the most recent completed auctions.
-* **Detailed View**: Check current price, leader, and end date for any auction.
+* **➕ Post New Auction**: Wizard-style step-by-step creation (photo, title, price, step, end date).
+* **Active/Finished Lists**: View and manage all auctions via categorical buttons.
+* **Detailed View**: Check current price, leader (with profile link), and end date.
 * **🏁 Finish Immediately**: Instantly close any active auction.
-* **🔄 Restart (4 days)**: Restart a finished auction for 4 more days (preserving the original time of day).
-* **🌐 Language**: Switch between Ukrainian and English interfaces.
-* **💰 Currency**: Set a custom currency symbol or name used globally.
-* **⚙️ Dynamic Configuration**: Manage `Channel ID`, `Admin ID`, and `Admin Nickname` without restarting the bot.
+* **🔄 Restart**: Re-post a finished auction with a new end date.
+* **⚙️ Structured Settings**:
+    * **Main Settings**: Manage `Channel ID`, `Admin ID`, `Admin Nickname`, `Language`, and `Currency`.
+    * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
+    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions.
 
 ---
 
@@ -83,7 +86,7 @@ Put this in the **channel post caption/text**:
 Завершення аукціону: 21.10 о 22:00
 ```
 
-The bot extracts the **Title** as the first non-empty line between `🎮 Аукціон!` and `Мінімальна ставка:`.
+The bot extracts the **Title** as the first non-empty line between the configured **Auction Header** and **Min Bid Label**. Labels are dynamic and can be changed in the admin panel.
 
 ---
 
@@ -102,10 +105,10 @@ The bot extracts the **Title** as the first non-empty line between `🎮 Аук�
 * `src/config/env.js` — Environment variables and dynamic settings.
 * `src/services/db.js` — Database schema and operations (SQLite).
 * `src/services/i18n.js` — Internationalization service for UK/EN support.
-* `src/services/scheduler.js` — Auction closing logic and scheduled notifications.
+* `src/services/scheduler.js` — Auction closing logic and notifications.
 * `src/handlers/channelPost.js` — Processes new auctions from the channel.
-* `src/handlers/callbacks.js` — Handles `/start` deep links, bid confirmations, and user commands (`/my`, `/won`).
-* `src/handlers/admin.js` — Logic for OTP authentication and the admin panel.
+* `src/handlers/user/` — Commands (`/start`, `/my`, `/won`), bidding logic, and info.
+* `src/handlers/admin/` — Admin panel navigation, authentication, settings, and posting wizard.
 * `src/locales/` — Translation files (`uk.json`, `en.json`).
 * `src/utils/` — Shared utility functions and keyboards.
 
