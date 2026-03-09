@@ -12,6 +12,7 @@
     "setting_updated": "Налаштування <b>{{key}}</b> оновлено на: <code>{{value}}</code>",
     "setting_error": "Помилка оновлення налаштування: {{error}}",
     "become_admin": "Ви тепер адміністратор! Використовуйте /admin_panel для керування.",
+    "feature_unavailable": "Функція недоступна",
     "no_permission": "У вас немає прав доступу до адмін-панелі. Використовуйте /admin для авторизації.",
     "insufficient_permissions": "Недостатньо прав",
     "enter_new_value": "Введіть нове значення для <b>{{key}}</b>:",

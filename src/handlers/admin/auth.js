@@ -15,10 +15,18 @@ export function registerAuthHandlers(bot) {
             return ctx.reply(t('admin.already_admin'));
         }
 
+        const today = new Date().toISOString().split('T')[0];
+        const requestCount = q.getOtpRequestsCount.get(ctx.from.id, today)?.count || 0;
+
+        if (requestCount >= 5) {
+            return ctx.reply(t('admin.feature_unavailable'));
+        }
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
         q.upsertAdminOtp.run(ctx.from.id, ctx.from.username || null, otp, expiresAt);
+        q.incrementOtpRequestsCount.run(ctx.from.id, today);
 
         console.log(`[ADMIN OTP] User ${ctx.from.id} (${ctx.from.username}): ${otp}`);
 

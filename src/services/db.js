@@ -55,6 +55,14 @@ db.exec(`
         key TEXT PRIMARY KEY,
         value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS admin_otp_requests
+    (
+        user_id INTEGER,
+        request_date TEXT,
+        count INTEGER DEFAULT 0,
+        PRIMARY KEY (user_id, request_date)
+    );
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -267,6 +275,22 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAllAdmins: db.prepare(`SELECT user_id FROM admins WHERE otp_code IS NULL`),
+
+  /**
+   * Retrieves OTP requests count for a user on a specific date.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getOtpRequestsCount: db.prepare(`SELECT count FROM admin_otp_requests WHERE user_id=? AND request_date=?`),
+
+  /**
+   * Increments the OTP requests count for a user on a specific date.
+   * @type {import('better-sqlite3').Statement}
+   */
+  incrementOtpRequestsCount: db.prepare(`
+    INSERT INTO admin_otp_requests (user_id, request_date, count)
+    VALUES (?, ?, 1)
+    ON CONFLICT(user_id, request_date) DO UPDATE SET count = count + 1
+  `),
 
   /**
    * Retrieves all active auctions for the admin panel.

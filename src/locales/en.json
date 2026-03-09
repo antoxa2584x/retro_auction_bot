@@ -12,6 +12,7 @@
     "setting_updated": "Setting <b>{{key}}</b> updated to: <code>{{value}}</code>",
     "setting_error": "Error updating setting: {{error}}",
     "become_admin": "You are now an administrator! Use /admin_panel for management.",
+    "feature_unavailable": "Feature unavailable",
     "no_permission": "You do not have permission to access the admin panel. Use /admin for authorization.",
     "insufficient_permissions": "Insufficient permissions",
     "enter_new_value": "Enter a new value for <b>{{key}}</b>:",
