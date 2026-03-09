@@ -8,15 +8,17 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 
 ## ✨ Features
 
+* **Multi-language Support** — supports both **Ukrainian** and **English**, with easy switching via the admin panel.
+* **Custom Currency** — admins can set any custom currency symbol or name (e.g., ₴, $, €, BTC) to be used across all auctions.
 * **One-tap bidding with confirmation** — users are redirected from the channel to the bot's private chat to confirm their bid, preventing accidental clicks.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
-* **Real-time notifications** — users receive private messages when they are overbidden or when they win an auction.
+* **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
+* **User Portfolio** — `/my` command to see active bids and `/won` to see auction history.
 * **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
 * **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
-* **Smart Parsing** — extracts lot name, min bid, step, and end time from natural-language Ukrainian posts.
-* **Advanced Admin Panel** — OTP-authenticated private panel to manage all auctions, with features like "Finish Immediately", "Restart", and dynamic configuration of Channel ID, Admin ID, and Admin Nickname.
-* **Undo Command** — special `/undo` command to cancel the last bid directly in the channel.
+* **Smart Parsing** — extracts lot name, min bid, step, and end time from natural-language posts.
+* **Advanced Admin Panel** — OTP-authenticated private panel to manage all auctions, with features like "Finish Immediately", "Restart", and dynamic configuration of Channel ID, Admin ID, Admin Nickname, Language, and Currency.
 
 ---
 
@@ -46,12 +48,25 @@ To access the admin panel:
 * **Detailed View**: Check current price, leader, and end date for any auction.
 * **🏁 Finish Immediately**: Instantly close any active auction.
 * **🔄 Restart (4 days)**: Restart a finished auction for 4 more days (preserving the original time of day).
+* **🌐 Language**: Switch between Ukrainian and English interfaces.
+* **💰 Currency**: Set a custom currency symbol or name used globally.
+* **⚙️ Dynamic Configuration**: Manage `Channel ID`, `Admin ID`, and `Admin Nickname` without restarting the bot.
 
-### ⏪ Undo Last Bid (Channel)
-Admins can reply to an auction post in the channel with the `/undo` command. This will:
-1. Delete the last bid from the database.
-2. Restore the previous leader and price.
-3. Update the inline keyboard on the auction post.
+---
+
+## ⚙️ Configuration
+
+Create a `.env` file with the following:
+
+```env
+BOT_TOKEN=your_bot_token
+CHANNEL_ID=-100...       # Auction channel ID
+ADMIN_ID=12345678        # Your Telegram user ID for OTP
+ADMIN_NICKNAME=@admin    # Contact for the winner
+BOT_USERNAME=YourBot     # Bot username (without @) for deep links
+CHANNEL_USERNAME=Channel # (Optional) Public channel username for links
+TZ=Europe/Kyiv           # Timezone
+```
 
 ---
 
@@ -81,39 +96,24 @@ The bot extracts the **Title** as the first non-empty line between `🎮 Аук�
 
 ---
 
-## ⚙️ Configuration
-
-Create a `.env` file with the following:
-
-```env
-BOT_TOKEN=your_bot_token
-CHANNEL_ID=-100...       # Auction channel ID
-ADMIN_ID=12345678        # Your Telegram user ID for /undo command
-ADMIN_NICKNAME=@admin    # Contact for the winner
-BOT_USERNAME=YourBot     # Bot username (without @) for deep links
-CHANNEL_USERNAME=Channel # (Optional) Public channel username for links
-TZ=Europe/Kyiv           # Timezone
-```
-
----
-
 ## 📁 Project layout
 
-* `bot.js` — Main entry point, wires handlers and restores jobs.
-* `db.js` — Database schema, migrations, and prepared statements.
-* `handlers/channelPost.js` — Processes new auctions and `/undo` command.
-* `handlers/callbacks.js` — Handles `/start` deep links, bid confirmations, and user commands (`/my`, `/won`).
-* `handlers/admin.js` — Logic for the OTP authentication, admin panel, and `/undo` command.
-* `scheduler.js` — Auction closing logic and notifications.
-* `keyboards.js` — Inline keyboard templates.
-* `parse.js` — Regex-based auction post parser.
-* `utils.js` — Shared utility functions (e.g., link generation).
+* `src/bot.js` — Main entry point, wires handlers and restores jobs.
+* `src/config/env.js` — Environment variables and dynamic settings.
+* `src/services/db.js` — Database schema and operations (SQLite).
+* `src/services/i18n.js` — Internationalization service for UK/EN support.
+* `src/services/scheduler.js` — Auction closing logic and scheduled notifications.
+* `src/handlers/channelPost.js` — Processes new auctions from the channel.
+* `src/handlers/callbacks.js` — Handles `/start` deep links, bid confirmations, and user commands (`/my`, `/won`).
+* `src/handlers/admin.js` — Logic for OTP authentication and the admin panel.
+* `src/locales/` — Translation files (`uk.json`, `en.json`).
+* `src/utils/` — Shared utility functions and keyboards.
 
 ---
 
 ## 🗄️ Database & Migrations
 
-The bot uses SQLite (`auction.sqlite3`). On startup, it automatically checks for and adds missing columns to the `auctions` table if you are upgrading from an older version.
+The bot uses SQLite (`auction.sqlite3`). On startup, it automatically checks for and adds missing columns/tables if you are upgrading.
 
 ---
 
@@ -121,7 +121,7 @@ The bot uses SQLite (`auction.sqlite3`). On startup, it automatically checks for
 
 ```bash
 npm install
-node bot.js
+node src/bot.js
 ```
 
 ---

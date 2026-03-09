@@ -1,4 +1,4 @@
-import { CHANNEL_USERNAME } from './env.js';
+import { CHANNEL_USERNAME } from '../config/env.js';
 
 export function getAuctionLink(chatId, messageId) {
     if (CHANNEL_USERNAME) {

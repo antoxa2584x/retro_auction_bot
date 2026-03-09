@@ -1,9 +1,9 @@
-import {getChannelId, TZ} from '../env.js';
-import {q} from '../db.js';
-import {makeKb} from '../keyboards.js';
-import {parsePost} from '../parse.js';
-import {scheduleClose} from '../scheduler.js';
-import {handleUndoMessage} from "./admin.js";
+import {getChannelId, TZ} from '../config/env.js';
+import {q} from '../services/db.js';
+import {makeKb} from '../utils/keyboards.js';
+import {parsePost} from '../utils/parse.js';
+import {scheduleClose} from '../services/scheduler.js';
+import { t } from '../services/i18n.js';
 
 export function registerChannelPostHandler(bot) {
     bot.on('channel_post', async (ctx) => {
@@ -12,12 +12,6 @@ export function registerChannelPostHandler(bot) {
         if (!post || post.chat.id !== currentChannelId) return;
 
         const text = post.text || post.caption || '';
-
-        const txt = text.trim();
-        if (/^\/undo(@\w+)?$/i.test(txt)) {
-            await handleUndoMessage(ctx);
-            return;
-        }
 
         let parsed;
         try {

@@ -1,8 +1,9 @@
 import schedule from 'node-schedule';
 import { q } from './db.js';
-import { makeEmptyFinishKb, winnerKeyboard } from './keyboards.js';
-import { getAdminNickname, CHANNEL_USERNAME } from "./env.js";
-import { getAuctionLink, escapeHtml } from './utils.js';
+import { makeEmptyFinishKb, winnerKeyboard } from '../utils/keyboards.js';
+import { getAdminNickname, CHANNEL_USERNAME } from "../config/env.js";
+import { getAuctionLink, escapeHtml } from '../utils/utils.js';
+import { t } from './i18n.js';
 
 export function scheduleClose(ctx, chat_id, message_id, when) {
     const id = `${chat_id}:${message_id}`;
@@ -35,9 +36,12 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 // Notify winner
                 const nickname = getAdminNickname();
                 const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
-                const winnerText = `🏆 Вітаємо! Ви перемогли в аукціоні <a href="${auctionLink}">"${row.title}"</a>!\n` +
-                                 `Фінальна ціна: <b>${row.current_price} грн</b>\n\n` +
-                                 `Для подальших кроків, звяжіться з ${adminContact}`;
+                const winnerText = t('scheduler.winner_notify', {
+                    link: auctionLink,
+                    title: row.title,
+                    price: row.current_price,
+                    admin: adminContact
+                });
                 try {
                     await ctx.telegram.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
                 } catch (err) {
@@ -46,10 +50,13 @@ export async function closeAuction(ctx, chat_id, message_id) {
 
                 // Notify admins
                 const escapedWinnerName = escapeHtml(row.leader_name);
-                const adminNotifyText = `🏁 <b>Аукціон завершено!</b>\n\n` +
-                                       `📦 Товар: <a href="${auctionLink}">${row.title}</a>\n` +
-                                       `💰 Ціна: <b>${row.current_price} грн</b>\n` +
-                                       `👤 Переможець: <a href="tg://user?id=${row.leader_id}">${escapedWinnerName}</a> (ID: ${row.leader_id})`;
+                const adminNotifyText = t('scheduler.admin_finished_notify', {
+                    link: auctionLink,
+                    title: row.title,
+                    price: row.current_price,
+                    user_id: row.leader_id,
+                    name: escapedWinnerName
+                });
                 for (const admin of admins) {
                     try {
                         await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
@@ -72,8 +79,10 @@ export async function closeAuction(ctx, chat_id, message_id) {
 
             if (!alreadyFinished) {
                 // Notify admins about no bids
-                const adminNotifyText = `🏁 <b>Аукціон завершено без ставок.</b>\n\n` +
-                                       `📦 Товар: <a href="${auctionLink}">${row.title}</a>`;
+                const adminNotifyText = t('scheduler.admin_no_bids_notify', {
+                    link: auctionLink,
+                    title: row.title
+                });
                 for (const admin of admins) {
                     try {
                         await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });

@@ -1,0 +1,90 @@
+{
+  "common": {
+    "cancel": "❌ Скасувати",
+    "back": "⬅️ Назад",
+    "error_try_again": "Помилка, спробуй ще раз"
+  },
+  "admin": {
+    "already_admin": "Ви вже є адміністратором. Використовуйте /admin_panel для керування.",
+    "enter_otp": "Введіть OTP код, щоб отримати права адміністратора.",
+    "otp_cancelled": "Введення OTP скасовано.",
+    "cancelled": "Скасовано",
+    "setting_updated": "Налаштування <b>{{key}}</b> оновлено на: <code>{{value}}</code>",
+    "setting_error": "Помилка оновлення налаштування: {{error}}",
+    "become_admin": "Ви тепер адміністратор! Використовуйте /admin_panel для керування.",
+    "no_permission": "У вас немає прав доступу до адмін-панелі. Використовуйте /admin для авторизації.",
+    "insufficient_permissions": "Недостатньо прав",
+    "enter_new_value": "Введіть нове значення для <b>{{key}}</b>:",
+    "active_auctions_header": "<b>Активні аукціони:</b>",
+    "no_active_auctions": "Немає активних аукціонів.",
+    "finished_auctions_header": "<b>Завершені аукціони (останні 10):</b>",
+    "no_finished_auctions": "Немає завершених аукціонів.",
+    "auction_details": "<b>{{title}}</b>\n\nID: <code>{{chat_id}}:{{message_id}}</code>\nЦіна: <b>{{price}} {{cur}}</b>\nСтатус: <b>{{status}}</b>\nЗавершення: <b>{{end_at}}</b>\nПереможець: {{winner}}\n\n<a href=\"{{link}}\">Посилання на пост</a>",
+    "status_active": "Активний",
+    "status_finished": "Завершено",
+    "panel_header": "<b>Панель Адміністратора</b>",
+    "choose_category": "Виберіть категорію:",
+    "panel_language": "<b>Панель Адміністратора — Мова / Language</b>",
+    "choose_language": "<i>Виберіть мову для бота.</i>",
+    "lang_button": "Мова",
+    "cur_button": "Валюта",
+    "current_language": "Поточна мова: <code>{{lang}}</code>",
+    "lang_uk": "🇺🇦 Українська",
+    "lang_en": "🇺🇸 English",
+    "panel_currency": "<b>Панель Адміністратора — Валюта</b>",
+    "current_currency": "Поточна валюта: <code>{{cur}}</code>",
+    "enter_currency": "<i>Введіть новий символ або назву валюти (наприклад: ₴, $, €, грн, USD, EUR):</i>",
+    "language_changed": "Мову змінено на Українську",
+    "panel_settings": "<b>Панель Адміністратора — Налаштування</b>",
+    "click_below_to_change": "<i>Натисніть на кнопку нижче, щоб змінити відповідне налаштування.</i>",
+    "no_auctions_in_db": "Аукціонів у базі даних поки що немає 📭",
+    "restart_success": "Аукціон перезапущено до {{date}}",
+    "finish_success": "Аукціон завершено: \"{{title}}\"",
+    "kb": {
+      "view_finished": "🏁 Переглянути завершені",
+      "settings": "⚙️ Налаштування",
+      "back_to_panel": "⬅️ Назад до адмін-панелі",
+      "refresh": "🔄 Оновити",
+      "restart": "🔄 Рестарт (4 дні)",
+      "finish_now": "🏁 Завершити негайно"
+    }
+  },
+  "bid": {
+    "not_found": "Аукціон не знайдено",
+    "finished": "Аукціон вже завершено",
+    "confirm_text": "Ви збираєтесь зробити ставку на аукціон:\n\n{{title}}\n\nСума ставки: <b>{{price}} {{cur}}</b>",
+    "welcome": "Привіт! Я бот для аукціонів. Ви можете робити ставки в каналі.\n\nКоманди:\n/my - Мої активні аукціони\n/won - Мої виграні аукціони",
+    "my_active_header": "<b>Ваші активні аукціони:</b>",
+    "no_my_active": "Ви ще не брали участі в активних аукціонах.",
+    "status_leading": "✅ Ви лідируєте",
+    "status_outbid": "❌ Вашу ставку перебито",
+    "won_header": "<b>Ваші виграні аукціони (останні 10):</b>\n\n",
+    "no_won": "Ви ще не виграли жодного аукціону.",
+    "won_item": "🏆 <a href=\"{{link}}\">{{title}}</a>\nЦіна викупу: <b>{{price}} {{cur}}</b>\nДата: <b>{{date}}</b>\n\n",
+    "cancel_bid": "Скасовано",
+    "bid_exists_alert": "Ставка {{price}} {{cur}} вже існує! Спробуйте зробити ставку {{expectedPrice}} {{cur}}",
+    "price_changed_alert": "Ціна змінилася! Нова ціна: {{expectedPrice}} {{cur}}",
+    "alert_with_details": "{{alert}}\n\n{{title}}\n\nНова сума ставки: <b>{{expectedPrice}} {{cur}}</b>",
+    "accepted_alert": "Ставка {{price}} {{cur}} прийнята!",
+    "outbid_notify": "🔔 Вашу ставку в аукціоні <a href=\"{{link}}\">\"{{title}}\"</a> перебито!\nНова ціна: <b>{{price}} {{cur}}</b>",
+    "accepted_text": "✅ Ваша ставка <b>{{price}} {{cur}}</b> прийнята!",
+    "no_bids": "Ставок не було",
+    "info_header": "Останні ставки (всього: {{total}}):\n\n",
+    "info_item": "{{index}}. {{name}} — {{price}} {{cur}}\n",
+    "info_more": "…та ще {{count}}",
+    "kb": {
+      "confirm": "✅ Підтвердити {{price}} {{cur}}",
+      "cancel": "❌ Скасувати",
+      "bids_count": "💬 Ставки ({{count}})",
+      "no_bids": "🏁 Ставок не було"
+    }
+  },
+  "scheduler": {
+    "winner_notify": "🏆 Вітаємо! Ви перемогли в аукціоні <a href=\"{{link}}\">\"{{title}}\"</a>!\nФінальна ціна: <b>{{price}} {{cur}}</b>\n\nДля подальших кроків, зв'яжіться з {{admin}}",
+    "admin_finished_notify": "🏁 <b>Аукціон завершено!</b>\n\n📦 Товар: <a href=\"{{link}}\">{{title}}</a>\n💰 Ціна: <b>{{price}} {{cur}}</b>\n👤 Переможець: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
+    "admin_no_bids_notify": "🏁 <b>Аукціон завершено без ставок.</b>\n\n📦 Товар: <a href=\"{{link}}\">{{title}}</a>"
+  },
+  "parse": {
+    "error": "Не знайдено мінімальну ставку, крок або час завершення"
+  }
+}
