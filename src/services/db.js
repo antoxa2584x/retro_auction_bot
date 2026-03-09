@@ -122,26 +122,63 @@ const resetAuctionNoBids = db.prepare(`
    WHERE chat_id=? AND message_id=?
 `); // NEW
 
+/**
+ * Database access object containing prepared statements for all auction operations.
+ */
 export const q = {
+  /**
+   * Inserts a new auction or replaces an existing one.
+   * @type {import('better-sqlite3').Statement}
+   */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
       (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count)
     VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0)
   `),
+
+  /**
+   * Retrieves an auction by its chat ID and message ID.
+   * @type {import('better-sqlite3').Statement}
+   */
   getAuction: db.prepare(`SELECT * FROM auctions WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Updates the current state of an auction (price, leader, participants count).
+   * @type {import('better-sqlite3').Statement}
+   */
   updateState: db.prepare(`
     UPDATE auctions
        SET current_price=?, leader_id=?, leader_name=?, participants_count=?
      WHERE chat_id=? AND message_id=?
   `),
+
+  /**
+   * Marks an auction as finished.
+   * @type {import('better-sqlite3').Statement}
+   */
   finish: db.prepare(`UPDATE auctions SET status='finished' WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Inserts a new bid into the history.
+   * @type {import('better-sqlite3').Statement}
+   */
   insertBid: db.prepare(`INSERT INTO bids (chat_id, message_id, user_id, amount, ts) VALUES (?, ?, ?, ?, ?)`),
+
+  /**
+   * Updates or inserts a participant's information.
+   * @type {import('better-sqlite3').Statement}
+   */
   upsertParticipant: db.prepare(`
     INSERT INTO participants (chat_id, message_id, user_id, username, first_name, last_name)
     VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(chat_id, message_id, user_id) DO UPDATE SET
       username=excluded.username, first_name=excluded.first_name, last_name=excluded.last_name
   `),
+
+  /**
+   * Retrieves bid history for an auction, including participant names.
+   * @type {import('better-sqlite3').Statement}
+   */
   selectBidsForInfo: db.prepare(`
     SELECT b.user_id, b.amount, b.ts, p.username, p.first_name, p.last_name
       FROM bids b
@@ -150,16 +187,34 @@ export const q = {
      WHERE b.chat_id=? AND b.message_id=?
      ORDER BY b.ts ASC
   `),
+
+  /**
+   * Selects all currently active auctions.
+   * @type {import('better-sqlite3').Statement}
+   */
   selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active'`),
+
+  /**
+   * Checks if a specific bid amount already exists for an auction.
+   * @type {import('better-sqlite3').Statement}
+   */
   checkBidExists: db.prepare(`SELECT 1 FROM bids WHERE chat_id=? AND message_id=? AND amount=? LIMIT 1`),
 
-  // NEW:
+  /**
+   * Retrieves active auctions that a specific user is participating in.
+   * @type {import('better-sqlite3').Statement}
+   */
   getParticipatingAuctions: db.prepare(`
     SELECT DISTINCT a.*
       FROM auctions a
       JOIN bids b ON a.chat_id=b.chat_id AND a.message_id=b.message_id
      WHERE b.user_id=? AND a.status='active'
   `),
+
+  /**
+   * Retrieves auctions won by a specific user.
+   * @type {import('better-sqlite3').Statement}
+   */
   getWonAuctions: db.prepare(`
     SELECT *
       FROM auctions
@@ -169,26 +224,66 @@ export const q = {
   `),
 
   // Admin related
+
+  /**
+   * Retrieves admin information by user ID.
+   * @type {import('better-sqlite3').Statement}
+   */
   getAdmin: db.prepare(`SELECT * FROM admins WHERE user_id=?`),
+
+  /**
+   * Stores or updates an OTP code for an admin.
+   * @type {import('better-sqlite3').Statement}
+   */
   upsertAdminOtp: db.prepare(`
     INSERT INTO admins (user_id, username, otp_code, otp_expires_at)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       username=excluded.username, otp_code=excluded.otp_code, otp_expires_at=excluded.otp_expires_at
   `),
+
+  /**
+   * Verifies an OTP code and clears it if valid.
+   * @type {import('better-sqlite3').Statement}
+   */
   verifyOtp: db.prepare(`
     UPDATE admins 
        SET otp_code=NULL, otp_expires_at=NULL 
      WHERE user_id=? AND otp_code=? AND otp_expires_at > ?
   `),
+
+  /**
+   * Grants admin rights to a user.
+   * @type {import('better-sqlite3').Statement}
+   */
   setAdmin: db.prepare(`
     INSERT INTO admins (user_id, username)
     VALUES (?, ?)
     ON CONFLICT(user_id) DO UPDATE SET username=excluded.username
   `),
+
+  /**
+   * Retrieves all registered admins.
+   * @type {import('better-sqlite3').Statement}
+   */
   getAllAdmins: db.prepare(`SELECT user_id FROM admins WHERE otp_code IS NULL`),
+
+  /**
+   * Retrieves all active auctions for the admin panel.
+   * @type {import('better-sqlite3').Statement}
+   */
   getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY end_at ASC`),
+
+  /**
+   * Retrieves recently finished auctions for the admin panel.
+   * @type {import('better-sqlite3').Statement}
+   */
   getRecentlyFinishedAuctions: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY end_at DESC LIMIT 10`),
+
+  /**
+   * Restarts a finished auction.
+   * @type {import('better-sqlite3').Statement}
+   */
   restartAuction: db.prepare(`
     UPDATE auctions 
        SET status='active', end_at=?, current_price=min_bid, leader_id=NULL, leader_name=NULL, participants_count=0
@@ -196,14 +291,47 @@ export const q = {
   `),
 
   // Settings related
+
+  /**
+   * Retrieves a global setting by its key.
+   * @type {import('better-sqlite3').Statement}
+   */
   getSetting: db.prepare(`SELECT value FROM settings WHERE key=?`),
+
+  /**
+   * Sets or updates a global setting.
+   * @type {import('better-sqlite3').Statement}
+   */
   setSetting: db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`),
 
-  // NEW:
+  /**
+   * Retrieves the most recent bid for an auction.
+   * @type {import('better-sqlite3').Statement}
+   */
   getLastBid,
+
+  /**
+   * Deletes a bid by its internal rowid.
+   * @type {import('better-sqlite3').Statement}
+   */
   deleteBidByRowId,
+
+  /**
+   * Retrieves the new leader information after a bid is removed.
+   * @type {import('better-sqlite3').Statement}
+   */
   getNewLeader,
+
+  /**
+   * Counts the total number of bids for an auction.
+   * @type {import('better-sqlite3').Statement}
+   */
   countBids,
+
+  /**
+   * Resets an auction to its initial "no bids" state.
+   * @type {import('better-sqlite3').Statement}
+   */
   resetAuctionNoBids
 };
 

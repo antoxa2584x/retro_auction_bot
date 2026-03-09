@@ -1,3 +1,7 @@
+/**
+ * Main entry point of the Telegram Auction Bot.
+ * Initializes the bot, loads settings, registers handlers, and restores jobs.
+ */
 import { Telegraf } from 'telegraf';
 import { BOT_TOKEN, TZ } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';

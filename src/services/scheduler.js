@@ -5,12 +5,27 @@ import { getAdminNickname, CHANNEL_USERNAME } from "../config/env.js";
 import { getAuctionLink, escapeHtml } from '../utils/utils.js';
 import { t } from './i18n.js';
 
+/**
+ * Schedules the automatic closing of an auction.
+ * 
+ * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {number} chat_id - The chat ID where the auction is posted.
+ * @param {number} message_id - The message ID of the auction post.
+ * @param {Date} when - The date and time when the auction should close.
+ */
 export function scheduleClose(ctx, chat_id, message_id, when) {
     const id = `${chat_id}:${message_id}`;
     schedule.cancelJob(id);
     schedule.scheduleJob(id, when, async () => closeAuction(ctx, chat_id, message_id));
 }
 
+/**
+ * Closes an auction, updates the UI, and notifies the winner and admins.
+ * 
+ * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {number} chat_id - The chat ID where the auction is posted.
+ * @param {number} message_id - The message ID of the auction post.
+ */
 export async function closeAuction(ctx, chat_id, message_id) {
     const row = q.getAuction.get(chat_id, message_id);
     if (!row) return;
@@ -97,6 +112,11 @@ export async function closeAuction(ctx, chat_id, message_id) {
     }
 }
 
+/**
+ * Restores all scheduled closing jobs for active auctions after a bot restart.
+ * 
+ * @param {import('telegraf').Context} ctx - Telegram context.
+ */
 export function restoreJobs(ctx) {
     const rows = q.selectActive.all();
     for (const r of rows) {

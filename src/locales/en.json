@@ -36,17 +36,45 @@
     "enter_currency": "<i>Enter a new currency symbol or name (e.g., ₴, $, €, UAH, USD, EUR):</i>",
     "language_changed": "Language changed to English",
     "panel_settings": "<b>Admin Panel — Settings</b>",
+    "panel_settings_main": "<b>⚙️ Main Settings</b>",
+    "panel_settings_template": "<b>📝 Auction Template</b>",
+    "panel_settings_defaults": "<b>⏳ Default Values</b>",
+    "settings_main": "⚙️ Main",
+    "settings_template": "📝 Template",
+    "settings_defaults": "⏳ Defaults",
     "click_below_to_change": "<i>Click the button below to change the corresponding setting.</i>",
+    "def_days": "Default End Days",
+    "def_time": "Default End Time",
+    "auction_header": "Auction Header",
+    "auction_min_bid_text": "Text: Minimum Bid",
+    "auction_bid_step_text": "Text: Bid Step",
+    "auction_end_date_text": "Text: End Date",
+    "auction_footer": "Auction Footer",
     "no_auctions_in_db": "No auctions in the database yet 📭",
+    "post_new": "➕ Post New Auction",
+    "post_step_img": "🖼 <b>Step 1/5: Image</b>\n\nSend an image for the auction, or click skip if you only want text.",
+    "post_step_title": "📝 <b>Step 2/5: Title & Description</b>\n\nEnter the title and description for the auction (HTML supported).",
+    "post_step_min_bid": "💰 <b>Step 3/5: Minimum Bid</b>\n\nEnter the starting price (number only).",
+    "post_step_step": "📈 <b>Step 4/5: Bid Step</b>\n\nSelect a bid step or enter a custom value.",
+    "post_step_end": "📅 <b>Step 5/5: End Date & Time</b>\n\nEnter the end date and time in <code>DD.MM.YYYY HH:MM</code> format, or use the default ({{default}}).",
+    "post_confirm": "📦 <b>Confirm Auction</b>\n\n{{full_text}}\n\nMin Bid: <b>{{min_bid}} {{cur}}</b>\nStep: <b>{{step}} {{cur}}</b>\nEnds at: <b>{{end_at}}</b>",
+    "post_success": "✅ Auction successfully posted to the channel!",
+    "post_cancelled": "❌ Auction creation cancelled.",
+    "invalid_number": "⚠️ Please enter a valid number.",
+    "invalid_date": "⚠️ Invalid date format. Please use <code>DD.MM.YYYY HH:MM</code>.",
     "restart_success": "Auction restarted until {{date}}",
     "finish_success": "Auction finished: \"{{title}}\"",
     "kb": {
       "view_finished": "🏁 View finished",
+      "view_active": "🚀 View active",
       "settings": "⚙️ Settings",
       "back_to_panel": "⬅️ Back to admin panel",
       "refresh": "🔄 Refresh",
       "restart": "🔄 Restart (4 days)",
-      "finish_now": "🏁 Finish now"
+      "finish_now": "🏁 Finish now",
+      "skip": "⏭ Skip",
+      "post_now": "🚀 Post now",
+      "custom": "⌨️ Custom"
     }
   },
   "bid": {
@@ -85,6 +113,13 @@
     "admin_no_bids_notify": "🏁 <b>Auction finished without bids.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>"
   },
   "parse": {
-    "error": "Could not find minimum bid, step, or end time"
+    "error": "Could not find minimum bid, step, or end time",
+    "defaults": {
+      "header": "🎮 Auction!",
+      "min_bid": "🔸 Minimum bid",
+      "bid_step": "🔸 Bid step",
+      "end_date": "🕘 Auction ends",
+      "footer": "To place a bid, just click the button under this post"
+    }
   }
 }

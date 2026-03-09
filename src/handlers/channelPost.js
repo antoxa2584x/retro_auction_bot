@@ -5,6 +5,12 @@ import {parsePost} from '../utils/parse.js';
 import {scheduleClose} from '../services/scheduler.js';
 import { t } from '../services/i18n.js';
 
+/**
+ * Registers a handler for new posts in the auction channel.
+ * Parses the post, saves it to the database, and attaches the "Bid" button.
+ * 
+ * @param {import('telegraf').Telegraf} bot - Telegraf bot instance.
+ */
 export function registerChannelPostHandler(bot) {
     bot.on('channel_post', async (ctx) => {
         const post = ctx.channelPost;
