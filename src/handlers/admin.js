@@ -1,9 +1,10 @@
-import { q } from '../db.js';
-import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminSettingsKb } from '../keyboards.js';
-import { getAdminId, getChannelId, getAdminNickname, TZ } from "../env.js";
+import { q } from '../services/db.js';
+import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminSettingsKb, makeAdminLangKb } from '../utils/keyboards.js';
+import { getAdminId, getChannelId, getAdminNickname, TZ } from "../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
-import { scheduleClose, closeAuction } from '../scheduler.js';
-import { getAuctionLink, escapeHtml } from '../utils.js';
+import { scheduleClose, closeAuction } from '../services/scheduler.js';
+import { getAuctionLink, escapeHtml } from '../utils/utils.js';
+import { t, setLocale, getLocale, setCurrency, getCurrency } from '../services/i18n.js';
 
 const userSessions = new Map();
 
@@ -13,7 +14,7 @@ export function registerAdminHandlers(bot) {
 
         const admin = q.getAdmin.get(ctx.from.id);
         if (admin && admin.otp_code === null) {
-            return ctx.reply('Ви вже є адміністратором. Використовуйте /admin_panel для керування.');
+            return ctx.reply(t('admin.already_admin'));
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -23,9 +24,9 @@ export function registerAdminHandlers(bot) {
 
         console.log(`[ADMIN OTP] User ${ctx.from.id} (${ctx.from.username}): ${otp}`);
 
-        await ctx.reply('Введіть OTP код, щоб отримати права адміністратора.', {
+        await ctx.reply(t('admin.enter_otp'), {
             reply_markup: {
-                inline_keyboard: [[{ text: '❌ Скасувати', callback_data: 'cancel_otp' }]]
+                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_otp' }]]
             }
         });
     });
@@ -36,8 +37,8 @@ export function registerAdminHandlers(bot) {
             // Clear OTP if not yet verified
             q.upsertAdminOtp.run(ctx.from.id, ctx.from.username || null, null, null);
         }
-        await ctx.editMessageText('Введення OTP скасовано.').catch(() => {});
-        await ctx.answerCbQuery('Скасовано');
+        await ctx.editMessageText(t('admin.otp_cancelled')).catch(() => {});
+        await ctx.answerCbQuery(t('admin.cancelled'));
     });
 
     // Handle OTP code entry and settings input
@@ -53,13 +54,16 @@ export function registerAdminHandlers(bot) {
             console.log(`[ADMIN SETTINGS] User ${ctx.from.id} updating ${userSessions.get(ctx.from.id)} to ${text}`);
             const settingKey = userSessions.get(ctx.from.id);
             try {
+                if (settingKey === 'CURRENCY') {
+                    setCurrency(text);
+                }
                 q.setSetting.run(settingKey, text);
                 userSessions.delete(ctx.from.id);
-                await ctx.reply(`Налаштування <b>${settingKey}</b> оновлено на: <code>${text}</code>`, { parse_mode: 'HTML' });
+                await ctx.reply(t('admin.setting_updated', { key: settingKey, value: text }), { parse_mode: 'HTML' });
                 await sendSettingsPanel(ctx, false);
             } catch (e) {
                 console.error(`[ADMIN SETTINGS ERROR] ${e.message}`);
-                await ctx.reply(`Помилка оновлення налаштування: ${e.message}`);
+                await ctx.reply(t('admin.setting_error', { error: e.message }));
             }
             return;
         }
@@ -68,7 +72,7 @@ export function registerAdminHandlers(bot) {
         if (/^\d{6}$/.test(text)) {
             const result = q.verifyOtp.run(ctx.from.id, text, new Date().toISOString());
             if (result.changes > 0) {
-                await ctx.reply('Ви тепер адміністратор! Використовуйте /admin_panel для керування.');
+                await ctx.reply(t('admin.become_admin'));
                 return;
             }
         }
@@ -78,7 +82,7 @@ export function registerAdminHandlers(bot) {
     bot.command('admin_panel', async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
         if (!admin || admin.otp_code !== null) {
-            return ctx.reply('У вас немає прав доступу до адмін-панелі. Використовуйте /admin для авторизації.');
+            return ctx.reply(t('admin.no_permission'));
         }
 
         await sendAdminPanel(ctx, false);
@@ -86,7 +90,7 @@ export function registerAdminHandlers(bot) {
 
     bot.action('adm_list', async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         userSessions.delete(ctx.from.id);
         await sendAdminPanel(ctx, true);
@@ -95,23 +99,70 @@ export function registerAdminHandlers(bot) {
 
     bot.action('adm_settings', async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         await sendSettingsPanel(ctx, true);
         await ctx.answerCbQuery();
     });
 
+    bot.action('adm_lang', async (ctx) => {
+        const admin = q.getAdmin.get(ctx.from.id);
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
+
+        const text = t('admin.panel_language') + '\n\n' +
+            t('admin.current_language', { lang: getLocale() === 'uk' ? t('admin.lang_uk') : t('admin.lang_en') }) + '\n\n' +
+            t('admin.choose_language');
+
+        await ctx.editMessageText(text, {
+            parse_mode: 'HTML',
+            reply_markup: makeAdminLangKb()
+        });
+        await ctx.answerCbQuery();
+    });
+
+    bot.action('adm_cur', async (ctx) => {
+        const admin = q.getAdmin.get(ctx.from.id);
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
+
+        userSessions.set(ctx.from.id, 'CURRENCY');
+
+        const currentCurrency = getCurrency();
+        const text = t('admin.panel_currency') + '\n\n' +
+            t('admin.current_currency', { cur: currentCurrency }) + '\n\n' +
+            t('admin.enter_currency');
+
+        await ctx.reply(text, {
+            parse_mode: 'HTML',
+            reply_markup: {
+                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings' }]]
+            }
+        });
+        await ctx.answerCbQuery();
+    });
+
+    bot.action(/^set_lang:(.+)$/, async (ctx) => {
+        const admin = q.getAdmin.get(ctx.from.id);
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
+
+        const lang = ctx.match[1];
+        setLocale(lang);
+        q.setSetting.run('LOCALE', lang);
+
+        await ctx.answerCbQuery(t('admin.language_changed'));
+        await sendSettingsPanel(ctx, true);
+    });
+
     bot.action(/^set_conf:(.+)$/, async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         const key = ctx.match[1];
         userSessions.set(ctx.from.id, key);
 
-        await ctx.reply(`Введіть нове значення для <b>${key}</b>:`, { 
+        await ctx.reply(t('admin.enter_new_value', { key }), { 
             parse_mode: 'HTML',
             reply_markup: {
-                inline_keyboard: [[{ text: '❌ Скасувати', callback_data: 'cancel_settings' }]]
+                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings' }]]
             }
         });
         await ctx.answerCbQuery();
@@ -119,32 +170,32 @@ export function registerAdminHandlers(bot) {
 
     bot.action('cancel_settings', async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         userSessions.delete(ctx.from.id);
         await ctx.deleteMessage().catch(() => {});
         await sendSettingsPanel(ctx, false);
-        await ctx.answerCbQuery('Скасовано');
+        await ctx.answerCbQuery(t('admin.cancelled'));
     });
 
     bot.action('adm_finished', async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         const auctions = q.getRecentlyFinishedAuctions.all();
 
         if (auctions.length === 0) {
-            await ctx.editMessageText('<b>Панель Адміністратора</b>\n\nНемає завершених аукціонів 💨', {
+            await ctx.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.no_finished_auctions'), {
                 parse_mode: 'HTML',
                 reply_markup: {
-                    inline_keyboard: [[{ text: '⬅️ Назад до адмін-панелі', callback_data: 'adm_list' }]]
+                    inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
                 }
             });
             await ctx.answerCbQuery();
             return;
         }
 
-        await ctx.editMessageText('<b>Панель Адміністратора</b>\n\nНещодавно завершені аукціони:', {
+        await ctx.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.finished_auctions_header'), {
             parse_mode: 'HTML',
             reply_markup: makeAdminFinishedKb(auctions)
         });
@@ -153,25 +204,34 @@ export function registerAdminHandlers(bot) {
 
     bot.action(/^adm_view:(.+):(.+)$/, async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         const chatId = Number(ctx.match[1]);
         const msgId = Number(ctx.match[2]);
         const a = q.getAuction.get(chatId, msgId);
 
-        if (!a) return ctx.answerCbQuery('Аукціон не знайдено');
+        if (!a) return ctx.answerCbQuery(t('bid.not_found'));
 
         const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM.yyyy HH:mm');
         const link = getAuctionLink(chatId, msgId);
-        const leader = a.leader_id 
-            ? `<a href="tg://user?id=${a.leader_id}">${escapeHtml(a.leader_name)}</a>` 
-            : 'немає';
+        
+        const statusText = a.status === 'active' ? t('admin.status_active') : t('admin.status_finished');
+        
+        const winner = a.leader_id 
+            ? `<a href="tg://user?id=${a.leader_id}">${a.leader_name || a.leader_id}</a>`
+            : t('bid.no_bids');
 
-        const text = `<b>Панель Адміністратора</b>\n\n` +
-            `📦 <a href="${link}"><b>${a.title}</b></a>\n\n` +
-            `Поточна ціна: <b>${a.current_price} грн</b>\n` +
-            `Лідер: ${leader}\n` +
-            `Кінець: ${endDate}`;
+        const text = t('admin.panel_header') + '\n\n' +
+            t('admin.auction_details', {
+                title: a.title,
+                chat_id: chatId,
+                message_id: msgId,
+                price: a.current_price,
+                status: statusText,
+                end_at: endDate,
+                winner: winner,
+                link: link
+            });
 
         await ctx.editMessageText(text, {
             parse_mode: 'HTML',
@@ -182,14 +242,14 @@ export function registerAdminHandlers(bot) {
 
     bot.action(/^adm_restart:(.+):(.+)$/, async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         const chatId = Number(ctx.match[1]);
         const msgId = Number(ctx.match[2]);
         const a = q.getAuction.get(chatId, msgId);
 
-        if (!a) return ctx.answerCbQuery('Аукціон не знайдено');
-        if (a.status !== 'finished') return ctx.answerCbQuery('Можна перезапускати лише завершені аукціони');
+        if (!a) return ctx.answerCbQuery(t('bid.not_found'));
+        if (a.status !== 'finished') return ctx.answerCbQuery('Only finished auctions can be restarted');
 
         // New end date: current date + 4 days, same time of day as original
         const originalEnd = new Date(a.end_at);
@@ -220,7 +280,7 @@ export function registerAdminHandlers(bot) {
             }
         } catch (e) {
             console.error('Failed to create new post for restart:', e.message);
-            return ctx.answerCbQuery('Помилка при створенні нового посту');
+            return ctx.answerCbQuery(t('common.error_try_again'));
         }
 
         // Update keyboard with correct message_id
@@ -247,8 +307,11 @@ export function registerAdminHandlers(bot) {
         // Reschedule close
         scheduleClose(ctx, chatId, newMsg.message_id, newEnd);
 
-        await ctx.reply(`Аукціон "${a.title}" перезапущено у новому пості до ${formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm')}`);
-        await ctx.answerCbQuery('Аукціон перезапущено');
+        await ctx.reply(t('admin.restart_success', { 
+            title: a.title, 
+            date: formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm') 
+        }));
+        await ctx.answerCbQuery(t('admin.finish_success'));
         
         // Return to list
         await sendAdminPanel(ctx, true);
@@ -256,19 +319,19 @@ export function registerAdminHandlers(bot) {
 
     bot.action(/^adm_finish_now:(.+):(.+)$/, async (ctx) => {
         const admin = q.getAdmin.get(ctx.from.id);
-        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery('Недостатньо прав');
+        if (!admin || admin.otp_code !== null) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
 
         const chatId = Number(ctx.match[1]);
         const msgId = Number(ctx.match[2]);
         const a = q.getAuction.get(chatId, msgId);
 
-        if (!a) return ctx.answerCbQuery('Аукціон не знайдено');
-        if (a.status !== 'active') return ctx.answerCbQuery('Можна завершити лише активні аукціони');
+        if (!a) return ctx.answerCbQuery(t('bid.not_found'));
+        if (a.status !== 'active') return ctx.answerCbQuery('Only active auctions can be finished');
 
         await closeAuction(ctx, chatId, msgId);
 
-        await ctx.answerCbQuery('Аукціон завершено');
-        await ctx.reply(`Аукціон "${a.title}" завершено негайно.`);
+        await ctx.answerCbQuery(t('admin.finish_success'));
+        await ctx.reply(t('admin.finish_success', { title: a.title }));
         
         // Return to list
         await sendAdminPanel(ctx, true);
@@ -279,22 +342,22 @@ async function sendAdminPanel(ctx, isEdit = false) {
     const active = q.getAllActiveAuctions.all();
     const finished = q.getRecentlyFinishedAuctions.all();
 
-    let text = '<b>Панель Адміністратора</b>\n\n';
+    let text = t('admin.panel_header') + '\n\n';
     let kb;
 
     if (active.length === 0 && finished.length === 0) {
-        text += 'Аукціонів у базі даних поки що немає 📭';
+        text += t('admin.no_auctions_in_db');
         kb = { 
             inline_keyboard: [
-                [{ text: '🔄 Оновити', callback_data: 'adm_list' }],
-                [{ text: '⚙️ Налаштування', callback_data: 'adm_settings' }]
+                [{ text: t('admin.kb.refresh'), callback_data: 'adm_list' }],
+                [{ text: t('admin.kb.settings'), callback_data: 'adm_settings' }]
             ] 
         };
     } else if (active.length === 0) {
-        text += 'Наразі немає активних аукціонів 💨\n\nВиберіть категорію:';
+        text += t('admin.no_active_auctions') + ' 💨\n\n' + t('admin.choose_category');
         kb = makeAdminActiveKb([]);
     } else {
-        text += `<b>Активні аукціони (${active.length}):</b>`;
+        text += t('admin.active_auctions_header') + ` (${active.length}):`;
         kb = makeAdminActiveKb(active);
     }
 
@@ -317,11 +380,11 @@ async function sendSettingsPanel(ctx, isEdit = false) {
     const adminId = getAdminId() || 'Not set';
     const adminNickname = getAdminNickname();
 
-    const text = `<b>Панель Адміністратора — Налаштування</b>\n\n` +
+    const text = t('admin.panel_settings') + '\n\n' +
         `📺 <b>Channel ID:</b> <code>${channelId}</code>\n` +
         `👤 <b>Admin ID:</b> <code>${adminId}</code>\n` +
         `🏷 <b>Admin Nickname:</b> <code>${adminNickname}</code>\n\n` +
-        `<i>Натисніть на кнопку нижче, щоб змінити відповідне налаштування.</i>`;
+        t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsKb();
 
@@ -336,77 +399,4 @@ async function sendSettingsPanel(ctx, isEdit = false) {
     } else {
         await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
     }
-}
-
-export async function handleUndoMessage(ctx) {
-    const post = ctx.channelPost;
-    if (!post) return;
-
-    // must be admin
-    const currentAdminId = getAdminId();
-    if (post.from?.id !== currentAdminId) return;
-
-    // must be reply
-    const replied = post.reply_to_message;
-    if (!replied) return;
-
-    const chatId = post.chat.id;
-    const auctionMsgId = replied.message_id;
-
-    // load auction
-    const auction = q.getAuction.get(chatId, auctionMsgId);
-    if (!auction) {
-        try { await ctx.deleteMessage(post.message_id); } catch {}
-        return;
-    }
-
-    if (auction.status !== 'active') {
-        try { await ctx.deleteMessage(post.message_id); } catch {}
-        return;
-    }
-
-    const lastBid = q.getLastBid.get(chatId, auctionMsgId);
-    if (!lastBid) {
-        try { await ctx.deleteMessage(post.message_id); } catch {}
-        return;
-    }
-
-    q.deleteBidByRowId.run(lastBid.rid);
-
-    const newLeader = q.getNewLeader.get(chatId, auctionMsgId);
-    const bidsCount = q.countBids.get(chatId, auctionMsgId);
-    const participantsCount = bidsCount?.cnt ?? 0;
-
-    if (!newLeader) {
-        q.resetAuctionNoBids.run(chatId, auctionMsgId);
-        try {
-            await ctx.telegram.editMessageReplyMarkup(
-                chatId,
-                auctionMsgId,
-                undefined,
-                makeKb(chatId, auctionMsgId, auction.min_bid, 0)
-            );
-        } catch (e) {}
-        try { await ctx.deleteMessage(post.message_id); } catch {}
-        await ctx.reply('⏪ Останню ставку скасовано. Активних ставок більше немає.', { reply_to_message_id: auctionMsgId });
-        return;
-    }
-
-    const leaderName = newLeader.first_name
-        ? newLeader.first_name + (newLeader.last_name ? ` ${newLeader.last_name}` : '')
-        : (newLeader.username ? `@${newLeader.username}` : `ID ${newLeader.user_id}`);
-
-    q.updateState.run(newLeader.amount, newLeader.user_id, leaderName, participantsCount, chatId, auctionMsgId);
-
-    try {
-        await ctx.telegram.editMessageReplyMarkup(
-            chatId,
-            auctionMsgId,
-            undefined,
-            makeKb(chatId, auctionMsgId, newLeader.amount, participantsCount)
-        );
-    } catch (e) {}
-
-    try { await ctx.deleteMessage(post.message_id); } catch {}
-    await ctx.reply(`⏪ Останню ставку скасовано.\nНовий лідер: ${leaderName}\nЦіна: ${newLeader.amount} грн`, { reply_to_message_id: auctionMsgId });
 }

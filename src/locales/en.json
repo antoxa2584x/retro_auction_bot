@@ -1,0 +1,90 @@
+{
+  "common": {
+    "cancel": "❌ Cancel",
+    "back": "⬅️ Back",
+    "error_try_again": "Error, try again"
+  },
+  "admin": {
+    "already_admin": "You are already an administrator. Use /admin_panel for management.",
+    "enter_otp": "Enter OTP code to gain administrator rights.",
+    "otp_cancelled": "OTP entry cancelled.",
+    "cancelled": "Cancelled",
+    "setting_updated": "Setting <b>{{key}}</b> updated to: <code>{{value}}</code>",
+    "setting_error": "Error updating setting: {{error}}",
+    "become_admin": "You are now an administrator! Use /admin_panel for management.",
+    "no_permission": "You do not have permission to access the admin panel. Use /admin for authorization.",
+    "insufficient_permissions": "Insufficient permissions",
+    "enter_new_value": "Enter a new value for <b>{{key}}</b>:",
+    "active_auctions_header": "<b>Active auctions:</b>",
+    "no_active_auctions": "No active auctions.",
+    "finished_auctions_header": "<b>Finished auctions (last 10):</b>",
+    "no_finished_auctions": "No finished auctions.",
+    "auction_details": "<b>{{title}}</b>\n\nID: <code>{{chat_id}}:{{message_id}}</code>\nPrice: <b>{{price}} {{cur}}</b>\nStatus: <b>{{status}}</b>\nEnds at: <b>{{end_at}}</b>\nWinner: {{winner}}\n\n<a href=\"{{link}}\">Link to post</a>",
+    "status_active": "Active",
+    "status_finished": "Finished",
+    "panel_header": "<b>Admin Panel</b>",
+    "choose_category": "Choose a category:",
+    "panel_language": "<b>Admin Panel — Language</b>",
+    "choose_language": "<i>Choose a language for the bot.</i>",
+    "lang_button": "Language",
+    "cur_button": "Currency",
+    "current_language": "Current language: <code>{{lang}}</code>",
+    "lang_uk": "🇺🇦 Ukrainian / Українська",
+    "lang_en": "🇺🇸 English",
+    "panel_currency": "<b>Admin Panel — Currency</b>",
+    "current_currency": "Current currency: <code>{{cur}}</code>",
+    "enter_currency": "<i>Enter a new currency symbol or name (e.g., ₴, $, €, UAH, USD, EUR):</i>",
+    "language_changed": "Language changed to English",
+    "panel_settings": "<b>Admin Panel — Settings</b>",
+    "click_below_to_change": "<i>Click the button below to change the corresponding setting.</i>",
+    "no_auctions_in_db": "No auctions in the database yet 📭",
+    "restart_success": "Auction restarted until {{date}}",
+    "finish_success": "Auction finished: \"{{title}}\"",
+    "kb": {
+      "view_finished": "🏁 View finished",
+      "settings": "⚙️ Settings",
+      "back_to_panel": "⬅️ Back to admin panel",
+      "refresh": "🔄 Refresh",
+      "restart": "🔄 Restart (4 days)",
+      "finish_now": "🏁 Finish now"
+    }
+  },
+  "bid": {
+    "not_found": "Auction not found",
+    "finished": "Auction already finished",
+    "confirm_text": "You are about to bid on the auction:\n\n{{title}}\n\nBid amount: <b>{{price}} {{cur}}</b>",
+    "welcome": "Hi! I am an auction bot. You can bid in the channel.\n\nCommands:\n/my - My active auctions\n/won - My won auctions",
+    "my_active_header": "<b>Your active auctions:</b>",
+    "no_my_active": "You haven't participated in any active auctions yet.",
+    "status_leading": "✅ You are leading",
+    "status_outbid": "❌ Your bid was outbid",
+    "won_header": "<b>Your won auctions (last 10):</b>\n\n",
+    "no_won": "You haven't won any auctions yet.",
+    "won_item": "🏆 <a href=\"{{link}}\">{{title}}</a>\nBuyout price: <b>{{price}} {{cur}}</b>\nDate: <b>{{date}}</b>\n\n",
+    "cancel_bid": "Cancelled",
+    "bid_exists_alert": "Bid of {{price}} {{cur}} already exists! Try making a bid of {{expectedPrice}} {{cur}}",
+    "price_changed_alert": "Price changed! New price: {{expectedPrice}} {{cur}}",
+    "alert_with_details": "{{alert}}\n\n{{title}}\n\nNew bid amount: <b>{{expectedPrice}} {{cur}}</b>",
+    "accepted_alert": "Bid of {{price}} {{cur}} accepted!",
+    "outbid_notify": "🔔 Your bid in auction <a href=\"{{link}}\">\"{{title}}\"</a> was outbid!\nNew price: <b>{{price}} {{cur}}</b>",
+    "accepted_text": "✅ Your bid of <b>{{price}} {{cur}}</b> accepted!",
+    "no_bids": "There were no bids",
+    "info_header": "Last bids (total: {{total}}):\n\n",
+    "info_item": "{{index}}. {{name}} — {{price}} {{cur}}\n",
+    "info_more": "…and {{count}} more",
+    "kb": {
+      "confirm": "✅ Confirm {{price}} {{cur}}",
+      "cancel": "❌ Cancel",
+      "bids_count": "💬 Bids ({{count}})",
+      "no_bids": "🏁 No bids were made"
+    }
+  },
+  "scheduler": {
+    "winner_notify": "🏆 Congratulations! You won the auction <a href=\"{{link}}\">\"{{title}}\"</a>!\nFinal price: <b>{{price}} {{cur}}</b>\n\nFor further steps, contact {{admin}}",
+    "admin_finished_notify": "🏁 <b>Auction finished!</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>\n💰 Price: <b>{{price}} {{cur}}</b>\n👤 Winner: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
+    "admin_no_bids_notify": "🏁 <b>Auction finished without bids.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>"
+  },
+  "parse": {
+    "error": "Could not find minimum bid, step, or end time"
+  }
+}

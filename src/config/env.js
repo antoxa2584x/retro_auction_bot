@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { q } from './db.js';
+import { q } from '../services/db.js';
 
 function getSetting(key, defaultValue) {
     try {
