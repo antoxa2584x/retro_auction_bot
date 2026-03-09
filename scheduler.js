@@ -12,9 +12,12 @@ export function scheduleClose(ctx, chat_id, message_id, when) {
 
 export async function closeAuction(ctx, chat_id, message_id) {
     const row = q.getAuction.get(chat_id, message_id);
-    if (!row || row.status === 'finished') return;
+    if (!row) return;
 
-    q.finish.run(chat_id, message_id);
+    const alreadyFinished = row.status === 'finished';
+    if (!alreadyFinished) {
+        q.finish.run(chat_id, message_id);
+    }
 
     const auctionLink = getAuctionLink(chat_id, message_id);
     const admins = q.getAllAdmins.all();
@@ -28,29 +31,31 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 winnerKeyboard(row.leader_id, row.leader_name, row.current_price)
             ).catch(() => {});
 
-            // Notify winner
-            const nickname = getAdminNickname();
-            const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
-            const winnerText = `🏆 Вітаємо! Ви перемогли в аукціоні <a href="${auctionLink}">"${row.title}"</a>!\n` +
-                             `Фінальна ціна: <b>${row.current_price} грн</b>\n\n` +
-                             `Для подальших кроків, звяжіться з ${adminContact}`;
-            try {
-                await ctx.telegram.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
-            } catch (err) {
-                console.error(`Failed to notify winner ${row.leader_id}:`, err.message);
-            }
-
-            // Notify admins
-            const escapedWinnerName = escapeHtml(row.leader_name);
-            const adminNotifyText = `🏁 <b>Аукціон завершено!</b>\n\n` +
-                                   `📦 Товар: <a href="${auctionLink}">${row.title}</a>\n` +
-                                   `💰 Ціна: <b>${row.current_price} грн</b>\n` +
-                                   `👤 Переможець: <a href="tg://user?id=${row.leader_id}">${escapedWinnerName}</a> (ID: ${row.leader_id})`;
-            for (const admin of admins) {
+            if (!alreadyFinished) {
+                // Notify winner
+                const nickname = getAdminNickname();
+                const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
+                const winnerText = `🏆 Вітаємо! Ви перемогли в аукціоні <a href="${auctionLink}">"${row.title}"</a>!\n` +
+                                 `Фінальна ціна: <b>${row.current_price} грн</b>\n\n` +
+                                 `Для подальших кроків, звяжіться з ${adminContact}`;
                 try {
-                    await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
-                } catch (e) {
-                    console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
+                    await ctx.telegram.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
+                } catch (err) {
+                    console.error(`Failed to notify winner ${row.leader_id}:`, err.message);
+                }
+
+                // Notify admins
+                const escapedWinnerName = escapeHtml(row.leader_name);
+                const adminNotifyText = `🏁 <b>Аукціон завершено!</b>\n\n` +
+                                       `📦 Товар: <a href="${auctionLink}">${row.title}</a>\n` +
+                                       `💰 Ціна: <b>${row.current_price} грн</b>\n` +
+                                       `👤 Переможець: <a href="tg://user?id=${row.leader_id}">${escapedWinnerName}</a> (ID: ${row.leader_id})`;
+                for (const admin of admins) {
+                    try {
+                        await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
+                    } catch (e) {
+                        console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
+                    }
                 }
             }
         } catch (e) {
@@ -65,14 +70,16 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 makeEmptyFinishKb()
             ).catch(() => {});
 
-            // Notify admins about no bids
-            const adminNotifyText = `🏁 <b>Аукціон завершено без ставок.</b>\n\n` +
-                                   `📦 Товар: <a href="${auctionLink}">${row.title}</a>`;
-            for (const admin of admins) {
-                try {
-                    await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
-                } catch (e) {
-                    console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
+            if (!alreadyFinished) {
+                // Notify admins about no bids
+                const adminNotifyText = `🏁 <b>Аукціон завершено без ставок.</b>\n\n` +
+                                       `📦 Товар: <a href="${auctionLink}">${row.title}</a>`;
+                for (const admin of admins) {
+                    try {
+                        await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
+                    } catch (e) {
+                        console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
+                    }
                 }
             }
         } catch (e) {
