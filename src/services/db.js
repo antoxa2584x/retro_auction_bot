@@ -197,6 +197,12 @@ export const q = {
   `),
 
   /**
+   * Retrieves all unique bidders for a specific auction.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getBidders: db.prepare(`SELECT DISTINCT user_id FROM bids WHERE chat_id=? AND message_id=?`),
+
+  /**
    * Selects all currently active auctions.
    * @type {import('better-sqlite3').Statement}
    */
