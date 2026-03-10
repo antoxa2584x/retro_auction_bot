@@ -111,7 +111,8 @@
   "scheduler": {
     "winner_notify": "🏆 Congratulations! You won the auction <a href=\"{{link}}\">\"{{title}}\"</a>!\nFinal price: <b>{{price}} {{cur}}</b>\n\nFor further steps, contact {{admin}}",
     "admin_finished_notify": "🏁 <b>Auction finished!</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>\n💰 Price: <b>{{price}} {{cur}}</b>\n👤 Winner: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
-    "admin_no_bids_notify": "🏁 <b>Auction finished without bids.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>"
+    "admin_no_bids_notify": "🏁 <b>Auction finished without bids.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>",
+    "reminder_30m": "⏳ <b>The auction <a href=\"{{link}}\">\"{{title}}\"</a> ends in 30 minutes!</b>\nCurrent price: <b>{{price}} {{cur}}</b>\n\nDon't miss your chance!"
   },
   "parse": {
     "error": "Could not find minimum bid, step, or end time",

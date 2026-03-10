@@ -17,6 +17,57 @@ export function scheduleClose(ctx, chat_id, message_id, when) {
     const id = `${chat_id}:${message_id}`;
     schedule.cancelJob(id);
     schedule.scheduleJob(id, when, async () => closeAuction(ctx, chat_id, message_id));
+
+    // Schedule 30m reminder
+    scheduleReminder(ctx, chat_id, message_id, when);
+}
+
+/**
+ * Schedules a reminder 30 minutes before the auction ends.
+ * 
+ * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {number} chat_id - The chat ID where the auction is posted.
+ * @param {number} message_id - The message ID of the auction post.
+ * @param {Date} endAt - The date and time when the auction ends.
+ */
+export function scheduleReminder(ctx, chat_id, message_id, endAt) {
+    const reminderId = `reminder:${chat_id}:${message_id}`;
+    schedule.cancelJob(reminderId);
+
+    const reminderTime = new Date(endAt.getTime() - 30 * 60 * 1000);
+    if (reminderTime > new Date()) {
+        schedule.scheduleJob(reminderId, reminderTime, async () => sendReminder(ctx, chat_id, message_id));
+    }
+}
+
+/**
+ * Sends a reminder to all bidders of an auction.
+ * 
+ * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {number} chat_id - The chat ID where the auction is posted.
+ * @param {number} message_id - The message ID of the auction post.
+ */
+export async function sendReminder(ctx, chat_id, message_id) {
+    const row = q.getAuction.get(chat_id, message_id);
+    if (!row || row.status !== 'active') return;
+
+    const bidders = q.getBidders.all(chat_id, message_id);
+    if (bidders.length === 0) return;
+
+    const auctionLink = getAuctionLink(chat_id, message_id);
+    const reminderText = t('scheduler.reminder_30m', {
+        link: auctionLink,
+        title: row.title,
+        price: row.current_price
+    });
+
+    for (const bidder of bidders) {
+        try {
+            await ctx.telegram.sendMessage(bidder.user_id, reminderText, { parse_mode: 'HTML' });
+        } catch (err) {
+            console.error(`Failed to send reminder to ${bidder.user_id}:`, err.message);
+        }
+    }
 }
 
 /**

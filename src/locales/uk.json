@@ -111,7 +111,8 @@
   "scheduler": {
     "winner_notify": "🏆 Вітаємо! Ви перемогли в аукціоні <a href=\"{{link}}\">\"{{title}}\"</a>!\nФінальна ціна: <b>{{price}} {{cur}}</b>\n\nДля подальших кроків, зв'яжіться з {{admin}}",
     "admin_finished_notify": "🏁 <b>Аукціон завершено!</b>\n\n📦 Товар: <a href=\"{{link}}\">{{title}}</a>\n💰 Ціна: <b>{{price}} {{cur}}</b>\n👤 Переможець: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
-    "admin_no_bids_notify": "🏁 <b>Аукціон завершено без ставок.</b>\n\n📦 Товар: <a href=\"{{link}}\">{{title}}</a>"
+    "admin_no_bids_notify": "🏁 <b>Аукціон завершено без ставок.</b>\n\n📦 Товар: <a href=\"{{link}}\">{{title}}</a>",
+    "reminder_30m": "⏳ <b>Аукціон <a href=\"{{link}}\">\"{{title}}\"</a> закінчується через 30 хвилин!</b>\nПоточна ціна: <b>{{price}} {{cur}}</b>\n\nНе пропустіть свій шанс!"
   },
   "parse": {
     "error": "Не знайдено мінімальну ставку, крок або час завершення",
