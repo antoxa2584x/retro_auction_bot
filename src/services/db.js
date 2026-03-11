@@ -16,6 +16,7 @@ db.exec(`
         current_price INTEGER,
         leader_id INTEGER,
         leader_name TEXT,
+        admin_contact TEXT,
         end_at TEXT,
         status TEXT DEFAULT 'active',
         participants_count INTEGER DEFAULT 0,
@@ -72,7 +73,8 @@ const columnNames = columns.map(c => c.name);
 const migrations = [
     { name: 'full_text', type: 'TEXT' },
     { name: 'photo_id', type: 'TEXT' },
-    { name: 'participants_count', type: 'INTEGER DEFAULT 0' }
+    { name: 'participants_count', type: 'INTEGER DEFAULT 0' },
+    { name: 'admin_contact', type: 'TEXT' }
 ];
 
 for (const m of migrations) {
@@ -140,8 +142,8 @@ export const q = {
    */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, end_at, status, participants_count)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @end_at, 'active', 0)
+      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0)
   `),
 
   /**

@@ -157,6 +157,7 @@ export function registerManageHandlers(bot) {
             min_bid: a.min_bid,
             step: a.step,
             current_price: a.min_bid,
+            admin_contact: a.admin_contact,
             end_at: newEnd.toISOString()
         });
 

@@ -1,4 +1,4 @@
-import {getChannelId, TZ} from '../config/env.js';
+import {getChannelId, TZ, getAdminNickname} from '../config/env.js';
 import {q} from '../services/db.js';
 import {makeKb} from '../utils/keyboards.js';
 import {parsePost} from '../utils/parse.js';
@@ -55,6 +55,7 @@ export function registerChannelPostHandler(bot) {
             min_bid: minBid,
             step,
             current_price: minBid,
+            admin_contact: getAdminNickname(),
             end_at: end.toISOString()
         });
 

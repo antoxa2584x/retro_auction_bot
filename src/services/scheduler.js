@@ -100,7 +100,7 @@ export async function closeAuction(ctx, chat_id, message_id) {
 
             if (!alreadyFinished) {
                 // Notify winner
-                const nickname = getAdminNickname();
+                const nickname = row.admin_contact || getAdminNickname();
                 const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
                 const winnerText = t('scheduler.winner_notify', {
                     link: auctionLink,
