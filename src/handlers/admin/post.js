@@ -1,6 +1,6 @@
 import { q } from '../../services/db.js';
-import { makeAdminPostStepKb, makeAdminPostCancelKb, makeAdminPostConfirmKb } from '../../utils/keyboards.js';
-import { TZ, getChannelId } from "../../config/env.js";
+import { makeAdminPostStepKb, makeAdminPostCancelKb, makeAdminPostConfirmKb, makeAdminPostContactKb } from '../../utils/keyboards.js';
+import { TZ, getChannelId, getAdminNickname } from "../../config/env.js";
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { scheduleClose } from '../../services/scheduler.js';
@@ -41,7 +41,7 @@ export function registerPostHandlers(bot) {
             });
         } else if (session.step === 'DATE') {
             session.data.end_at = session.data.default_date;
-            await goToConfirmStep(ctx, session);
+            await goToContactStep(ctx, session);
         }
         await ctx.answerCbQuery();
     });
@@ -68,6 +68,25 @@ export function registerPostHandlers(bot) {
         } else {
             session.data.step = parseInt(val);
             await goToDateStep(ctx, session);
+        }
+        await ctx.answerCbQuery();
+    });
+
+    bot.action(/^post_contact:(.+)$/, async (ctx) => {
+        if (!isAdmin(ctx)) return ctx.answerCbQuery(t('admin.insufficient_permissions'));
+        const session = postSessions.get(ctx.from.id);
+        if (!session || session.step !== 'CONTACT') return ctx.answerCbQuery();
+
+        const val = ctx.match[1];
+        if (val === 'default') {
+            session.data.admin_contact = getAdminNickname();
+            await goToConfirmStep(ctx, session);
+        } else {
+            session.step = 'CONTACT_MANUAL';
+            await ctx.editMessageText(t('admin.kb.enter_contact_manually'), {
+                parse_mode: 'HTML',
+                reply_markup: makeAdminPostCancelKb()
+            });
         }
         await ctx.answerCbQuery();
     });
@@ -128,6 +147,7 @@ export function registerPostHandlers(bot) {
                 min_bid: data.min_bid,
                 step: data.step,
                 current_price: data.min_bid,
+                admin_contact: data.admin_contact,
                 end_at: data.end_at.toISOString()
             });
 
@@ -224,6 +244,14 @@ export async function handlePostInput(ctx) {
                     return true;
                 }
                 session.data.end_at = date;
+                await goToContactStep(ctx, session);
+                return true;
+            }
+            break;
+
+        case 'CONTACT_MANUAL':
+            if (text) {
+                session.data.admin_contact = text.startsWith('@') ? text : '@' + text;
                 await goToConfirmStep(ctx, session);
                 return true;
             }
@@ -252,13 +280,22 @@ async function goToDateStep(ctx, session) {
     });
 }
 
+async function goToContactStep(ctx, session) {
+    session.step = 'CONTACT';
+    const defaultContact = getAdminNickname();
+    await ctx.reply(t('admin.post_step_contact', { default: defaultContact }), {
+        parse_mode: 'HTML',
+        reply_markup: makeAdminPostContactKb()
+    });
+}
+
 // Special skip for date step
 export async function handleDateSkip(ctx) {
     const session = postSessions.get(ctx.from.id);
     if (!session || session.step !== 'DATE') return false;
     
     session.data.end_at = session.data.default_date;
-    await goToConfirmStep(ctx, session);
+    await goToContactStep(ctx, session);
     return true;
 }
 
@@ -270,6 +307,7 @@ async function goToConfirmStep(ctx, session) {
         min_bid: data.min_bid,
         step: data.step,
         end_at: formatInTimeZone(data.end_at, TZ, 'dd.MM.yyyy HH:mm'),
+        contact: data.admin_contact,
         cur: getCurrency()
     });
 

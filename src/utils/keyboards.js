@@ -173,6 +173,21 @@ export function makeAdminPostCancelKb(includeSkip = false) {
 }
 
 /**
+ * Creates the keyboard for selecting an admin contact.
+ * 
+ * @returns {Object} Telegraf inline keyboard object.
+ */
+export function makeAdminPostContactKb() {
+    return {
+        inline_keyboard: [
+            [{ text: t('admin.kb.use_settings_contact'), callback_data: 'post_contact:default' }],
+            [{ text: t('admin.kb.enter_contact_manually'), callback_data: 'post_contact:manual' }],
+            [{ text: t('common.cancel'), callback_data: 'post_cancel' }]
+        ]
+    };
+}
+
+/**
  * Creates the confirmation keyboard for posting an auction.
  * 
  * @returns {Object} Telegraf inline keyboard object.
