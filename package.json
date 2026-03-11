@@ -6,10 +6,10 @@
     "start": "node src/bot.js"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.0",
+    "better-sqlite3": "^12.6.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.3.1",
     "node-schedule": "^2.1.1",
     "telegraf": "^4.16.3"
   }
