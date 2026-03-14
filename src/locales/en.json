@@ -1,7 +1,7 @@
 {
   "common": {
-    "cancel": "❌ Cancel",
-    "back": "⬅️ Back",
+    "cancel": "Cancel",
+    "back": "Back",
     "error_try_again": "Error, try again"
   },
   "admin": {
@@ -74,7 +74,7 @@
       "refresh": "🔄 Refresh",
       "restart": "🔄 Restart (4 days)",
       "finish_now": "🏁 Finish now",
-      "skip": "⏭ Skip",
+      "skip": "Skip",
       "post_now": "🚀 Post now",
       "use_settings_contact": "👤 Use from settings",
       "enter_contact_manually": "⌨️ Enter manually",
@@ -106,7 +106,7 @@
     "info_more": "…and {{count}} more",
     "kb": {
       "confirm": "✅ Confirm {{price}} {{cur}}",
-      "cancel": "❌ Cancel",
+      "cancel": "Cancel",
       "bids_count": "💬 Bids ({{count}})",
       "no_bids": "🏁 No bids were made"
     }

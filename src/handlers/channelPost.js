@@ -9,11 +9,10 @@ import { t } from '../services/i18n.js';
  * Registers a handler for new posts in the auction channel.
  * Parses the post, saves it to the database, and attaches the "Bid" button.
  * 
- * @param {import('telegraf').Telegraf} bot - Telegraf bot instance.
+ * @param {TelegramBot} bot - Telegram bot instance.
  */
 export function registerChannelPostHandler(bot) {
-    bot.on('channel_post', async (ctx) => {
-        const post = ctx.channelPost;
+    bot.on('channel_post', async (post) => {
         const currentChannelId = getChannelId();
         if (!post || post.chat.id !== currentChannelId) return;
 
@@ -60,26 +59,29 @@ export function registerChannelPostHandler(bot) {
         });
 
         const finalKb = makeKb(post.chat.id, post.message_id, minBid, 0);
-        await attachKbToMedia(ctx, post, finalKb);
+        await attachKbToMedia(bot, post, finalKb);
 
-        scheduleClose(ctx, post.chat.id, post.message_id, end);
+        scheduleClose(bot, post.chat.id, post.message_id, end);
     });
 }
 
-async function attachKbToMedia(ctx, post, kb) {
+async function attachKbToMedia(bot, post, kb) {
     try {
-        await ctx.telegram.editMessageCaption(
-            post.chat.id,
-            post.message_id,
-            null,
-            post.caption,
-            {
+        if (post.caption) {
+            await bot.editMessageCaption(post.caption, {
+                chat_id: post.chat.id,
+                message_id: post.message_id,
                 reply_markup: kb,
                 parse_mode: 'HTML',
                 caption_entities: post.caption_entities
-            }
-        );
+            });
+        } else {
+            await bot.editMessageReplyMarkup(kb, {
+                chat_id: post.chat.id,
+                message_id: post.message_id
+            });
+        }
     } catch (e) {
-        console.log(e);
+        console.log('Error attaching keyboard:', e.message);
     }
 }

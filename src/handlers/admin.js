@@ -11,43 +11,41 @@ export function registerAdminHandlers(bot) {
     registerManageHandlers(bot);
     registerPostHandlers(bot);
 
-    // Handle OTP code entry and settings input
-    bot.on(['text', 'photo'], async (ctx, next) => {
-        if (ctx.chat.type !== 'private') return next();
-        const text = ctx.message?.text?.trim();
+    // Handle messages (text and photo)
+    bot.on('message', async (msg) => {
+        if (msg.chat.type !== 'private') return;
+        const text = msg.text?.trim();
 
-        const admin = q.getAdmin.get(ctx.from.id);
+        const admin = q.getAdmin.get(msg.from.id);
         const isAdmin = admin && admin.otp_code === null;
 
         if (!isAdmin) {
             if (text) {
-                const otpHandled = handleOtpInput(ctx, text);
+                const otpHandled = handleOtpInput(bot, msg, text);
                 if (otpHandled) return;
             }
-            return next();
+            return;
         }
 
         // Auction posting input handling
-        const postHandled = await handlePostInput(ctx);
+        const postHandled = await handlePostInput(bot, msg);
         if (postHandled) return;
 
         // Settings input handling
-        if (userSessions.has(ctx.from.id)) {
+        if (userSessions.has(msg.from.id)) {
             if (text) {
-                const handled = await handleSettingsInput(ctx, text);
+                const handled = await handleSettingsInput(bot, msg, text);
                 if (handled) return;
             }
         }
-
-        return next();
     });
 
-    bot.command('admin_panel', async (ctx) => {
-        const admin = q.getAdmin.get(ctx.from.id);
+    bot.onText(/^\/admin_panel$/, async (msg) => {
+        const admin = q.getAdmin.get(msg.from.id);
         if (!admin || admin.otp_code !== null) {
-            return ctx.reply(t('admin.no_permission'));
+            return bot.sendMessage(msg.chat.id, t('admin.no_permission'), { parse_mode: 'HTML' });
         }
 
-        await sendAdminPanel(ctx, false);
+        await sendAdminPanel(bot, msg.chat.id, false);
     });
 }

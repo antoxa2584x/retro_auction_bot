@@ -2,7 +2,7 @@
  * Main entry point of the Telegram Auction Bot.
  * Initializes the bot, loads settings, registers handlers, and restores jobs.
  */
-import { Telegraf } from 'telegraf';
+import TelegramBot from 'node-telegram-bot-api';
 import { BOT_TOKEN, TZ } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
@@ -23,21 +23,28 @@ if (dbCurrency) {
     setCurrency(dbCurrency);
 }
 
-const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 30_000 });
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Handlers
 registerCallbackHandler(bot);
 registerChannelPostHandler(bot);
 registerAdminHandlers(bot);
 
-// Restore scheduled jobs (після рестарту)
-restoreJobs(bot);
-
-// Start
-bot.launch().then(() => {
-    console.log('Auction bot started. Timezone:', TZ);
+// Catch-all for unanswered callback queries to prevent "query is too old" errors
+bot.on('callback_query', async (query) => {
+    try {
+        await bot.answerCallbackQuery(query.id);
+    } catch (e) {
+        // Silently ignore if already answered
+    }
 });
 
-// Graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Restore scheduled jobs
+restoreJobs(bot);
+
+console.log('Auction bot started. Timezone:', TZ);
+
+// Error handling
+bot.on('polling_error', (error) => {
+    console.error('Polling error:', error.code, error.message);
+});
