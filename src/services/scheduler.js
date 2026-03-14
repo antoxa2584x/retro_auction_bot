@@ -8,46 +8,46 @@ import { t } from './i18n.js';
 /**
  * Schedules the automatic closing of an auction.
  * 
- * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
  * @param {Date} when - The date and time when the auction should close.
  */
-export function scheduleClose(ctx, chat_id, message_id, when) {
+export function scheduleClose(bot, chat_id, message_id, when) {
     const id = `${chat_id}:${message_id}`;
     schedule.cancelJob(id);
-    schedule.scheduleJob(id, when, async () => closeAuction(ctx, chat_id, message_id));
+    schedule.scheduleJob(id, when, async () => closeAuction(bot, chat_id, message_id));
 
     // Schedule 30m reminder
-    scheduleReminder(ctx, chat_id, message_id, when);
+    scheduleReminder(bot, chat_id, message_id, when);
 }
 
 /**
  * Schedules a reminder 30 minutes before the auction ends.
  * 
- * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
  * @param {Date} endAt - The date and time when the auction ends.
  */
-export function scheduleReminder(ctx, chat_id, message_id, endAt) {
+export function scheduleReminder(bot, chat_id, message_id, endAt) {
     const reminderId = `reminder:${chat_id}:${message_id}`;
     schedule.cancelJob(reminderId);
 
     const reminderTime = new Date(endAt.getTime() - 30 * 60 * 1000);
     if (reminderTime > new Date()) {
-        schedule.scheduleJob(reminderId, reminderTime, async () => sendReminder(ctx, chat_id, message_id));
+        schedule.scheduleJob(reminderId, reminderTime, async () => sendReminder(bot, chat_id, message_id));
     }
 }
 
 /**
  * Sends a reminder to all bidders of an auction.
  * 
- * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
  */
-export async function sendReminder(ctx, chat_id, message_id) {
+export async function sendReminder(bot, chat_id, message_id) {
     const row = q.getAuction.get(chat_id, message_id);
     if (!row || row.status !== 'active') return;
 
@@ -63,7 +63,7 @@ export async function sendReminder(ctx, chat_id, message_id) {
 
     for (const bidder of bidders) {
         try {
-            await ctx.telegram.sendMessage(bidder.user_id, reminderText, { parse_mode: 'HTML' });
+            await bot.sendMessage(bidder.user_id, reminderText, { parse_mode: 'HTML' });
         } catch (err) {
             console.error(`Failed to send reminder to ${bidder.user_id}:`, err.message);
         }
@@ -73,11 +73,11 @@ export async function sendReminder(ctx, chat_id, message_id) {
 /**
  * Closes an auction, updates the UI, and notifies the winner and admins.
  * 
- * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
  */
-export async function closeAuction(ctx, chat_id, message_id) {
+export async function closeAuction(bot, chat_id, message_id) {
     const row = q.getAuction.get(chat_id, message_id);
     if (!row) return;
 
@@ -91,11 +91,9 @@ export async function closeAuction(ctx, chat_id, message_id) {
 
     if (row.leader_id) {
         try {
-            await ctx.telegram.editMessageReplyMarkup(
-                chat_id,
-                message_id,
-                null,
-                winnerKeyboard(row.leader_id, row.leader_name, row.current_price)
+            await bot.editMessageReplyMarkup(
+                winnerKeyboard(row.leader_id, row.leader_name, row.current_price),
+                { chat_id: chat_id, message_id: message_id }
             ).catch(() => {});
 
             if (!alreadyFinished) {
@@ -109,7 +107,7 @@ export async function closeAuction(ctx, chat_id, message_id) {
                     admin: adminContact
                 });
                 try {
-                    await ctx.telegram.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
+                    await bot.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
                 } catch (err) {
                     console.error(`Failed to notify winner ${row.leader_id}:`, err.message);
                 }
@@ -125,7 +123,7 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 });
                 for (const admin of admins) {
                     try {
-                        await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
+                        await bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
                     } catch (e) {
                         console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
                     }
@@ -136,11 +134,9 @@ export async function closeAuction(ctx, chat_id, message_id) {
         }
     } else {
         try {
-            await ctx.telegram.editMessageReplyMarkup(
-                chat_id,
-                message_id,
-                null,
-                makeEmptyFinishKb()
+            await bot.editMessageReplyMarkup(
+                makeEmptyFinishKb(),
+                { chat_id: chat_id, message_id: message_id }
             ).catch(() => {});
 
             if (!alreadyFinished) {
@@ -151,7 +147,7 @@ export async function closeAuction(ctx, chat_id, message_id) {
                 });
                 for (const admin of admins) {
                     try {
-                        await ctx.telegram.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
+                        await bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
                     } catch (e) {
                         console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
                     }
@@ -166,16 +162,16 @@ export async function closeAuction(ctx, chat_id, message_id) {
 /**
  * Restores all scheduled closing jobs for active auctions after a bot restart.
  * 
- * @param {import('telegraf').Context} ctx - Telegram context.
+ * @param {TelegramBot} bot - Telegram bot instance.
  */
-export function restoreJobs(ctx) {
+export function restoreJobs(bot) {
     const rows = q.selectActive.all();
     for (const r of rows) {
         const when = new Date(r.end_at);
         if (when > new Date()) {
-            scheduleClose(ctx, r.chat_id, r.message_id, when);
+            scheduleClose(bot, r.chat_id, r.message_id, when);
         } else {
-            setTimeout(() => closeAuction(ctx, r.chat_id, r.message_id), 2_000);
+            setTimeout(() => closeAuction(bot, r.chat_id, r.message_id), 2_000);
         }
     }
 }

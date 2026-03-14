@@ -9,25 +9,27 @@ import { confirmBidKb } from '../../utils/keyboards.js';
 /**
  * Registers user commands (/start, /my, /won).
  * 
- * @param {import('telegraf').Telegraf} bot - Telegraf bot instance.
+ * @param {TelegramBot} bot - Telegram bot instance.
  */
 export function registerUserCommands(bot) {
-    bot.start(async (ctx) => {
-        const payload = ctx.startPayload;
+    bot.onText(/^\/start(?:\s+(.+))?$/, async (msg, match) => {
+        const payload = match[1];
+        const chatId = msg.chat.id;
+
         if (payload && payload.startsWith('bid_')) {
             const parts = payload.split('_');
             if (parts.length === 3) {
-                const chatId = -Math.abs(Number(parts[1]));
-                const messageId = Number(parts[2]);
+                const targetChatId = -Math.abs(Number(parts[1]));
+                const targetMessageId = Number(parts[2]);
 
-                const row = q.getAuction.get(chatId, messageId);
-                if (!row) return ctx.reply(t('bid.not_found'));
+                const row = q.getAuction.get(targetChatId, targetMessageId);
+                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' });
 
                 const now = new Date();
                 const end = new Date(row.end_at);
                 if (now >= end || row.status !== 'active') {
-                    await closeAuction(ctx, chatId, messageId);
-                    return ctx.reply(t('bid.finished'));
+                    await closeAuction(bot, targetChatId, targetMessageId);
+                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' });
                 }
 
                 const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
@@ -35,35 +37,36 @@ export function registerUserCommands(bot) {
                     title: row.full_text || row.title,
                     price: newPrice
                 });
-                const replyMarkup = confirmBidKb(chatId, messageId, newPrice);
+                const replyMarkup = confirmBidKb(targetChatId, targetMessageId, newPrice);
 
                 if (row.photo_id) {
-                    await ctx.replyWithPhoto(row.photo_id, {
+                    await bot.sendPhoto(chatId, row.photo_id, {
                         caption: messageText,
                         parse_mode: 'HTML',
                         reply_markup: replyMarkup
                     });
                 } else {
-                    await ctx.reply(messageText, {
+                    await bot.sendMessage(chatId, messageText, {
                         parse_mode: 'HTML',
                         reply_markup: replyMarkup
                     });
                 }
             }
         } else {
-            await ctx.reply(t('bid.welcome'));
+            await bot.sendMessage(chatId, t('bid.welcome'), { parse_mode: 'HTML' });
         }
     });
 
-    bot.command('my', async (ctx) => {
-        const userId = ctx.from.id;
+    bot.onText(/^\/my$/, async (msg) => {
+        const userId = msg.from.id;
+        const chatId = msg.chat.id;
         const auctions = q.getParticipatingAuctions.all(userId);
 
         if (auctions.length === 0) {
-            return ctx.reply(t('bid.no_my_active'));
+            return bot.sendMessage(chatId, t('bid.no_my_active'), { parse_mode: 'HTML' });
         }
 
-        await ctx.reply(t('bid.my_active_header'), { parse_mode: 'HTML' });
+        await bot.sendMessage(chatId, t('bid.my_active_header'), { parse_mode: 'HTML' });
 
         for (const a of auctions) {
             const link = getAuctionLink(a.chat_id, a.message_id);
@@ -76,13 +79,13 @@ export function registerUserCommands(bot) {
                           `Статус: ${status}`;
 
             if (a.photo_id) {
-                await ctx.replyWithPhoto(a.photo_id, {
+                await bot.sendPhoto(chatId, a.photo_id, {
                     caption,
                     parse_mode: 'HTML',
                     disable_web_page_preview: true
                 });
             } else {
-                await ctx.reply(caption, {
+                await bot.sendMessage(chatId, caption, {
                     parse_mode: 'HTML',
                     disable_web_page_preview: true
                 });
@@ -90,12 +93,13 @@ export function registerUserCommands(bot) {
         }
     });
 
-    bot.command('won', async (ctx) => {
-        const userId = ctx.from.id;
+    bot.onText(/^\/won$/, async (msg) => {
+        const userId = msg.from.id;
+        const chatId = msg.chat.id;
         const auctions = q.getWonAuctions.all(userId);
 
         if (auctions.length === 0) {
-            return ctx.reply(t('bid.no_won'));
+            return bot.sendMessage(chatId, t('bid.no_won'), { parse_mode: 'HTML' });
         }
 
         let text = t('bid.won_header');
@@ -110,6 +114,6 @@ export function registerUserCommands(bot) {
             });
         }
 
-        await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+        await bot.sendMessage(chatId, text, { parse_mode: 'HTML', disable_web_page_preview: true });
     });
 }
