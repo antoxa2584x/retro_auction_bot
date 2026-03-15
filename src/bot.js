@@ -30,21 +30,12 @@ registerCallbackHandler(bot);
 registerChannelPostHandler(bot);
 registerAdminHandlers(bot);
 
-// Catch-all for unanswered callback queries to prevent "query is too old" errors
-bot.on('callback_query', async (query) => {
-    try {
-        await bot.answerCallbackQuery(query.id);
-    } catch (e) {
-        // Silently ignore if already answered
-    }
+// Error handling
+bot.on('polling_error', (error) => {
+    console.error('Polling error:', error.code, error.message);
 });
 
 // Restore scheduled jobs
 restoreJobs(bot);
 
 console.log('Auction bot started. Timezone:', TZ);
-
-// Error handling
-bot.on('polling_error', (error) => {
-    console.error('Polling error:', error.code, error.message);
-});
