@@ -19,6 +19,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
 * **Customizable Auction Templates** — admins can edit the auction post header, footer, and all field labels (e.g., "Min bid", "Bid step") directly from the bot.
 * **Auction Posting Wizard** — create and post new auctions to the channel directly via a step-by-step bot interface (upload photo, set title, price, step, and end date).
+* **AI Auction Generation** — integrate OpenAI's GPT-4o-mini to automatically generate professional auction titles and descriptions from uploaded photos. Just set your `OPENAI_API_KEY` in the admin settings.
 * **Smart Parsing** — extracts lot name, min bid, step, and end time from channel posts, with dynamic regex that adapts to your custom template labels.
 * **Advanced Admin Panel** — OTP-authenticated private panel to manage auctions, post new ones, and configure all bot settings (IDs, Language, Currency, Default End Times, and Post Templates).
 
@@ -51,7 +52,7 @@ To access the admin panel:
 * **🏁 Finish Immediately**: Instantly close any active auction.
 * **🔄 Restart**: Re-post a finished auction with a new end date.
 * **⚙️ Structured Settings**:
-    * **Main Settings**: Manage `Channel ID`, `Admin ID`, `Admin Nickname`, `Language`, and `Currency`.
+    * **Main Settings**: Manage `Channel ID`, `Admin ID`, `Admin Nickname`, `OpenAI API Key`, `Language`, and `Currency`.
     * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
     * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions.
 
@@ -69,6 +70,7 @@ ADMIN_NICKNAME=@admin    # Contact for the winner
 BOT_USERNAME=YourBot     # Bot username (without @) for deep links
 CHANNEL_USERNAME=Channel # (Optional) Public channel username for links
 TZ=Europe/Kyiv           # Timezone
+OPENAI_API_KEY=your_key   # (Optional) For AI generation
 ```
 
 ---

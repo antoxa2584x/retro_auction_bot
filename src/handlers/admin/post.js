@@ -1,12 +1,16 @@
 import { q } from '../../services/db.js';
-import { makeAdminPostStepKb, makeAdminPostCancelKb, makeAdminPostConfirmKb, makeAdminPostContactKb } from '../../utils/keyboards.js';
+import { makeAdminPostStepKb, makeAdminPostCancelKb, makeAdminPostConfirmKb, makeAdminPostContactKb, makeAdminPostAIGenKb, makeAdminPostAIConfirmKb } from '../../utils/keyboards.js';
 import { TZ, getChannelId, getAdminNickname } from "../../config/env.js";
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { scheduleClose } from '../../services/scheduler.js';
 import { makeKb } from '../../utils/keyboards.js';
-import { t, getCurrency } from '../../services/i18n.js';
+import { t, getCurrency, getLocale } from '../../services/i18n.js';
 import { sendAdminPanel } from './manage.js';
+import { generateAuctionDetails, calculateImageHash } from '../../services/openai.js';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 /** @type {Map<number, {step: string, data: any}>} */
 const postSessions = new Map();
@@ -41,7 +45,7 @@ export function registerPostHandlers(bot) {
             const session = postSessions.get(from.id);
             if (!session) return;
 
-            if (session.step === 'IMAGE') {
+            if (session.step === 'IMAGE' || session.step === 'AI_PROMPT') {
                 session.step = 'TITLE';
                 await bot.editMessageText(t('admin.post_step_title'), {
                     chat_id: chatId,
@@ -65,6 +69,85 @@ export function registerPostHandlers(bot) {
                 parse_mode: 'HTML'
             });
             await sendAdminPanel(bot, chatId, false);
+        }
+
+        if (data === 'post_ai_gen') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            const session = postSessions.get(from.id);
+            if (!session || session.step !== 'AI_PROMPT' || !session.data.photo_id) {
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+            }
+            await bot.answerCallbackQuery(query.id);
+
+            const statusMsg = await bot.sendMessage(chatId, t('admin.kb.ai_generating'), { parse_mode: 'HTML' });
+
+            try {
+                // Download file to temp
+                const tempPath = await bot.downloadFile(session.data.photo_id, os.tmpdir());
+
+                const imageHash = calculateImageHash(tempPath);
+                session.data.image_hash = imageHash;
+
+                const aiText = await generateAuctionDetails(tempPath, getLocale());
+                
+                fs.unlinkSync(tempPath);
+
+                session.data.full_text = aiText;
+                session.data.title = aiText.split('\n')[0].substring(0, 50);
+                session.step = 'AI_CONFIRM';
+
+                await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+                await bot.sendMessage(chatId, `${t('admin.kb.ai_generated_title')}\n\n<code>${aiText}</code>`, {
+                    parse_mode: 'HTML',
+                    reply_markup: makeAdminPostAIConfirmKb()
+                });
+            } catch (e) {
+                console.error('AI Gen error:', e);
+                const errorKey = e.message === 'OPENAI_API_KEY_NOT_SET' ? 'Set OpenAI API Key in settings first!' : t('common.error_try_again');
+                await bot.sendMessage(chatId, `❌ Error: ${errorKey}`, { parse_mode: 'HTML' });
+                
+                // Re-show manual title input
+                session.step = 'TITLE';
+                await bot.sendMessage(chatId, t('admin.post_step_title'), {
+                    parse_mode: 'HTML',
+                    reply_markup: makeAdminPostCancelKb()
+                });
+            }
+        }
+
+        if (data === 'post_ai_confirm') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            const session = postSessions.get(from.id);
+            if (!session || session.step !== 'AI_CONFIRM') {
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+            }
+            await bot.answerCallbackQuery(query.id);
+
+            // Save confirmed text for training
+            if (session.data.image_hash && session.data.full_text) {
+                q.insertAiTrainingData.run(session.data.image_hash, session.data.full_text, getLocale());
+            }
+
+            session.step = 'MIN_BID';
+            await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
+                parse_mode: 'HTML',
+                reply_markup: makeAdminPostCancelKb()
+            });
+        }
+
+        if (data === 'post_ai_edit') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            const session = postSessions.get(from.id);
+            if (!session || session.step !== 'AI_CONFIRM') {
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+            }
+            await bot.answerCallbackQuery(query.id);
+
+            session.step = 'AI_EDIT';
+            await bot.sendMessage(chatId, t('admin.kb.ai_edit_prompt'), {
+                parse_mode: 'HTML',
+                reply_markup: makeAdminPostCancelKb()
+            });
         }
 
         const stepMatch = data.match(/^post_step:(.+)$/);
@@ -209,17 +292,33 @@ export async function handlePostInput(bot, msg) {
         case 'IMAGE':
             if (photo) {
                 session.data.photo_id = photo[photo.length - 1].file_id;
-                session.step = 'TITLE';
-                await bot.sendMessage(chatId, t('admin.post_step_title'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                
+                const hasApiKey = !!q.getSetting.get('OPENAI_API_KEY')?.value || !!process.env.OPENAI_API_KEY;
+                if (hasApiKey) {
+                    session.step = 'AI_PROMPT';
+                    await bot.sendMessage(chatId, t('admin.kb.ai_received'), {
+                        parse_mode: 'HTML',
+                        reply_markup: makeAdminPostAIGenKb()
+                    });
+                } else {
+                    session.step = 'TITLE';
+                    await bot.sendMessage(chatId, t('admin.post_step_title'), {
+                        parse_mode: 'HTML',
+                        reply_markup: makeAdminPostCancelKb()
+                    });
+                }
                 return true;
             }
             return false;
 
         case 'TITLE':
+        case 'AI_EDIT':
             if (text) {
+                // Save edited text for training if it was an AI edit
+                if (session.step === 'AI_EDIT' && session.data.image_hash) {
+                    q.insertAiTrainingData.run(session.data.image_hash, text, getLocale());
+                }
+
                 session.data.full_text = text;
                 session.data.title = text.split('\n')[0].substring(0, 50);
                 session.step = 'MIN_BID';
