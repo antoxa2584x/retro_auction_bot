@@ -64,6 +64,15 @@ db.exec(`
         count INTEGER DEFAULT 0,
         PRIMARY KEY (user_id, request_date)
     );
+
+    CREATE TABLE IF NOT EXISTS ai_training_data
+    (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_hash TEXT,
+        final_text TEXT,
+        locale TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -209,6 +218,26 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active'`),
+
+  /**
+   * Inserts a new training example for AI.
+   * @type {import('better-sqlite3').Statement}
+   */
+  insertAiTrainingData: db.prepare(`
+    INSERT INTO ai_training_data (image_hash, final_text, locale)
+    VALUES (?, ?, ?)
+  `),
+
+  /**
+   * Retrieves the most recent training examples for a specific locale.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getRecentAiTrainingData: db.prepare(`
+    SELECT final_text FROM ai_training_data
+    WHERE locale=?
+    ORDER BY created_at DESC
+    LIMIT 5
+  `),
 
   /**
    * Checks if a specific bid amount already exists for an auction.

@@ -192,11 +192,13 @@ export async function sendSettingsMainPanel(bot, chatId, userId, isEdit = false,
     const channelId = getChannelId() || 'Not set';
     const adminId = getAdminId() || 'Not set';
     const adminNickname = getAdminNickname();
+    const openAiKey = q.getSetting.get('OPENAI_API_KEY')?.value ? '********' : 'Not set';
 
     const text = t('admin.panel_settings_main') + '\n\n' +
         `📺 <b>Channel ID:</b> <code>${channelId}</code>\n` +
         `👤 <b>Admin ID:</b> <code>${adminId}</code>\n` +
-        `🏷 <b>Admin Nickname:</b> <code>${adminNickname}</code>\n\n` +
+        `🏷 <b>Admin Nickname:</b> <code>${adminNickname}</code>\n` +
+        `🤖 <b>OpenAI API Key:</b> <code>${openAiKey}</code>\n\n` +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsMainKb();
