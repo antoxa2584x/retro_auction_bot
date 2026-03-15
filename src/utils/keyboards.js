@@ -44,7 +44,6 @@ export function makeAdminPanelKb() {
         inline_keyboard: [
             [{ text: t('admin.kb.view_active'), callback_data: 'adm_active' }],
             [{ text: t('admin.kb.view_finished'), callback_data: 'adm_finished' }],
-            [{ text: t('admin.kb.refresh'), callback_data: 'adm_list', style: 'primary' }],
             [{ text: t('admin.post_new'), callback_data: 'adm_post', style: 'success' }],
             [{ text: t('admin.kb.settings'), callback_data: 'adm_settings', style: 'danger' }]
         ]
