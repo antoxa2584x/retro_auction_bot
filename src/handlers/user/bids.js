@@ -17,7 +17,7 @@ export function registerBidHandlers(bot) {
 
         if (data === 'cancelbid') {
             await bot.answerCallbackQuery(query.id, { text: t('bid.cancel_bid'), show_alert: true });
-            await bot.deleteMessage(chatId, messageId).catch(() => {});
+            return bot.deleteMessage(chatId, messageId).catch(() => {});
         }
 
         const confMatch = data.match(/^confbid:(.+)$/);

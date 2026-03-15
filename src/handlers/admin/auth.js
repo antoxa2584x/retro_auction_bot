@@ -49,7 +49,7 @@ export function registerAuthHandlers(bot) {
                 chat_id: query.message.chat.id,
                 message_id: query.message.message_id
             }).catch(() => {});
-            await bot.answerCallbackQuery(query.id, { text: t('admin.cancelled'), show_alert: true });
+            return bot.answerCallbackQuery(query.id, { text: t('admin.cancelled'), show_alert: true });
         }
     });
 }

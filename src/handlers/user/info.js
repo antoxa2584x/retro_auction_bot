@@ -15,7 +15,7 @@ export function registerInfoHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'none') {
-            await bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+            return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
         }
 
         const infoMatch = data.match(/^info:(.+)$/);
@@ -74,7 +74,7 @@ export function registerInfoHandlers(bot) {
             const hidden = coalesced.length - shown;
             if (hidden > 0) text += t('bid.info_more', { count: hidden });
 
-            await bot.answerCallbackQuery(query.id, { text: text, show_alert: true });
+            return bot.answerCallbackQuery(query.id, { text: text, show_alert: true });
         }
     });
 }
