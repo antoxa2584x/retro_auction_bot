@@ -96,6 +96,7 @@ export function makeAdminSettingsMainKb() {
             [{ text: '📺 Channel ID', callback_data: 'set_conf:CHANNEL_ID' }],
             [{ text: '👤 Admin ID', callback_data: 'set_conf:ADMIN_ID' }],
             [{ text: '🏷 Admin Nickname', callback_data: 'set_conf:ADMIN_NICKNAME' }],
+            [{ text: '🤖 OpenAI API Key', callback_data: 'set_conf:OPENAI_API_KEY' }],
             [{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]
         ]
     };
@@ -170,6 +171,38 @@ export function makeAdminPostCancelKb(includeSkip = false) {
     }
     row.push({ text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger' });
     return { inline_keyboard: [row] };
+}
+
+/**
+ * Creates a keyboard with an option to generate description using AI.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPostAIGenKb() {
+    return {
+        inline_keyboard: [
+            [{ text: t('admin.kb.ai_gen'), callback_data: 'post_ai_gen', style: 'success'  }],
+            [{ text: t('admin.kb.skip'), callback_data: 'post_skip', style: 'primary' }],
+            [{ text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger' }]
+        ]
+    };
+}
+
+/**
+ * Creates a keyboard for confirming or editing AI-generated text.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPostAIConfirmKb() {
+    return {
+        inline_keyboard: [
+            [
+                { text: t('admin.kb.ai_confirm'), callback_data: 'post_ai_confirm', style: 'success'  },
+                { text: t('admin.kb.ai_edit'), callback_data: 'post_ai_edit', style: 'primary'  }
+            ],
+            [{ text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger' }]
+        ]
+    };
 }
 
 /**
