@@ -78,7 +78,14 @@
       "post_now": "🚀 Post now",
       "use_settings_contact": "👤 Use from settings",
       "enter_contact_manually": "⌨️ Enter manually",
-      "custom": "⌨️ Custom"
+      "custom": "⌨️ Custom",
+      "ai_gen": "🤖 AI Generate",
+      "ai_confirm": "✅ Confirm",
+      "ai_edit": "📝 Edit",
+      "ai_generating": "⏳ Generating auction details with AI...",
+      "ai_received": "🖼 <b>Photo received!</b>\n\nDo you want to generate auction title and description using AI?",
+      "ai_generated_title": "🤖 <b>AI Generated:</b>",
+      "ai_edit_prompt": "📝 <b>Enter the new auction description:</b>"
     }
   },
   "bid": {
