@@ -42,8 +42,8 @@ export function registerAuthHandlers(bot) {
         if (query.data === 'cancel_otp') {
             const admin = q.getAdmin.get(query.from.id);
             if (admin && admin.otp_code !== null) {
-                // Clear OTP if not yet verified
-                q.upsertAdminOtp.run(query.from.id, query.from.username || null, null, null);
+                // Remove pending admin record if not yet verified
+                q.deleteAdmin.run(query.from.id);
             }
             await bot.editMessageText(t('admin.otp_cancelled'), {
                 chat_id: query.message.chat.id,
