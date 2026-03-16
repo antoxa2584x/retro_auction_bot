@@ -399,7 +399,13 @@ export const q = {
    * Resets an auction to its initial "no bids" state.
    * @type {import('better-sqlite3').Statement}
    */
-  resetAuctionNoBids
+  resetAuctionNoBids,
+
+  /**
+   * Retrieves all unique user IDs who have interacted with auctions.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getAllUsers: db.prepare(`SELECT DISTINCT user_id FROM participants`)
 };
 
 /**

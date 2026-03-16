@@ -3,6 +3,7 @@ import { registerAuthHandlers, handleOtpInput } from './admin/auth.js';
 import { registerSettingsHandlers, handleSettingsInput, userSessions } from './admin/settings.js';
 import { registerManageHandlers, sendAdminPanel } from './admin/manage.js';
 import { registerPostHandlers, handlePostInput } from './admin/post.js';
+import { registerBroadcastHandlers, handleBroadcastInput } from './admin/broadcast.js';
 import { t } from '../services/i18n.js';
 
 export function registerAdminHandlers(bot) {
@@ -10,6 +11,7 @@ export function registerAdminHandlers(bot) {
     registerSettingsHandlers(bot);
     registerManageHandlers(bot);
     registerPostHandlers(bot);
+    registerBroadcastHandlers(bot);
 
     // Handle messages (text and photo)
     bot.on('message', async (msg) => {
@@ -30,6 +32,10 @@ export function registerAdminHandlers(bot) {
         // Auction posting input handling
         const postHandled = await handlePostInput(bot, msg);
         if (postHandled) return;
+
+        // Broadcast input handling
+        const broadcastHandled = await handleBroadcastInput(bot, msg);
+        if (broadcastHandled) return;
 
         // Settings input handling
         if (userSessions.has(msg.from.id)) {

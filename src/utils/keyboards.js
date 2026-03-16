@@ -45,6 +45,7 @@ export function makeAdminPanelKb() {
             [{ text: t('admin.kb.view_active'), callback_data: 'adm_active' }],
             [{ text: t('admin.kb.view_finished'), callback_data: 'adm_finished' }],
             [{ text: t('admin.post_new'), callback_data: 'adm_post', style: 'success' }],
+            [{ text: t('admin.kb.broadcast'), callback_data: 'adm_broadcast', style: 'primary' }],
             [{ text: t('admin.kb.settings'), callback_data: 'adm_settings', style: 'danger' }]
         ]
     };
@@ -352,4 +353,18 @@ export function makeAdminListKb(admins) {
     ]));
     buttons.push([{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]);
     return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the confirmation keyboard for broadcast.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminBroadcastConfirmKb() {
+    return {
+        inline_keyboard: [
+            [{ text: t('admin.kb.broadcast_send'), callback_data: 'broadcast_confirm', style: 'success' }],
+            [{ text: t('common.cancel'), callback_data: 'broadcast_cancel', style: 'danger' }]
+        ]
+    };
 }
