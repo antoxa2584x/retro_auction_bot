@@ -12,6 +12,13 @@ import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../service
 
 export const userSessions = new Map();
 
+
+/**
+ * Checks if a user has admin rights (verified record in admins table).
+ * 
+ * @param {number} userId 
+ * @returns {boolean}
+ */
 function isAdmin(userId) {
     const admin = q.getAdmin.get(userId);
     return !!(admin && admin.otp_code === null);
@@ -332,9 +339,4 @@ async function updateOrSendMessage(bot, chatId, text, kb, isEdit, messageId = nu
     } else {
         await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
     }
-}
-
-function isAdmin(userId) {
-    const admin = q.getAdmin.get(userId);
-    return admin && admin.otp_code === null;
 }
