@@ -4,12 +4,18 @@ import {
     makeAdminLangKb,
     makeAdminSettingsMainKb,
     makeAdminSettingsTemplateKb,
-    makeAdminSettingsDefaultsKb
+    makeAdminSettingsDefaultsKb,
+    makeAdminListKb
 } from '../../utils/keyboards.js';
 import { getAdminId, getChannelId, getAdminNickname } from "../../config/env.js";
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
 
 export const userSessions = new Map();
+
+function isAdmin(userId) {
+    const admin = q.getAdmin.get(userId);
+    return !!(admin && admin.otp_code === null);
+}
 
 /**
  * Registers handlers for the admin settings panel (language, currency, IDs).
@@ -44,6 +50,33 @@ export function registerSettingsHandlers(bot) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
             await bot.answerCallbackQuery(query.id);
             await sendSettingsDefaultsPanel(bot, chatId, from.id, true, messageId);
+        }
+
+        if (data === 'clear_openai_key') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            await bot.answerCallbackQuery(query.id);
+
+            q.setSetting.run('OPENAI_API_KEY', null);
+            await bot.sendMessage(chatId, t('admin.openai_key_deleted'), { parse_mode: 'HTML' });
+            await sendSettingsMainPanel(bot, chatId, from.id, false);
+        }
+
+        if (data === 'adm_admins') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            await bot.answerCallbackQuery(query.id);
+            await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
+        }
+
+        if (data.startsWith('adm_del:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            const delUserId = parseInt(data.split(':')[1]);
+            
+            // Prevent self-deletion if needed, though typically we want to allow it
+            // but at least one admin must remain?
+            
+            q.deleteAdmin.run(delUserId);
+            await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true });
+            await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_lang') {
@@ -121,6 +154,7 @@ export function registerSettingsHandlers(bot) {
             if (lastPanel === 'adm_settings_main') await sendSettingsMainPanel(bot, chatId, from.id, false);
             else if (lastPanel === 'adm_settings_template') await sendSettingsTemplatePanel(bot, chatId, from.id, false);
             else if (lastPanel === 'adm_settings_defaults') await sendSettingsDefaultsPanel(bot, chatId, from.id, false);
+            else if (lastPanel === 'adm_admins') await sendAdminManagementPanel(bot, chatId, from.id, false);
             else await sendSettingsPanel(bot, chatId, from.id, false);
         }
     });
@@ -154,6 +188,7 @@ export async function handleSettingsInput(bot, msg, text) {
         if (lastPanel === 'adm_settings_main') await sendSettingsMainPanel(bot, chatId, userId, false);
         else if (lastPanel === 'adm_settings_template') await sendSettingsTemplatePanel(bot, chatId, userId, false);
         else if (lastPanel === 'adm_settings_defaults') await sendSettingsDefaultsPanel(bot, chatId, userId, false);
+        else if (lastPanel === 'adm_admins') await sendAdminManagementPanel(bot, chatId, userId, false);
         else await sendSettingsPanel(bot, chatId, userId, false);
     } catch (e) {
         console.error(`[ADMIN SETTINGS ERROR] ${e.message}`);
@@ -245,6 +280,33 @@ export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = fa
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsDefaultsKb();
+    await updateOrSendMessage(bot, chatId, text, kb, isEdit, messageId);
+}
+
+/**
+ * Sends or updates the admin management panel.
+ * 
+ * @param {TelegramBot} bot 
+ * @param {number} chatId 
+ * @param {number} userId 
+ * @param {boolean} isEdit 
+ * @param {number} messageId 
+ */
+export async function sendAdminManagementPanel(bot, chatId, userId, isEdit = false, messageId = null) {
+    userSessions.set(`${userId}:last_panel`, 'adm_admins');
+    const admins = q.getAllAdmins.all();
+    
+    let text = t('admin.panel_admins') + '\n\n' + t('admin.admin_list_header');
+    
+    if (admins.length === 0) {
+        text += t('admin.no_admins');
+    } else {
+        admins.forEach(a => {
+            text += t('admin.admin_item', { user_id: a.user_id, name: a.username || 'Unknown' }) + '\n';
+        });
+    }
+
+    const kb = makeAdminListKb(admins);
     await updateOrSendMessage(bot, chatId, text, kb, isEdit, messageId);
 }
 

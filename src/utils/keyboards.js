@@ -78,6 +78,7 @@ export function makeAdminSettingsKb() {
                 { text: t('admin.settings_template'), callback_data: 'adm_settings_template' },
                 { text: t('admin.settings_defaults'), callback_data: 'adm_settings_defaults' }
             ],
+            [{ text: t('admin.settings_admins'), callback_data: 'adm_admins' }],
             [{ text: `🌐 ${t('admin.lang_button')}`, callback_data: 'adm_lang' }],
             [{ text: `💰 ${t('admin.cur_button')}`, callback_data: 'adm_cur' }],
             [{ text: t('common.back'), callback_data: 'adm_list', style: 'primary' }]
@@ -336,4 +337,19 @@ export function winnerKeyboard(leaderId, leaderName, price) {
             [{ text: `🏆 ${price} ${cur} : ${leaderName}`, url: url, style: 'success' }]
         ]
     };
+}
+
+/**
+ * Creates the admin list keyboard with delete buttons.
+ * 
+ * @param {Array} admins - List of admin objects {user_id, username}.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminListKb(admins) {
+    const buttons = admins.map(a => ([
+        { text: `${a.username || a.user_id}`, callback_data: 'none' },
+        { text: t('admin.kb.delete_admin'), callback_data: `adm_del:${a.user_id}`, style: 'danger' }
+    ]));
+    buttons.push([{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]);
+    return { inline_keyboard: buttons };
 }

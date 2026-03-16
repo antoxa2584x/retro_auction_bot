@@ -311,7 +311,7 @@ export const q = {
    * Retrieves all registered admins.
    * @type {import('better-sqlite3').Statement}
    */
-  getAllAdmins: db.prepare(`SELECT user_id FROM admins WHERE otp_code IS NULL`),
+  getAllAdmins: db.prepare(`SELECT user_id, username FROM admins WHERE otp_code IS NULL`),
 
   /**
    * Deletes an admin record.
