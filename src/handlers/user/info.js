@@ -67,7 +67,12 @@ export function registerInfoHandlers(bot) {
                     price: b.amount,
                     cur: getCurrency()
                 });
-                if ((text + line).length > 200) break; // Telegram alerts have limits
+
+                const remaining = coalesced.length - (shown + 1);
+                const moreText = remaining > 0 ? t('bid.info_more', { count: remaining }) : '';
+                
+                if ((text + line + moreText).length > 200) break; 
+                
                 text += line;
                 shown++;
             }
