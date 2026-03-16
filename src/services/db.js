@@ -314,6 +314,12 @@ export const q = {
   getAllAdmins: db.prepare(`SELECT user_id FROM admins WHERE otp_code IS NULL`),
 
   /**
+   * Deletes an admin record.
+   * @type {import('better-sqlite3').Statement}
+   */
+  deleteAdmin: db.prepare(`DELETE FROM admins WHERE user_id=?`),
+
+  /**
    * Retrieves OTP requests count for a user on a specific date.
    * @type {import('better-sqlite3').Statement}
    */
