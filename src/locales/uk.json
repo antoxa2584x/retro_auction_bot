@@ -40,10 +40,16 @@
     "panel_settings_main": "<b>⚙️ Основні налаштування</b>",
     "panel_settings_template": "<b>📝 Шаблон аукціону</b>",
     "panel_settings_defaults": "<b>⏳ Значення за замовчуванням</b>",
+    "panel_admins": "<b>👥 Керування адміністраторами</b>",
     "settings_main": "⚙️ Основні",
     "settings_template": "📝 Шаблон",
     "settings_defaults": "⏳ За замовчуванням",
+    "settings_admins": "👥 Адміни",
     "click_below_to_change": "<i>Натисніть на кнопку нижче, щоб змінити відповідне налаштування.</i>",
+    "admin_list_header": "<b>Список адміністраторів:</b>\n\n",
+    "admin_item": "👤 <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)",
+    "no_admins": "Адміністраторів не знайдено.",
+    "admin_deleted": "Адміністратора з ID <code>{{user_id}}</code> видалено.",
     "def_days": "Днів до завершення (за замовч.)",
     "def_time": "Час завершення (за замовч.)",
     "auction_header": "Заголовок аукціону",
@@ -85,7 +91,8 @@
       "ai_generating": "⏳ Генерую деталі аукціону за допомогою ШІ...",
       "ai_received": "🖼 <b>Фото отримано!</b>\n\nБажаєте згенерувати назву та опис аукціону за допомогою ШІ?",
       "ai_generated_title": "🤖 <b>Згенеровано ШІ:</b>",
-      "ai_edit_prompt": "📝 <b>Введіть новий опис для аукціону:</b>"
+      "ai_edit_prompt": "📝 <b>Введіть новий опис для аукціону:</b>",
+      "delete_admin": "🗑 Видалити"
     }
   },
   "bid": {

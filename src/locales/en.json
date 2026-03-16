@@ -40,10 +40,16 @@
     "panel_settings_main": "<b>⚙️ Main Settings</b>",
     "panel_settings_template": "<b>📝 Auction Template</b>",
     "panel_settings_defaults": "<b>⏳ Default Values</b>",
+    "panel_admins": "<b>👥 Admin Management</b>",
     "settings_main": "⚙️ Main",
     "settings_template": "📝 Template",
     "settings_defaults": "⏳ Defaults",
+    "settings_admins": "👥 Admins",
     "click_below_to_change": "<i>Click the button below to change the corresponding setting.</i>",
+    "admin_list_header": "<b>List of administrators:</b>\n\n",
+    "admin_item": "👤 <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)",
+    "no_admins": "No administrators found.",
+    "admin_deleted": "Administrator with ID <code>{{user_id}}</code> has been removed.",
     "def_days": "Default End Days",
     "def_time": "Default End Time",
     "auction_header": "Auction Header",
@@ -85,7 +91,8 @@
       "ai_generating": "⏳ Generating auction details with AI...",
       "ai_received": "🖼 <b>Photo received!</b>\n\nDo you want to generate auction title and description using AI?",
       "ai_generated_title": "🤖 <b>AI Generated:</b>",
-      "ai_edit_prompt": "📝 <b>Enter the new auction description:</b>"
+      "ai_edit_prompt": "📝 <b>Enter the new auction description:</b>",
+      "delete_admin": "🗑 Delete"
     }
   },
   "bid": {
