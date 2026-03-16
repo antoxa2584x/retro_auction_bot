@@ -4,9 +4,22 @@ import { closeAuction } from "../../services/scheduler.js";
 import { getAuctionLink } from '../../utils/utils.js';
 import { t } from '../../services/i18n.js';
 
+/** Rate limiter: max 5 bids per second per user */
+const bidTimestamps = new Map();
+
+function isRateLimited(userId) {
+    const now = Date.now();
+    const timestamps = bidTimestamps.get(userId) || [];
+    const recent = timestamps.filter(ts => now - ts < 1000);
+    if (recent.length >= 5) return true;
+    recent.push(now);
+    bidTimestamps.set(userId, recent);
+    return false;
+}
+
 /**
  * Registers handlers for the bidding process (confirmation and placement).
- * 
+ *
  * @param {TelegramBot} bot - Telegram bot instance.
  */
 export function registerBidHandlers(bot) {
@@ -22,6 +35,10 @@ export function registerBidHandlers(bot) {
 
         const confMatch = data.match(/^confbid:(.+)$/);
         if (confMatch) {
+            if (isRateLimited(from.id)) {
+                return bot.answerCallbackQuery(query.id, { text: t('bid.rate_limited'), show_alert: true });
+            }
+
             const params = confMatch[1];
             const [chatIdStr, msgIdStr, priceStr] = params.split(':');
             const target_chat_id = Number(chatIdStr);

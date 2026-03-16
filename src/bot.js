@@ -3,7 +3,7 @@
  * Initializes the bot, loads settings, registers handlers, and restores jobs.
  */
 import TelegramBot from 'node-telegram-bot-api';
-import { BOT_TOKEN, TZ } from './config/env.js';
+import { BOT_TOKEN, TZ, SUPER_ADMIN_ID } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
 import { registerAdminHandlers } from './handlers/admin.js';
@@ -21,6 +21,14 @@ if (dbLocale) {
 const dbCurrency = q.getSetting.get('CURRENCY')?.value;
 if (dbCurrency) {
     setCurrency(dbCurrency);
+}
+
+// Auto-register super admin on startup
+if (SUPER_ADMIN_ID) {
+    const existing = q.getAdmin.get(SUPER_ADMIN_ID);
+    if (!existing || existing.otp_code !== null) {
+        q.setAdmin.run(SUPER_ADMIN_ID, 'super_admin');
+    }
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });

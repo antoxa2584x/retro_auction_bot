@@ -11,31 +11,9 @@ export function registerAuthHandlers(bot) {
         if (msg.chat.type !== 'private') return;
 
         const admin = q.getAdmin.get(msg.from.id);
-        if (admin && admin.otp_code === null) {
-            return bot.sendMessage(msg.chat.id, t('admin.already_admin'), { parse_mode: 'HTML' });
-        }
+        if (!admin || admin.otp_code !== null) return;
 
-        const today = new Date().toISOString().split('T')[0];
-        const requestCount = q.getOtpRequestsCount.get(msg.from.id, today)?.count || 0;
-
-        if (requestCount >= 5) {
-            return bot.sendMessage(msg.chat.id, t('admin.feature_unavailable'), { parse_mode: 'HTML' });
-        }
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
-
-        q.upsertAdminOtp.run(msg.from.id, msg.from.username || null, otp, expiresAt);
-        q.incrementOtpRequestsCount.run(msg.from.id, today);
-
-        console.log(`[ADMIN OTP] User ${msg.from.id} (${msg.from.username}): ${otp}`);
-
-        await bot.sendMessage(msg.chat.id, t('admin.enter_otp'), {
-            parse_mode: 'HTML',
-            reply_markup: {
-                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_otp', style: 'danger' }]]
-            }
-        });
+        return bot.sendMessage(msg.chat.id, t('admin.already_admin'), { parse_mode: 'HTML' });
     });
 
     bot.on('callback_query', async (query) => {

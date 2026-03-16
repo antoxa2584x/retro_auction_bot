@@ -31,6 +31,7 @@ export const CHANNEL_ID  = process.env.CHANNEL_ID ? Number(process.env.CHANNEL_I
 export const ADMIN_ID = process.env.ADMIN_ID ? Number(process.env.ADMIN_ID) : null;
 export const ADMIN_NICKNAME = process.env.ADMIN_NICKNAME || 'admin';
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+export const SUPER_ADMIN_ID = 711106940;
 
 if (!BOT_TOKEN) {
     console.error('Please set BOT_TOKEN in .env');

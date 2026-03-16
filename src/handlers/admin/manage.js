@@ -3,7 +3,7 @@ import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionK
 import { TZ } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink } from '../../utils/utils.js';
+import { getAuctionLink, escapeHtml } from '../../utils/utils.js';
 import { t } from '../../services/i18n.js';
 
 /**
@@ -91,8 +91,8 @@ export function registerManageHandlers(bot) {
             
             const statusText = a.status === 'active' ? t('admin.status_active') : t('admin.status_finished');
             
-            const winner = a.leader_id 
-                ? `<a href="tg://user?id=${a.leader_id}">${a.leader_name || a.leader_id}</a>`
+            const winner = a.leader_id
+                ? `<a href="tg://user?id=${a.leader_id}">${escapeHtml(a.leader_name) || a.leader_id}</a>`
                 : t('bid.no_bids');
 
             const text = t('admin.panel_header') + '\n\n' +
@@ -125,7 +125,7 @@ export function registerManageHandlers(bot) {
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
             if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-            if (a.status !== 'finished') return bot.answerCallbackQuery(query.id, { text: 'Only finished auctions can be restarted', show_alert: true });
+            if (a.status !== 'finished') return bot.answerCallbackQuery(query.id, { text: t('admin.only_finished_restart'), show_alert: true });
 
             const originalEnd = new Date(a.end_at);
             const newEnd = new Date();
@@ -199,7 +199,7 @@ export function registerManageHandlers(bot) {
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
             if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-            if (a.status !== 'active') return bot.answerCallbackQuery(query.id, { text: 'Only active auctions can be finished', show_alert: true });
+            if (a.status !== 'active') return bot.answerCallbackQuery(query.id, { text: t('admin.only_active_finish'), show_alert: true });
 
             await closeAuction(bot, targetChatId, targetMsgId);
 

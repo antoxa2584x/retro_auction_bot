@@ -201,7 +201,7 @@ export function registerPostHandlers(bot) {
             const channelId = getChannelId();
             
             if (!channelId) {
-                return bot.sendMessage(chatId, "Channel ID is not set in settings!").catch(() => {});
+                return bot.sendMessage(chatId, t('admin.channel_not_set'), { parse_mode: 'HTML' }).catch(() => {});
             }
 
             try {

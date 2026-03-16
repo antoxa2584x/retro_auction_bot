@@ -73,10 +73,13 @@ export function registerUserCommands(bot) {
             const status = a.leader_id === userId ? t('bid.status_leading') : t('bid.status_outbid');
             const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
             
-            const caption = `🔹 <a href="${link}">${a.title}</a>\n` +
-                          `Поточна ціна: <b>${a.current_price} грн</b>\n` +
-                          `Завершення: <b>${endDate}</b>\n` +
-                          `Статус: ${status}`;
+            const caption = t('bid.my_item', {
+                link,
+                title: a.title,
+                price: a.current_price,
+                date: endDate,
+                status
+            });
 
             if (a.photo_id) {
                 await bot.sendPhoto(chatId, a.photo_id, {
