@@ -6,6 +6,11 @@ import { scheduleClose, closeAuction } from '../../services/scheduler.js';
 import { getAuctionLink, formatUserLink } from '../../utils/utils.js';
 import { t } from '../../services/i18n.js';
 
+function isAdmin(userId) {
+    const admin = q.getAdmin.get(userId);
+    return admin && admin.otp_code === null;
+}
+
 /**
  * Registers handlers for managing auctions in the admin panel.
  * 
@@ -209,11 +214,6 @@ export function registerManageHandlers(bot) {
     });
 }
 
-function isAdmin(userId) {
-    const admin = q.getAdmin.get(userId);
-    return admin && admin.otp_code === null;
-}
-
 /**
  * Sends or updates the main admin panel message.
  * 
@@ -246,9 +246,4 @@ export async function sendAdminPanel(bot, chatId, isEdit = false, messageId = nu
     } else {
         await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
     }
-}
-
-function isAdmin(userId) {
-    const admin = q.getAdmin.get(userId);
-    return admin && admin.otp_code === null;
 }
