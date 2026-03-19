@@ -107,7 +107,14 @@ export async function closeAuction(bot, chat_id, message_id) {
                     admin: adminContact
                 });
                 try {
-                    await bot.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
+                    if (row.photo_id) {
+                        await bot.sendPhoto(row.leader_id, row.photo_id, {
+                            caption: winnerText,
+                            parse_mode: 'HTML'
+                        });
+                    } else {
+                        await bot.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
+                    }
                 } catch (err) {
                     console.error(`Failed to notify winner ${row.leader_id}:`, err.message);
                 }

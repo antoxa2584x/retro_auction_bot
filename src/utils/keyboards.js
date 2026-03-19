@@ -59,9 +59,17 @@ export function makeAdminPanelKb() {
  */
 export function makeAdminActiveKb(auctions) {
     const cur = getCurrency();
-    const buttons = auctions.map(a => ([
-        { text: `🚀 ${a.title} - ${a.current_price} ${cur}`, callback_data: `adm_view:${a.chat_id}:${a.message_id}` }
-    ]));
+    const buttons = auctions.map(a => {
+        let emoji = '🚀';
+        if (a.participants_count === 0) {
+            emoji = '⚪';
+        } else if (a.participants_count < 10) {
+            emoji = '🟢';
+        } else {
+            emoji = '🔥';
+        }
+        return [{ text: `${emoji} ${a.title} - ${a.current_price} ${cur}`, callback_data: `adm_view:${a.chat_id}:${a.message_id}` }];
+    });
     buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list', style: 'primary' }]);
     return { inline_keyboard: buttons };
 }

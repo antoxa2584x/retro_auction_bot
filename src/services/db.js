@@ -47,6 +47,8 @@ db.exec(`
     (
         user_id INTEGER PRIMARY KEY,
         username TEXT,
+        first_name TEXT,
+        last_name TEXT,
         otp_code TEXT,
         otp_expires_at TEXT
     );
@@ -86,6 +88,20 @@ const migrations = [
     { name: 'admin_contact', type: 'TEXT' }
 ];
 
+const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
+const adminColumnNames = adminColumns.map(c => c.name);
+const adminMigrations = [
+    { name: 'first_name', type: 'TEXT' },
+    { name: 'last_name', type: 'TEXT' }
+];
+
+for (const m of adminMigrations) {
+    if (!adminColumnNames.includes(m.name)) {
+        console.log(`Migrating: Adding column ${m.name} to admins table`);
+        db.exec(`ALTER TABLE admins ADD COLUMN ${m.name} ${m.type}`);
+    }
+}
+
 for (const m of migrations) {
     if (!columnNames.includes(m.name)) {
         console.log(`Migrating: Adding column ${m.name} to auctions table`);
@@ -124,9 +140,9 @@ const getNewLeader = db.prepare(`
    LIMIT 1
 `); // NEW
 
-// 4) count total bids
-const countBids = db.prepare(`
-  SELECT COUNT(*) AS cnt
+// 4) count unique participants
+const countParticipants = db.prepare(`
+  SELECT COUNT(DISTINCT user_id) AS cnt
     FROM bids
    WHERE chat_id=? AND message_id=?
 `); // NEW
@@ -217,7 +233,7 @@ export const q = {
    * Selects all currently active auctions.
    * @type {import('better-sqlite3').Statement}
    */
-  selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active'`),
+  selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active' ORDER BY message_id ASC`),
 
   /**
    * Inserts a new training example for AI.
@@ -281,10 +297,11 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   upsertAdminOtp: db.prepare(`
-    INSERT INTO admins (user_id, username, otp_code, otp_expires_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO admins (user_id, username, first_name, last_name, otp_code, otp_expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
-      username=excluded.username, otp_code=excluded.otp_code, otp_expires_at=excluded.otp_expires_at
+      username=excluded.username, first_name=excluded.first_name, last_name=excluded.last_name, 
+      otp_code=excluded.otp_code, otp_expires_at=excluded.otp_expires_at
   `),
 
   /**
@@ -311,7 +328,7 @@ export const q = {
    * Retrieves all registered admins.
    * @type {import('better-sqlite3').Statement}
    */
-  getAllAdmins: db.prepare(`SELECT user_id, username FROM admins WHERE otp_code IS NULL`),
+  getAllAdmins: db.prepare(`SELECT * FROM admins WHERE otp_code IS NULL`),
 
   /**
    * Deletes an admin record.
@@ -339,13 +356,13 @@ export const q = {
    * Retrieves all active auctions for the admin panel.
    * @type {import('better-sqlite3').Statement}
    */
-  getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY end_at ASC`),
+  getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id ASC`),
 
   /**
    * Retrieves recently finished auctions for the admin panel.
    * @type {import('better-sqlite3').Statement}
    */
-  getRecentlyFinishedAuctions: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY end_at DESC LIMIT 10`),
+  getRecentlyFinishedAuctions: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY message_id DESC LIMIT 10`),
 
   /**
    * Restarts a finished auction.
@@ -390,10 +407,10 @@ export const q = {
   getNewLeader,
 
   /**
-   * Counts the total number of bids for an auction.
+   * Counts the total number of unique participants for an auction.
    * @type {import('better-sqlite3').Statement}
    */
-  countBids,
+  countParticipants,
 
   /**
    * Resets an auction to its initial "no bids" state.
@@ -448,8 +465,8 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
     q.insertBid.run(chat_id, message_id, user.id, price, now.toISOString());
 
     // 6. Update auction state
-    const bidsCount = q.countBids.get(chat_id, message_id);
-    const finalParticipants = bidsCount?.cnt ?? 0;
+    const partCount = q.countParticipants.get(chat_id, message_id);
+    const finalParticipants = partCount?.cnt ?? 0;
     const leaderName = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
 
     q.updateState.run(

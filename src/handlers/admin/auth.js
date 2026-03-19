@@ -26,7 +26,14 @@ export function registerAuthHandlers(bot) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
-        q.upsertAdminOtp.run(msg.from.id, msg.from.username || null, otp, expiresAt);
+        q.upsertAdminOtp.run(
+            msg.from.id, 
+            msg.from.username || null, 
+            msg.from.first_name || null, 
+            msg.from.last_name || null, 
+            otp, 
+            expiresAt
+        );
         q.incrementOtpRequestsCount.run(msg.from.id, today);
 
         console.log(`[ADMIN OTP] User ${msg.from.id} (${msg.from.username}): ${otp}`);

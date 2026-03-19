@@ -18,6 +18,22 @@ export function getAuctionLink(chatId, messageId) {
 }
 
 /**
+ * Formats a user mention link based on available information.
+ * 
+ * @param {number} userId - Telegram user ID.
+ * @param {string} [name] - User's name to display.
+ * @param {string} [username] - Telegram @username.
+ * @returns {string} HTML-formatted link.
+ */
+export function formatUserLink(userId, name, username) {
+    const displayName = escapeHtml(name || (username ? `@${username}` : `ID ${userId}`));
+    if (username) {
+        return `<a href="https://t.me/${username}">${displayName}</a>`;
+    }
+    return `<a href="tg://user?id=${userId}">${displayName}</a>`;
+}
+
+/**
  * Escapes HTML special characters to prevent injection when using HTML parse mode.
  * 
  * @param {string} str - String to escape.

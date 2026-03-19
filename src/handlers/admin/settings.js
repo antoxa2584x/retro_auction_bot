@@ -8,6 +8,7 @@ import {
     makeAdminListKb
 } from '../../utils/keyboards.js';
 import { getAdminId, getChannelId, getAdminNickname } from "../../config/env.js";
+import { formatUserLink } from '../../utils/utils.js';
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
 
 export const userSessions = new Map();
@@ -309,7 +310,8 @@ export async function sendAdminManagementPanel(bot, chatId, userId, isEdit = fal
         text += t('admin.no_admins');
     } else {
         admins.forEach(a => {
-            text += t('admin.admin_item', { user_id: a.user_id, name: a.username || 'Unknown' }) + '\n';
+            const name = a.username ? `@${a.username}` : (a.first_name ? `${a.first_name} ${a.last_name || ''}`.trim() : `ID ${a.user_id}`);
+            text += t('admin.admin_item', { user_id: a.user_id, name: formatUserLink(a.user_id, name, a.username) }) + '\n';
         });
     }
 
