@@ -50,6 +50,7 @@
     "admin_item": "👤 <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)",
     "no_admins": "Адміністраторів не знайдено.",
     "admin_deleted": "Адміністратора з ID <code>{{user_id}}</code> видалено.",
+    "new_admin_notify": "🔔 <b>Новий адміністратор!</b>\n\n👤 Користувач: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)\nДодано адміністратором: <a href=\"tg://user?id={{added_by_id}}\">{{added_by_name}}</a>",
     "def_days": "Днів до завершення (за замовч.)",
     "def_time": "Час завершення (за замовч.)",
     "auction_header": "Заголовок аукціону",

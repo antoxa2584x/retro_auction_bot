@@ -50,6 +50,7 @@
     "admin_item": "👤 <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)",
     "no_admins": "No administrators found.",
     "admin_deleted": "Administrator with ID <code>{{user_id}}</code> has been removed.",
+    "new_admin_notify": "🔔 <b>New Administrator!</b>\n\n👤 User: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)\nAdded by admin: <a href=\"tg://user?id={{added_by_id}}\">{{added_by_name}}</a>",
     "def_days": "Default End Days",
     "def_time": "Default End Time",
     "auction_header": "Auction Header",

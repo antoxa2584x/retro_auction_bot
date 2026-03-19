@@ -1,5 +1,6 @@
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
+import { escapeHtml } from '../../utils/utils.js';
 
 /**
  * Registers handlers for admin authentication (OTP process).
@@ -66,6 +67,22 @@ export function handleOtpInput(bot, msg, text) {
     if (/^\d{6}$/.test(text)) {
         const result = q.verifyOtp.run(msg.from.id, text, new Date().toISOString());
         if (result.changes > 0) {
+            // Notify other admins
+            const otherAdmins = q.getAllAdmins.all();
+            const newAdminName = msg.from.first_name ? (msg.from.last_name ? `${msg.from.first_name} ${msg.from.last_name}` : msg.from.first_name)
+                : (msg.from.username ? `@${msg.from.username}` : `ID ${msg.from.id}`);
+
+            for (const admin of otherAdmins) {
+                if (admin.user_id !== msg.from.id) {
+                    bot.sendMessage(admin.user_id, t('admin.new_admin_notify', {
+                        user_id: msg.from.id,
+                        name: escapeHtml(newAdminName),
+                        added_by_id: msg.from.id,
+                        added_by_name: escapeHtml(newAdminName)
+                    }), { parse_mode: 'HTML' }).catch(() => {});
+                }
+            }
+
             bot.sendMessage(msg.chat.id, t('admin.become_admin'), { parse_mode: 'HTML' });
             return true;
         }

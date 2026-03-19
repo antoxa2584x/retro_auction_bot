@@ -3,7 +3,7 @@ import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionK
 import { TZ } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink } from '../../utils/utils.js';
+import { getAuctionLink, formatUserLink } from '../../utils/utils.js';
 import { t } from '../../services/i18n.js';
 
 /**
@@ -92,7 +92,7 @@ export function registerManageHandlers(bot) {
             const statusText = a.status === 'active' ? t('admin.status_active') : t('admin.status_finished');
             
             const winner = a.leader_id 
-                ? `<a href="tg://user?id=${a.leader_id}">${a.leader_name || a.leader_id}</a>`
+                ? formatUserLink(a.leader_id, a.leader_name)
                 : t('bid.no_bids');
 
             const text = t('admin.panel_header') + '\n\n' +
@@ -207,6 +207,11 @@ export function registerManageHandlers(bot) {
             await sendAdminPanel(bot, chatId, true, messageId);
         }
     });
+}
+
+function isAdmin(userId) {
+    const admin = q.getAdmin.get(userId);
+    return admin && admin.otp_code === null;
 }
 
 /**
