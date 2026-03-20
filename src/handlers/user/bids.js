@@ -1,8 +1,8 @@
 import { q, placeBidTransaction } from '../../services/db.js';
-import { makeKb, confirmBidKb } from '../../utils/keyboards.js';
+import { makeKb, confirmBidKb, confirmManualBidKb } from '../../utils/keyboards.js';
 import { closeAuction } from "../../services/scheduler.js";
 import { getAuctionLink } from '../../utils/utils.js';
-import { t } from '../../services/i18n.js';
+import { t, getCurrency } from '../../services/i18n.js';
 
 /**
  * Registers handlers for the bidding process (confirmation and placement).
@@ -20,6 +20,59 @@ export function registerBidHandlers(bot) {
             return bot.deleteMessage(chatId, messageId).catch(() => {});
         }
 
+        const manualMatch = data.match(/^manualbid:(.+)$/);
+        if (manualMatch) {
+            const params = manualMatch[1];
+            const [targetChatIdStr, targetMsgIdStr] = params.split(':');
+            const targetChatId = Number(targetChatIdStr);
+            const targetMsgId = Number(targetMsgIdStr);
+
+            await bot.answerCallbackQuery(query.id);
+            
+            const prompt = await bot.sendMessage(chatId, t('bid.manual_prompt'), {
+                reply_markup: { force_reply: true }
+            });
+
+            bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
+                const amount = Number(replyMsg.text.replace(/[^0-9.]/g, ''));
+                const cur = getCurrency();
+
+                if (isNaN(amount) || amount <= 0) {
+                    return bot.sendMessage(chatId, t('bid.error_invalid_amount'));
+                }
+
+                const auction = q.getAuction.get(targetChatId, targetMsgId);
+                if (!auction) {
+                    return bot.sendMessage(chatId, t('bid.not_found'));
+                }
+
+                const minBid = auction.leader_id ? auction.current_price + auction.step : auction.current_price;
+                if (amount < minBid) {
+                    return bot.sendMessage(chatId, t('bid.error_low_amount', { min: minBid, cur }));
+                }
+
+                const messageText = t('bid.confirm_text', {
+                    title: auction.full_text || auction.title,
+                    price: amount
+                });
+                const replyMarkup = confirmManualBidKb(targetChatId, targetMsgId, amount);
+
+                if (auction.photo_id) {
+                    await bot.sendPhoto(chatId, auction.photo_id, {
+                        caption: messageText,
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    });
+                } else {
+                    await bot.sendMessage(chatId, messageText, {
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    });
+                }
+            });
+            return;
+        }
+
         const confMatch = data.match(/^confbid:(.+)$/);
         if (confMatch) {
             const params = confMatch[1];
@@ -33,7 +86,8 @@ export function registerBidHandlers(bot) {
 
             if (!res.success) {
                 if (res.reason === 'not_found') {
-                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    return bot.deleteMessage(chatId, messageId).catch(() => {});
                 }
 
                 if (res.reason === 'finished') {
@@ -52,6 +106,10 @@ export function registerBidHandlers(bot) {
                     await bot.answerCallbackQuery(query.id, { text: alertText, show_alert: true });
                     
                     const row = q.getAuction.get(target_chat_id, target_message_id);
+                    if (!row) {
+                        return bot.deleteMessage(chatId, messageId).catch(() => {});
+                    }
+
                     const newText = t('bid.alert_with_details', {
                         alert: alertText,
                         title: row.full_text || row.title,
@@ -65,14 +123,14 @@ export function registerBidHandlers(bot) {
                             message_id: messageId,
                             parse_mode: 'HTML',
                             reply_markup: newKb
-                        });
+                        }).catch(() => {});
                     } else {
                         await bot.editMessageText(newText, {
                             chat_id: chatId,
                             message_id: messageId,
                             parse_mode: 'HTML',
                             reply_markup: newKb
-                        });
+                        }).catch(() => {});
                     }
                     return;
                 }

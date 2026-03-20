@@ -75,6 +75,28 @@ export function makeAdminActiveKb(auctions) {
 }
 
 /**
+ * Creates a carousel navigation keyboard for "/my" or "/won" auctions.
+ * 
+ * @param {number} index - Current auction index.
+ * @param {number} total - Total number of auctions.
+ * @param {string} [prefix='my'] - Prefix for callback data ('my' or 'won').
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeMyCarouselKb(index, total, prefix = 'my') {
+    const buttons = [];
+    const row = [];
+
+    if (total > 1) {
+        row.push({ text: t('admin.kb.prev'), callback_data: `${prefix}_prev:${index}` });
+        row.push({ text: `${index + 1} / ${total}`, callback_data: 'undefined' });
+        row.push({ text: t('admin.kb.next'), callback_data: `${prefix}_next:${index}` });
+        buttons.push(row);
+    }
+
+    return { inline_keyboard: buttons };
+}
+
+/**
  * Creates the admin settings keyboard.
  * 
  * @returns {Object} Inline keyboard object.
@@ -307,6 +329,28 @@ export function makeAdminAuctionActionKb(chatId, messageId, status) {
  * @returns {Object} Inline keyboard object.
  */
 export function confirmBidKb(chatId, msgId, price) {
+    return {
+        inline_keyboard: [
+            [
+                { text: t('bid.kb.confirm', { price }), callback_data: `confbid:${chatId}:${msgId}:${price}`, style: 'success' },
+                { text: t('bid.kb.manual'), callback_data: `manualbid:${chatId}:${msgId}`, style: 'primary' }
+            ],
+            [
+                { text: t('bid.kb.cancel'), callback_data: 'cancelbid', style: 'danger' }
+            ]
+        ]
+    };
+}
+
+/**
+ * Creates a confirmation keyboard for a manual bid.
+ * 
+ * @param {number} chatId - Chat ID.
+ * @param {number} msgId - Message ID.
+ * @param {number} price - Bid amount.
+ * @returns {Object} Inline keyboard object.
+ */
+export function confirmManualBidKb(chatId, msgId, price) {
     return {
         inline_keyboard: [
             [

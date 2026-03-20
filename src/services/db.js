@@ -270,6 +270,7 @@ export const q = {
       FROM auctions a
       JOIN bids b ON a.chat_id=b.chat_id AND a.message_id=b.message_id
      WHERE b.user_id=? AND a.status='active'
+     ORDER BY a.message_id DESC
   `),
 
   /**
@@ -280,7 +281,7 @@ export const q = {
     SELECT *
       FROM auctions
      WHERE status='finished' AND leader_id=?
-     ORDER BY end_at DESC
+     ORDER BY message_id DESC
      LIMIT 10
   `),
 
@@ -451,7 +452,7 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         return { success: false, reason: 'bid_exists', expectedPrice };
     }
 
-    if (price !== expectedPrice) {
+    if (price < expectedPrice) {
         return { success: false, reason: 'price_changed', expectedPrice };
     }
 

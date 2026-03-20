@@ -4,7 +4,43 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
 import { t } from '../../services/i18n.js';
-import { confirmBidKb } from '../../utils/keyboards.js';
+import { confirmBidKb, makeMyCarouselKb } from '../../utils/keyboards.js';
+
+/**
+ * Formats a single auction for the /my carousel.
+ * 
+ * @param {Object} a - Auction object.
+ * @param {number} userId - User ID.
+ * @returns {string} Formatted caption.
+ */
+function formatMyAuctionCaption(a, userId) {
+    const link = getAuctionLink(a.chat_id, a.message_id);
+    const status = a.leader_id === userId ? t('bid.status_leading') : t('bid.status_outbid');
+    const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+
+    return `🔹 <a href="${link}">${a.title}</a>\n` +
+           `${t('admin.auction_min_bid_text').replace('🔸 ', '')}: <b>${a.current_price} грн</b>\n` +
+           `${t('admin.auction_end_date_text').replace('🕘 ', '')}: <b>${endDate}</b>\n` +
+           `Статус: ${status}`;
+}
+
+/**
+ * Formats a single auction for the /won carousel.
+ * 
+ * @param {Object} a - Auction object.
+ * @returns {string} Formatted caption.
+ */
+function formatWonAuctionCaption(a) {
+    const link = getAuctionLink(a.chat_id, a.message_id);
+    const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+
+    return t('bid.won_item', {
+        link: link,
+        title: a.title,
+        price: a.current_price,
+        date: endDate
+    });
+}
 
 /**
  * Registers user commands (/start, /my, /won).
@@ -66,29 +102,113 @@ export function registerUserCommands(bot) {
             return bot.sendMessage(chatId, t('bid.no_my_active'), { parse_mode: 'HTML' });
         }
 
-        await bot.sendMessage(chatId, t('bid.my_active_header'), { parse_mode: 'HTML' });
+        const a = auctions[0];
+        const caption = formatMyAuctionCaption(a, userId);
+        const replyMarkup = makeMyCarouselKb(0, auctions.length);
 
-        for (const a of auctions) {
-            const link = getAuctionLink(a.chat_id, a.message_id);
-            const status = a.leader_id === userId ? t('bid.status_leading') : t('bid.status_outbid');
-            const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+        if (a.photo_id) {
+            await bot.sendPhoto(chatId, a.photo_id, {
+                caption,
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup
+            });
+        } else {
+            await bot.sendMessage(chatId, caption, {
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup,
+                disable_web_page_preview: true
+            });
+        }
+    });
+
+    bot.on('callback_query', async (query) => {
+        const { data, message, from } = query;
+        const chatId = message.chat.id;
+        const messageId = message.message_id;
+        const userId = from.id;
+
+        const myCarouselMatch = data.match(/^my_(prev|next):(\d+)$/);
+        const wonCarouselMatch = data.match(/^won_(prev|next):(\d+)$/);
+
+        if (myCarouselMatch || wonCarouselMatch) {
+            const isWon = !!wonCarouselMatch;
+            const match = isWon ? wonCarouselMatch : myCarouselMatch;
+            const action = match[1];
+            const currentIndex = parseInt(match[2], 10);
             
-            const caption = `🔹 <a href="${link}">${a.title}</a>\n` +
-                          `Поточна ціна: <b>${a.current_price} грн</b>\n` +
-                          `Завершення: <b>${endDate}</b>\n` +
-                          `Статус: ${status}`;
+            const auctions = isWon ? q.getWonAuctions.all(userId) : q.getParticipatingAuctions.all(userId);
+            const noItemsKey = isWon ? 'bid.no_won' : 'bid.no_my_active';
 
-            if (a.photo_id) {
-                await bot.sendPhoto(chatId, a.photo_id, {
-                    caption,
-                    parse_mode: 'HTML',
-                    disable_web_page_preview: true
-                });
+            if (auctions.length === 0) {
+                await bot.answerCallbackQuery(query.id, { text: t(noItemsKey), show_alert: true });
+                return bot.deleteMessage(chatId, messageId).catch(() => {});
+            }
+
+            let nextIndex;
+            if (action === 'prev') {
+                nextIndex = (currentIndex - 1 + auctions.length) % auctions.length;
             } else {
-                await bot.sendMessage(chatId, caption, {
-                    parse_mode: 'HTML',
-                    disable_web_page_preview: true
-                });
+                nextIndex = (currentIndex + 1) % auctions.length;
+            }
+
+            if (nextIndex === currentIndex && auctions.length > 1) {
+                return bot.answerCallbackQuery(query.id);
+            }
+
+            const a = auctions[nextIndex];
+            const caption = isWon ? formatWonAuctionCaption(a) : formatMyAuctionCaption(a, userId);
+            const prefix = isWon ? 'won' : 'my';
+            const replyMarkup = makeMyCarouselKb(nextIndex, auctions.length, prefix);
+
+            await bot.answerCallbackQuery(query.id);
+
+            try {
+                if (a.photo_id) {
+                    // If the current message has a photo, we can try to edit it
+                    if (message.photo) {
+                        await bot.editMessageMedia({
+                            type: 'photo',
+                            media: a.photo_id,
+                            caption: caption,
+                            parse_mode: 'HTML'
+                        }, {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            reply_markup: replyMarkup
+                        });
+                    } else {
+                        // If it was a text message, we must delete and send a new one with photo
+                        await bot.deleteMessage(chatId, messageId).catch(() => {});
+                        await bot.sendPhoto(chatId, a.photo_id, {
+                            caption,
+                            parse_mode: 'HTML',
+                            reply_markup: replyMarkup
+                        });
+                    }
+                } else {
+                    // No photo for the next auction
+                    if (message.photo) {
+                        // Current has photo, next doesn't - must delete and send text
+                        await bot.deleteMessage(chatId, messageId).catch(() => {});
+                        await bot.sendMessage(chatId, caption, {
+                            parse_mode: 'HTML',
+                            reply_markup: replyMarkup,
+                            disable_web_page_preview: true
+                        });
+                    } else {
+                        // Both are text
+                        await bot.editMessageText(caption, {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            parse_mode: 'HTML',
+                            reply_markup: replyMarkup,
+                            disable_web_page_preview: true
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error updating carousel:', err.message);
+                // Fallback: if editing fails (e.g. content is the same), just answer callback
             }
         }
     });
@@ -102,18 +222,22 @@ export function registerUserCommands(bot) {
             return bot.sendMessage(chatId, t('bid.no_won'), { parse_mode: 'HTML' });
         }
 
-        let text = t('bid.won_header');
-        for (const a of auctions) {
-            const link = getAuctionLink(a.chat_id, a.message_id);
-            const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
-            text += t('bid.won_item', {
-                link: link,
-                title: a.title,
-                price: a.current_price,
-                date: endDate
+        const a = auctions[0];
+        const caption = formatWonAuctionCaption(a);
+        const replyMarkup = makeMyCarouselKb(0, auctions.length, 'won');
+
+        if (a.photo_id) {
+            await bot.sendPhoto(chatId, a.photo_id, {
+                caption,
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup
+            });
+        } else {
+            await bot.sendMessage(chatId, caption, {
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup,
+                disable_web_page_preview: true
             });
         }
-
-        await bot.sendMessage(chatId, text, { parse_mode: 'HTML', disable_web_page_preview: true });
     });
 }

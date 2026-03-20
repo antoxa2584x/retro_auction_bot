@@ -93,7 +93,9 @@
       "ai_received": "🖼 <b>Photo received!</b>\n\nDo you want to generate auction title and description using AI?",
       "ai_generated_title": "🤖 <b>AI Generated:</b>",
       "ai_edit_prompt": "📝 <b>Enter the new auction description:</b>",
-      "delete_admin": "🗑 Delete"
+      "delete_admin": "🗑 Delete",
+      "prev": "⬅️ Previous",
+      "next": "Next ➡️"
     }
   },
   "bid": {
@@ -121,10 +123,14 @@
     "info_more": "…and {{count}} more",
     "kb": {
       "confirm": "✅ Confirm {{price}} {{cur}}",
+      "manual": "⌨️ Other amount",
       "cancel": "Cancel",
       "bids_count": "💬 Bids ({{count}})",
       "no_bids": "🏁 No bids were made"
-    }
+    },
+    "manual_prompt": "Enter your bid amount:",
+    "error_invalid_amount": "⚠️ Please enter a number.",
+    "error_low_amount": "⚠️ Bid amount must be at least {{min}} {{cur}}."
   },
   "scheduler": {
     "winner_notify": "🏆 Congratulations! You won the auction <a href=\"{{link}}\">\"{{title}}\"</a>!\nFinal price: <b>{{price}} {{cur}}</b>\n\nFor further steps, contact {{admin}}",
