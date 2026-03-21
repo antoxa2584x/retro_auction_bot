@@ -8,6 +8,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 
 ## ✨ Features
 
+* **Continuous Auctions** — extensions are automatically added to the auction end time (e.g., +5 minutes) if a bid is placed near the deadline, preventing last-second "sniping".
 * **Multi-language Support** — supports both **Ukrainian** and **English**, with easy switching via the admin panel.
 * **Custom Currency** — admins can set any custom currency symbol or name (e.g., ₴, $, €, BTC) to be used across all auctions.
 * **One-tap bidding with confirmation** — users are redirected from the channel to the bot's private chat to confirm their bid, preventing accidental clicks.
@@ -46,15 +47,24 @@ To access the admin panel:
 3. Use `/admin_panel` to open the management interface.
 
 **Features:**
-* **➕ Post New Auction**: Wizard-style step-by-step creation (photo, title, price, step, end date).
+* **➕ Post New Auction**: Wizard-style step-by-step creation:
+    1. **Image**: Upload a photo or skip for text-only.
+    2. **Title & Description**: Enter manually or use **AI Generate** to create them from the photo.
+    3. **Minimum Bid**: Starting price.
+    4. **Bid Step**: Fixed increments (e.g., 50, 100) or custom value.
+    5. **End Date & Time**: Set manually or use the default calculated from settings.
+    6. **Continuous Auction**: Toggle whether to extend the auction if a bid is placed near the deadline.
+    7. **Contact Nickname**: Choose the nickname winners should contact.
 * **Active/Finished Lists**: View and manage all auctions via categorical buttons.
 * **Detailed View**: Check current price, leader (with profile link), and end date.
 * **🏁 Finish Immediately**: Instantly close any active auction.
 * **🔄 Restart**: Re-post a finished auction with a new end date.
 * **⚙️ Structured Settings**:
-    * **Main Settings**: Manage `Channel ID`, `Admin ID`, `Admin Nickname`, `OpenAI API Key`, `Language`, and `Currency`.
+    * **Main Settings**: Manage `Channel ID`, `Contact Nickname`, `OpenAI API Key`, `Language`, `Currency`, `Timezone`, and **Continuous Minutes** (the default duration for extensions, e.g., 5 minutes).
     * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
     * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions.
+* **👥 Admin Management**: Add or remove other administrators by their Telegram User ID.
+* **📢 Broadcast**: Send a message to all users who have ever interacted with the bot.
 
 ---
 
@@ -63,15 +73,10 @@ To access the admin panel:
 Create a `.env` file with the following:
 
 ```env
-BOT_TOKEN=your_bot_token
-CHANNEL_ID=-100...       # Auction channel ID
-ADMIN_ID=12345678        # Your Telegram user ID for OTP
-ADMIN_NICKNAME=@admin    # Contact for the winner
-BOT_USERNAME=YourBot     # Bot username (without @) for deep links
-CHANNEL_USERNAME=Channel # (Optional) Public channel username for links
-TZ=Europe/Kyiv           # Timezone
-OPENAI_API_KEY=your_key   # (Optional) For AI generation
+BOT_TOKEN=your_bot_token   # Required
 ```
+
+All other settings (Channel ID, Timezone, Contact Nickname, OpenAI Key, etc.) are configured directly via the **Admin Panel** in the bot and stored in the database.
 
 ---
 
@@ -96,8 +101,10 @@ The bot extracts the **Title** as the first non-empty line between the configure
 
 * **Node.js 18+**
 * **better-sqlite3** (SQLite database)
-* **Telegraf** (Bot API framework)
+* **node-telegram-bot-api** (Bot API framework)
 * **node-schedule**
+* **date-fns & date-fns-tz** (Date manipulation)
+* **openai** (Optional, for AI generation)
 
 ---
 
