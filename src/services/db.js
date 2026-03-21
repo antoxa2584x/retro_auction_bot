@@ -427,6 +427,58 @@ export const q = {
 };
 
 /**
+ * Removes the last bid from an auction atomically and updates its state.
+ * Returns { success: true, ... } or { success: false, reason: '...' }
+ */
+export const undoLastBidTransaction = db.transaction((chat_id, message_id) => {
+    const auction = q.getAuction.get(chat_id, message_id);
+    if (!auction) return { success: false, reason: 'not_found' };
+
+    const lastBid = q.getLastBid.get(chat_id, message_id);
+    if (!lastBid) return { success: false, reason: 'no_bids' };
+
+    // 1. Delete the last bid
+    q.deleteBidByRowId.run(lastBid.rid);
+
+    // 2. Get the new last bid
+    const newLeader = q.getNewLeader.get(chat_id, message_id);
+    const partCount = q.countParticipants.get(chat_id, message_id);
+    const finalParticipants = partCount?.cnt ?? 0;
+
+    if (newLeader) {
+        const leaderName = newLeader.first_name + (newLeader.last_name ? ` ${newLeader.last_name}` : '');
+        q.updateState.run(
+            newLeader.amount,
+            newLeader.user_id,
+            leaderName,
+            finalParticipants,
+            chat_id, message_id
+        );
+        return {
+            success: true,
+            removedBidUserId: lastBid.user_id,
+            newLeaderId: newLeader.user_id,
+            newLeaderName: leaderName,
+            newPrice: newLeader.amount,
+            participantsCount: finalParticipants,
+            auctionTitle: auction.title
+        };
+    } else {
+        // No bids left
+        q.resetAuctionNoBids.run(chat_id, message_id);
+        return {
+            success: true,
+            removedBidUserId: lastBid.user_id,
+            newLeaderId: null,
+            newLeaderName: null,
+            newPrice: auction.min_bid,
+            participantsCount: 0,
+            auctionTitle: auction.title
+        };
+    }
+});
+
+/**
  * Places a bid atomically.
  * Checks if the auction is still active and if the price is still the expected one.
  * Returns { success: true, ... } or { success: false, reason: '...' }

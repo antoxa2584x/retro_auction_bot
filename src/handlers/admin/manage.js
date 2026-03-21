@@ -1,10 +1,10 @@
-import { q } from '../../services/db.js';
-import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminPanelKb } from '../../utils/keyboards.js';
-import { TZ } from "../../config/env.js";
+import { q, undoLastBidTransaction } from '../../services/db.js';
+import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminPanelKb, winnerKeyboard, makeEmptyFinishKb } from '../../utils/keyboards.js';
+import { TZ, getAdminNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
 import { getAuctionLink, formatUserLink } from '../../utils/utils.js';
-import { t } from '../../services/i18n.js';
+import { t, getCurrency } from '../../services/i18n.js';
 
 function isAdmin(userId) {
     const admin = q.getAdmin.get(userId);
@@ -209,6 +209,94 @@ export function registerManageHandlers(bot) {
             await closeAuction(bot, targetChatId, targetMsgId);
 
             await bot.sendMessage(chatId, t('admin.finish_success', { title: a.title }), { parse_mode: 'HTML' });
+            await sendAdminPanel(bot, chatId, true, messageId);
+        }
+
+        const undoBidMatch = data.match(/^adm_undo_bid:(.+):(.+)$/);
+        if (undoBidMatch) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            await bot.answerCallbackQuery(query.id);
+
+            const targetChatId = Number(undoBidMatch[1]);
+            const targetMsgId = Number(undoBidMatch[2]);
+            
+            const res = undoLastBidTransaction(targetChatId, targetMsgId);
+
+            if (!res.success) {
+                const errorKey = res.reason === 'no_bids' ? 'admin.undo_bid_no_bids' : 'bid.not_found';
+                return bot.sendMessage(chatId, t(errorKey), { parse_mode: 'HTML' });
+            }
+
+            const auctionLink = getAuctionLink(targetChatId, targetMsgId);
+
+            // 1. Notify the user whose bid was removed
+            try {
+                await bot.sendMessage(res.removedBidUserId, t('bid.bid_removed_notify', {
+                    link: auctionLink,
+                    title: res.auctionTitle
+                }), { parse_mode: 'HTML' });
+            } catch (err) {
+                console.error(`Failed to notify user ${res.removedBidUserId} about removed bid:`, err.message);
+            }
+
+            // 2. Update channel post keyboard
+            try {
+                const a = q.getAuction.get(targetChatId, targetMsgId);
+                let newKb;
+                if (a.status === 'active') {
+                    newKb = makeKb(targetChatId, targetMsgId, res.newPrice, res.participantsCount);
+                    
+                    // Notify new leader if any
+                    if (res.newLeaderId) {
+                        try {
+                            await bot.sendMessage(res.newLeaderId, t('bid.new_winner_notify', {
+                                link: auctionLink,
+                                title: res.auctionTitle,
+                                price: res.newPrice,
+                                cur: getCurrency()
+                            }), { parse_mode: 'HTML' });
+                        } catch (err) {
+                            console.error(`Failed to notify new leader ${res.newLeaderId} in active auction:`, err.message);
+                        }
+                    }
+                } else {
+                    // Finished auction
+                    if (res.newLeaderId) {
+                        newKb = winnerKeyboard(res.newLeaderId, res.newLeaderName, res.newPrice);
+                        
+                        // Notify new winner
+                        const nickname = a.admin_contact || getAdminNickname();
+                        const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
+                        const winnerText = t('scheduler.winner_notify', {
+                            link: auctionLink,
+                            title: res.auctionTitle,
+                            price: res.newPrice,
+                            admin: adminContact
+                        });
+                        try {
+                            if (a.photo_id) {
+                                await bot.sendPhoto(res.newLeaderId, a.photo_id, { caption: winnerText, parse_mode: 'HTML' });
+                            } else {
+                                await bot.sendMessage(res.newLeaderId, winnerText, { parse_mode: 'HTML' });
+                            }
+                        } catch (err) {
+                            console.error(`Failed to notify new winner ${res.newLeaderId}:`, err.message);
+                        }
+                    } else {
+                        newKb = makeEmptyFinishKb();
+                    }
+                }
+                await bot.editMessageReplyMarkup(newKb, { chat_id: targetChatId, message_id: targetMsgId });
+            } catch (err) {
+                console.error('Failed to update channel post keyboard after undo bid:', err.message);
+            }
+
+            // 3. Confirm to admin
+            await bot.sendMessage(chatId, t('admin.undo_bid_success', {
+                price: res.newPrice,
+                cur: getCurrency()
+            }), { parse_mode: 'HTML' });
+            
             await sendAdminPanel(bot, chatId, true, messageId);
         }
     });

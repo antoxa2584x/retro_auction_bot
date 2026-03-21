@@ -312,6 +312,9 @@ export function makeAdminAuctionActionKb(chatId, messageId, status) {
     } else if (status === 'active') {
         buttons.push([{ text: t('admin.kb.finish_now'), callback_data: `adm_finish_now:${chatId}:${messageId}`, style: 'danger' }]);
     }
+    
+    buttons.push([{ text: t('admin.kb.undo_bid'), callback_data: `adm_undo_bid:${chatId}:${messageId}`, style: 'danger' }]);
+
     if (status === 'finished') {
         buttons.push([{ text: t('common.back'), callback_data: 'adm_finished', style: 'primary' }]);
     } else {
