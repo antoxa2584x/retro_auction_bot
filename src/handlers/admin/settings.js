@@ -1,3 +1,4 @@
+import { formatInTimeZone } from 'date-fns-tz';
 import { q } from '../../services/db.js';
 import { 
     makeAdminSettingsKb, 
@@ -244,6 +245,13 @@ export async function handleSettingsInput(bot, msg, text) {
         if (settingKey === 'CURRENCY') {
             setCurrency(text);
         }
+        if (settingKey === 'TZ') {
+            try {
+                formatInTimeZone(new Date(), text, 'yyyy-MM-dd HH:mm:ss');
+            } catch (e) {
+                throw new Error(t('admin.setting_error_tz'));
+            }
+        }
         q.setSetting.run(settingKey, text);
         userSessions.delete(userId);
         await bot.sendMessage(chatId, t('admin.setting_updated', { key: settingKey, value: text }), { parse_mode: 'HTML' });
@@ -291,11 +299,13 @@ export async function sendSettingsMainPanel(bot, chatId, userId, isEdit = false,
     const channelId = getChannelId() || t('admin.not_set');
     const adminNickname = getContactNickname() || t('admin.not_set');
     const openAiKey = q.getSetting.get('OPENAI_API_KEY')?.value ? '********' : t('admin.not_set');
+    const timezone = q.getSetting.get('TZ')?.value || 'UTC';
 
     const text = t('admin.panel_settings_main') + '\n\n' +
         t('admin.panel_settings_main_channel', { id: channelId }) + '\n' +
         t('admin.panel_settings_main_contact_nickname', { nickname: adminNickname }) + '\n' +
-        t('admin.panel_settings_main_openai', { key: openAiKey }) + '\n\n' +
+        t('admin.panel_settings_main_openai', { key: openAiKey }) + '\n' +
+        t('admin.panel_settings_main_timezone', { tz: timezone }) + '\n\n' +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsMainKb();

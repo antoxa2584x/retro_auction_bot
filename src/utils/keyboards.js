@@ -129,6 +129,7 @@ export function makeAdminSettingsMainKb() {
             [{ text: '📺 Channel ID', callback_data: 'set_conf:CHANNEL_ID' }],
             [{ text: '🏷 Contact Nickname', callback_data: 'set_conf:CONTACT_NICKNAME' }],
             [{ text: '🤖 OpenAI API Key', callback_data: 'set_conf:OPENAI_API_KEY' }],
+            [{ text: '🕒 Timezone', callback_data: 'set_conf:TZ' }],
             [{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]
         ]
     };
