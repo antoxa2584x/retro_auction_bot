@@ -15,7 +15,12 @@ export function registerInfoHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'none') {
-            return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+            try {
+                return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering none callback:', e.message);
+                return;
+            }
         }
 
         const infoMatch = data.match(/^info:(.+)$/);
@@ -26,17 +31,36 @@ export function registerInfoHandlers(bot) {
             const target_message_id = Number(msgIdStr);
 
             const row = q.getAuction.get(target_chat_id, target_message_id);
-            if (!row) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+            if (!row) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering info not_found callback:', e.message);
+                    return;
+                }
+            }
 
             const now = new Date();
             const end = new Date(row.end_at);
             if (now >= end && row.status === 'active') {
                 await closeAuction(bot, target_chat_id, target_message_id);
-                return bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering info finished callback:', e.message);
+                    return;
+                }
             }
 
             const allBids = q.selectBidsForInfo.all(target_chat_id, target_message_id);
-            if (allBids.length === 0) return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+            if (allBids.length === 0) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering info no_bids callback:', e.message);
+                    return;
+                }
+            }
 
             const coalesced = [];
             for (const b of allBids) {
@@ -44,7 +68,14 @@ export function registerInfoHandlers(bot) {
                 if (last && last.user_id === b.user_id) coalesced[coalesced.length - 1] = b;
                 else coalesced.push(b);
             }
-            if (coalesced.length === 0) return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+            if (coalesced.length === 0) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering info no_bids coalesced callback:', e.message);
+                    return;
+                }
+            }
 
             const totalBids = allBids.length;
 
@@ -79,7 +110,12 @@ export function registerInfoHandlers(bot) {
             const hidden = coalesced.length - shown;
             if (hidden > 0) text += t('bid.info_more', { count: hidden });
 
-            return bot.answerCallbackQuery(query.id, { text: text, show_alert: true });
+            try {
+                return bot.answerCallbackQuery(query.id, { text: text, show_alert: true });
+            } catch (e) {
+                console.error('Error answering info success callback:', e.message);
+                return;
+            }
         }
     });
 }

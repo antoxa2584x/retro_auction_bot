@@ -140,7 +140,11 @@ export function registerUserCommands(bot) {
             const noItemsKey = isWon ? 'bid.no_won' : 'bid.no_my_active';
 
             if (auctions.length === 0) {
-                await bot.answerCallbackQuery(query.id, { text: t(noItemsKey), show_alert: true });
+                try {
+                    await bot.answerCallbackQuery(query.id, { text: t(noItemsKey), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering carousel empty callback:', e.message);
+                }
                 return bot.deleteMessage(chatId, messageId).catch(() => {});
             }
 
@@ -152,7 +156,12 @@ export function registerUserCommands(bot) {
             }
 
             if (nextIndex === currentIndex && auctions.length > 1) {
-                return bot.answerCallbackQuery(query.id);
+                try {
+                    return bot.answerCallbackQuery(query.id);
+                } catch (e) {
+                    console.error('Error answering carousel same index callback:', e.message);
+                    return;
+                }
             }
 
             const a = auctions[nextIndex];
@@ -160,7 +169,11 @@ export function registerUserCommands(bot) {
             const prefix = isWon ? 'won' : 'my';
             const replyMarkup = makeMyCarouselKb(nextIndex, auctions.length, prefix);
 
-            await bot.answerCallbackQuery(query.id);
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering carousel update callback:', e.message);
+            }
 
             try {
                 if (a.photo_id) {

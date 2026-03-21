@@ -1,5 +1,13 @@
 import { q } from '../../services/db.js';
-import { makeAdminPostStepKb, makeAdminPostCancelKb, makeAdminPostConfirmKb, makeAdminPostContactKb, makeAdminPostAIGenKb, makeAdminPostAIConfirmKb } from '../../utils/keyboards.js';
+import { 
+    makeAdminPostStepKb, 
+    makeAdminPostCancelKb, 
+    makeAdminPostConfirmKb, 
+    makeAdminPostContactKb, 
+    makeAdminPostAIGenKb, 
+    makeAdminPostAIConfirmKb,
+    makeAdminPostContinuousKb
+} from '../../utils/keyboards.js';
 import { TZ, getChannelId, getAdminNickname } from "../../config/env.js";
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
@@ -27,8 +35,12 @@ export function registerPostHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_post') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_post callback:', e.message);
+            }
             
             postSessions.set(from.id, { step: 'IMAGE', data: {} });
             await bot.editMessageText(t('admin.post_step_img'), {
@@ -40,8 +52,12 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_skip') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_skip callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session) return;
 
@@ -55,13 +71,17 @@ export function registerPostHandlers(bot) {
                 });
             } else if (session.step === 'DATE') {
                 session.data.end_at = session.data.default_date;
-                await goToContactStep(bot, chatId, session);
+                await goToContinuousStep(bot, chatId, session);
             }
         }
 
         if (data === 'post_cancel') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_cancel callback:', e.message);
+            }
             postSessions.delete(from.id);
             await bot.editMessageText(t('admin.post_cancelled'), {
                 chat_id: chatId,
@@ -72,12 +92,25 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_gen') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering post_ai_gen perm check callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_PROMPT' || !session.data.photo_id) {
-                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                } catch (e) {
+                    console.error('Error answering post_ai_gen error callback:', e.message);
+                    return;
+                }
             }
-            await bot.answerCallbackQuery(query.id);
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_ai_gen callback:', e.message);
+            }
 
             const statusMsg = await bot.sendMessage(chatId, t('admin.kb.ai_generating'), { parse_mode: 'HTML' });
 
@@ -116,12 +149,25 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_confirm') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering post_ai_confirm perm check callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_CONFIRM') {
-                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                } catch (e) {
+                    console.error('Error answering post_ai_confirm error callback:', e.message);
+                    return;
+                }
             }
-            await bot.answerCallbackQuery(query.id);
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_ai_confirm callback:', e.message);
+            }
 
             // Save confirmed text for training
             if (session.data.image_hash && session.data.full_text) {
@@ -136,12 +182,25 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_edit') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering post_ai_edit perm check callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_CONFIRM') {
-                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
+                } catch (e) {
+                    console.error('Error answering post_ai_edit error callback:', e.message);
+                    return;
+                }
             }
-            await bot.answerCallbackQuery(query.id);
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_ai_edit callback:', e.message);
+            }
 
             session.step = 'AI_EDIT';
             await bot.sendMessage(chatId, t('admin.kb.ai_edit_prompt'), {
@@ -152,8 +211,12 @@ export function registerPostHandlers(bot) {
 
         const stepMatch = data.match(/^post_step:(.+)$/);
         if (stepMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_step callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'STEP') return;
 
@@ -171,8 +234,12 @@ export function registerPostHandlers(bot) {
 
         const contactMatch = data.match(/^post_contact:(.+)$/);
         if (contactMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_contact callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'CONTACT') return;
 
@@ -191,9 +258,29 @@ export function registerPostHandlers(bot) {
             }
         }
 
+        if (data.startsWith('post_cont:')) {
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_cont callback:', e.message);
+            }
+            const session = postSessions.get(from.id);
+            if (!session) return;
+
+            session.data.is_continuous = parseInt(data.split(':')[1]);
+            session.data.continuous_minutes = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
+            
+            await goToContactStep(bot, chatId, session);
+        }
+
         if (data === 'post_confirm') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering post_confirm perm check callback:', e.message);
+            }
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'CONFIRM') return;
 
@@ -252,7 +339,9 @@ export function registerPostHandlers(bot) {
                     step: sessionData.step,
                     current_price: sessionData.min_bid,
                     admin_contact: sessionData.admin_contact,
-                    end_at: sessionData.end_at.toISOString()
+                    end_at: sessionData.end_at.toISOString(),
+                    is_continuous: sessionData.is_continuous || 0,
+                    continuous_minutes: sessionData.continuous_minutes || 5
                 });
 
                 scheduleClose(bot, channelId, sentMsg.message_id, sessionData.end_at);
@@ -268,7 +357,6 @@ export function registerPostHandlers(bot) {
                 console.error('Failed to post auction:', e);
                 await bot.sendMessage(chatId, t('common.error_try_again') + ': ' + e.message, { parse_mode: 'HTML' });
             }
-            await bot.answerCallbackQuery(query.id);
         }
     });
 }
@@ -371,7 +459,7 @@ export async function handlePostInput(bot, msg) {
                     return true;
                 }
                 session.data.end_at = date;
-                await goToContactStep(bot, chatId, session);
+                await goToContinuousStep(bot, chatId, session);
                 return true;
             }
             break;
@@ -407,6 +495,15 @@ async function goToDateStep(bot, chatId, session) {
     });
 }
 
+async function goToContinuousStep(bot, chatId, session) {
+    session.step = 'CONTINUOUS';
+    const min = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
+    await bot.sendMessage(chatId, t('admin.post_step_continuous', { min }), {
+        parse_mode: 'HTML',
+        reply_markup: makeAdminPostContinuousKb(min)
+    });
+}
+
 async function goToContactStep(bot, chatId, session) {
     session.step = 'CONTACT';
     const defaultContact = getAdminNickname();
@@ -422,7 +519,7 @@ export async function handleDateSkip(bot, chatId, userId) {
     if (!session || session.step !== 'DATE') return false;
     
     session.data.end_at = session.data.default_date;
-    await goToContactStep(bot, chatId, session);
+    await goToContinuousStep(bot, chatId, session);
     return true;
 }
 
@@ -434,6 +531,7 @@ async function goToConfirmStep(bot, chatId, session) {
         min_bid: data.min_bid,
         step: data.step,
         end_at: formatInTimeZone(data.end_at, TZ, 'dd.MM.yyyy HH:mm'),
+        continuous: data.is_continuous ? t('admin.continuous_yes', { min: data.continuous_minutes }) : t('admin.continuous_no'),
         contact: data.admin_contact,
         cur: getCurrency()
     });

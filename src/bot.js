@@ -12,6 +12,7 @@ import { q } from './services/db.js';
 import { setLocale, setCurrency } from './services/i18n.js';
 
 // Load global locale from DB
+q.initDefaults();
 const dbLocale = q.getSetting.get('LOCALE')?.value;
 if (dbLocale) {
     setLocale(dbLocale);

@@ -85,7 +85,9 @@ const migrations = [
     { name: 'full_text', type: 'TEXT' },
     { name: 'photo_id', type: 'TEXT' },
     { name: 'participants_count', type: 'INTEGER DEFAULT 0' },
-    { name: 'admin_contact', type: 'TEXT' }
+    { name: 'admin_contact', type: 'TEXT' },
+    { name: 'is_continuous', type: 'INTEGER DEFAULT 0' },
+    { name: 'continuous_minutes', type: 'INTEGER DEFAULT 5' }
 ];
 
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
@@ -167,8 +169,8 @@ export const q = {
    */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0)
+      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes)
   `),
 
   /**
@@ -183,7 +185,7 @@ export const q = {
    */
   updateState: db.prepare(`
     UPDATE auctions
-       SET current_price=?, leader_id=?, leader_name=?, participants_count=?
+       SET current_price=?, leader_id=?, leader_name=?, participants_count=?, end_at=?
      WHERE chat_id=? AND message_id=?
   `),
 
@@ -396,6 +398,21 @@ export const q = {
   setSetting: db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`),
 
   /**
+   * Initializes default settings if they don't exist.
+   */
+  initDefaults: () => {
+    const defaults = [
+      { key: 'CONTINUOUS_MINUTES', value: '5' }
+    ];
+    for (const d of defaults) {
+      const exists = q.getSetting.get(d.key);
+      if (!exists) {
+          q.setSetting.run(d.key, d.value);
+      }
+    }
+  },
+
+  /**
    * Retrieves the most recent bid for an auction.
    * @type {import('better-sqlite3').Statement}
    */
@@ -514,16 +531,31 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         return { success: false, reason: 'price_changed', expectedPrice };
     }
 
-    // 4. Upsert participant
+    // 4. Handle continuous auction extension
+    let newEndAt = auction.end_at;
+    let timeExtended = false;
+
+    if (auction.is_continuous) {
+        const remainingMs = end.getTime() - now.getTime();
+        const extensionMs = auction.continuous_minutes * 60 * 1000;
+        
+        if (remainingMs <= extensionMs) {
+            const extendedDate = new Date(end.getTime() + extensionMs);
+            newEndAt = extendedDate.toISOString();
+            timeExtended = true;
+        }
+    }
+
+    // 5. Upsert participant
     q.upsertParticipant.run(
         chat_id, message_id, user.id,
         user.username || null, user.first_name || null, user.last_name || null
     );
 
-    // 5. Insert bid
+    // 6. Insert bid
     q.insertBid.run(chat_id, message_id, user.id, price, now.toISOString());
 
-    // 6. Update auction state
+    // 7. Update auction state
     const partCount = q.countParticipants.get(chat_id, message_id);
     const finalParticipants = partCount?.cnt ?? 0;
     const leaderName = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
@@ -533,6 +565,7 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         user.id,
         leaderName,
         finalParticipants,
+        newEndAt,
         chat_id, message_id
     );
 
@@ -540,6 +573,8 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         success: true, 
         previousLeaderId: auction.leader_id,
         auctionTitle: auction.title,
-        participantsCount: finalParticipants
+        participantsCount: finalParticipants,
+        timeExtended,
+        newEndAt
     };
 });

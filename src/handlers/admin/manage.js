@@ -23,14 +23,22 @@ export function registerManageHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_list') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_list callback:', e.message);
+            }
             await sendAdminPanel(bot, chatId, true, messageId);
         }
 
         if (data === 'adm_active') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_active callback:', e.message);
+            }
 
             const auctions = q.getAllActiveAuctions.all();
 
@@ -55,8 +63,12 @@ export function registerManageHandlers(bot) {
         }
 
         if (data === 'adm_finished') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_finished callback:', e.message);
+            }
 
             const auctions = q.getRecentlyFinishedAuctions.all();
 
@@ -82,14 +94,25 @@ export function registerManageHandlers(bot) {
 
         const viewMatch = data.match(/^adm_view:(.+):(.+)$/);
         if (viewMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_view callback:', e.message);
+            }
 
             const targetChatId = Number(viewMatch[1]);
             const targetMsgId = Number(viewMatch[2]);
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
-            if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+            if (!a) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering adm_view not_found callback:', e.message);
+                    return;
+                }
+            }
 
             const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM.yyyy HH:mm');
             const link = getAuctionLink(targetChatId, targetMsgId);
@@ -122,15 +145,33 @@ export function registerManageHandlers(bot) {
 
         const restartMatch = data.match(/^adm_restart:(.+):(.+)$/);
         if (restartMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_restart callback:', e.message);
+            }
 
             const targetChatId = Number(restartMatch[1]);
             const targetMsgId = Number(restartMatch[2]);
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
-            if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-            if (a.status !== 'finished') return bot.answerCallbackQuery(query.id, { text: 'Only finished auctions can be restarted', show_alert: true });
+            if (!a) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering adm_restart not_found callback:', e.message);
+                    return;
+                }
+            }
+            if (a.status !== 'finished') {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: 'Only finished auctions can be restarted', show_alert: true });
+                } catch (e) {
+                    console.error('Error answering adm_restart not_finished callback:', e.message);
+                    return;
+                }
+            }
 
             const originalEnd = new Date(a.end_at);
             const newEnd = new Date();
@@ -174,7 +215,12 @@ export function registerManageHandlers(bot) {
                 }
             } catch (e) {
                 console.error('Failed to create new post for restart:', e.message);
-                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
+                } catch (err) {
+                    console.error('Error answering adm_restart error callback:', err.message);
+                    return;
+                }
             }
 
             try {
@@ -197,7 +243,9 @@ export function registerManageHandlers(bot) {
                 step: a.step,
                 current_price: a.min_bid,
                 admin_contact: a.admin_contact,
-                end_at: newEnd.toISOString()
+                end_at: newEnd.toISOString(),
+                is_continuous: a.is_continuous,
+                continuous_minutes: a.continuous_minutes
             });
 
             scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
@@ -211,15 +259,33 @@ export function registerManageHandlers(bot) {
 
         const finishNowMatch = data.match(/^adm_finish_now:(.+):(.+)$/);
         if (finishNowMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_finish_now callback:', e.message);
+            }
 
             const targetChatId = Number(finishNowMatch[1]);
             const targetMsgId = Number(finishNowMatch[2]);
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
-            if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-            if (a.status !== 'active') return bot.answerCallbackQuery(query.id, { text: 'Only active auctions can be finished', show_alert: true });
+            if (!a) {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering adm_finish_now not_found callback:', e.message);
+                    return;
+                }
+            }
+            if (a.status !== 'active') {
+                try {
+                    return bot.answerCallbackQuery(query.id, { text: 'Only active auctions can be finished', show_alert: true });
+                } catch (e) {
+                    console.error('Error answering adm_finish_now not_active callback:', e.message);
+                    return;
+                }
+            }
 
             await closeAuction(bot, targetChatId, targetMsgId);
 
@@ -229,8 +295,12 @@ export function registerManageHandlers(bot) {
 
         const undoBidMatch = data.match(/^adm_undo_bid:(.+):(.+)$/);
         if (undoBidMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_undo_bid callback:', e.message);
+            }
 
             const targetChatId = Number(undoBidMatch[1]);
             const targetMsgId = Number(undoBidMatch[2]);
@@ -317,8 +387,12 @@ export function registerManageHandlers(bot) {
         
         const deleteMatch = data.match(/^adm_delete:(.+):(.+)$/);
         if (deleteMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_delete callback:', e.message);
+            }
 
             const targetChatId = Number(deleteMatch[1]);
             const targetMsgId = Number(deleteMatch[2]);

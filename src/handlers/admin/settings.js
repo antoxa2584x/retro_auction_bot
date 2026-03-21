@@ -37,32 +37,52 @@ export function registerSettingsHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_settings') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_settings callback:', e.message);
+            }
             await sendSettingsPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_main') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_settings_main callback:', e.message);
+            }
             await sendSettingsMainPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_template') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_settings_template callback:', e.message);
+            }
             await sendSettingsTemplatePanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_defaults') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_settings_defaults callback:', e.message);
+            }
             await sendSettingsDefaultsPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'clear_openai_key') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering clear_openai_key callback:', e.message);
+            }
 
             q.setSetting.run('OPENAI_API_KEY', null);
             await bot.sendMessage(chatId, t('admin.openai_key_deleted'), { parse_mode: 'HTML' });
@@ -70,26 +90,42 @@ export function registerSettingsHandlers(bot) {
         }
 
         if (data === 'adm_admins') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_admins callback:', e.message);
+            }
             await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data.startsWith('adm_del:')) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering adm_del perm check callback:', e.message);
+            }
             const delUserId = parseInt(data.split(':')[1]);
             
             // Prevent self-deletion if needed, though typically we want to allow it
             // but at least one admin must remain?
             
             q.deleteAdmin.run(delUserId);
-            await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true });
+            try {
+                await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true });
+            } catch (e) {
+                console.error('Error answering admin_deleted callback:', e.message);
+            }
             await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_lang') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_lang callback:', e.message);
+            }
 
             const text = t('admin.panel_language') + '\n\n' +
                 t('admin.current_language', { lang: getLocale() === 'uk' ? t('admin.lang_uk') : t('admin.lang_en') }) + '\n\n' +
@@ -104,8 +140,12 @@ export function registerSettingsHandlers(bot) {
         }
 
         if (data === 'adm_cur') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering adm_cur callback:', e.message);
+            }
 
             userSessions.set(from.id, 'CURRENCY');
 
@@ -124,21 +164,33 @@ export function registerSettingsHandlers(bot) {
 
         const setLangMatch = data.match(/^set_lang:(.+)$/);
         if (setLangMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering set_lang callback:', e.message);
+            }
 
             const lang = setLangMatch[1];
             setLocale(lang);
             q.setSetting.run('LOCALE', lang);
 
-            await bot.answerCallbackQuery(query.id, { text: t('admin.language_changed'), show_alert: true });
+            try {
+                await bot.answerCallbackQuery(query.id, { text: t('admin.language_changed'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering language_changed callback:', e.message);
+            }
             await sendSettingsPanel(bot, chatId, from.id, true, messageId);
         }
 
         const setConfMatch = data.match(/^set_conf:(.+)$/);
         if (setConfMatch) {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering set_conf callback:', e.message);
+            }
 
             const key = setConfMatch[1];
             userSessions.set(from.id, key);
@@ -152,8 +204,12 @@ export function registerSettingsHandlers(bot) {
         }
 
         if (data === 'cancel_settings') {
-            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            await bot.answerCallbackQuery(query.id);
+            try {
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering cancel_settings callback:', e.message);
+            }
 
             userSessions.delete(from.id);
             const lastPanel = userSessions.get(`${from.id}:last_panel`) || 'adm_settings';
@@ -284,7 +340,8 @@ export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = fa
     userSessions.set(`${userId}:last_panel`, 'adm_settings_defaults');
     const text = t('admin.panel_settings_defaults') + '\n\n' +
         `📅 <b>Default End Days:</b> <code>${q.getSetting.get('DEFAULT_END_DAYS')?.value || '5'}</code>\n` +
-        `🕒 <b>Default End Time:</b> <code>${q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00'}</code>\n\n` +
+        `🕒 <b>Default End Time:</b> <code>${q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00'}</code>\n` +
+        `⏳ <b>Continuous Extension (min):</b> <code>${q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5'}</code>\n\n` +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsDefaultsKb();

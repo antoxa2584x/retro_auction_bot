@@ -162,7 +162,26 @@ export function makeAdminSettingsDefaultsKb() {
         inline_keyboard: [
             [{ text: `📅 ${t('admin.def_days')}`, callback_data: 'set_conf:DEFAULT_END_DAYS' }],
             [{ text: `🕒 ${t('admin.def_time')}`, callback_data: 'set_conf:DEFAULT_END_TIME' }],
+            [{ text: `⏳ ${t('admin.def_continuous')}`, callback_data: 'set_conf:CONTINUOUS_MINUTES' }],
             [{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]
+        ]
+    };
+}
+
+/**
+ * Creates the "is continuous" keyboard for post creation.
+ * 
+ * @param {number} min - Extension minutes.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPostContinuousKb(min) {
+    return {
+        inline_keyboard: [
+            [
+                { text: t('admin.continuous_yes', { min }), callback_data: 'post_cont:1' },
+                { text: t('admin.continuous_no'), callback_data: 'post_cont:0', style: 'primary' }
+            ],
+            [{ text: t('bid.kb.cancel'), callback_data: 'post_cancel', style: 'danger' }]
         ]
     };
 }

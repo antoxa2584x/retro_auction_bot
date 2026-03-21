@@ -2,7 +2,7 @@ import schedule from 'node-schedule';
 import { q } from './db.js';
 import { makeEmptyFinishKb, winnerKeyboard } from '../utils/keyboards.js';
 import { getAdminNickname, CHANNEL_USERNAME } from "../config/env.js";
-import { getAuctionLink, escapeHtml } from '../utils/utils.js';
+import { getAuctionLink, escapeHtml, formatUserLink } from '../utils/utils.js';
 import { t } from './i18n.js';
 
 /**
@@ -19,6 +19,8 @@ export function scheduleClose(bot, chat_id, message_id, when) {
     schedule.scheduleJob(id, when, async () => closeAuction(bot, chat_id, message_id));
 
     // Schedule 30m reminder
+    const reminderId = `reminder:${chat_id}:${message_id}`;
+    schedule.cancelJob(reminderId);
     scheduleReminder(bot, chat_id, message_id, when);
 }
 

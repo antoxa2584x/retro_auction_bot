@@ -1,8 +1,10 @@
-import { q, placeBidTransaction } from '../../services/db.js';
+import { db, q, placeBidTransaction } from '../../services/db.js';
 import { makeKb, confirmBidKb, confirmManualBidKb } from '../../utils/keyboards.js';
-import { closeAuction } from "../../services/scheduler.js";
+import { scheduleClose, closeAuction } from "../../services/scheduler.js";
 import { getAuctionLink } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
+import { formatInTimeZone } from 'date-fns-tz';
+import { TZ } from '../../config/env.js';
 
 /**
  * Registers handlers for the bidding process (confirmation and placement).
@@ -16,7 +18,11 @@ export function registerBidHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'cancelbid') {
-            await bot.answerCallbackQuery(query.id, { text: t('bid.cancel_bid'), show_alert: true });
+            try {
+                await bot.answerCallbackQuery(query.id, { text: t('bid.cancel_bid'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering cancelbid callback:', e.message);
+            }
             return bot.deleteMessage(chatId, messageId).catch(() => {});
         }
 
@@ -27,7 +33,11 @@ export function registerBidHandlers(bot) {
             const targetChatId = Number(targetChatIdStr);
             const targetMsgId = Number(targetMsgIdStr);
 
-            await bot.answerCallbackQuery(query.id);
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {
+                console.error('Error answering manualbid callback:', e.message);
+            }
             
             const prompt = await bot.sendMessage(chatId, t('bid.manual_prompt'), {
                 reply_markup: { force_reply: true }
@@ -86,13 +96,21 @@ export function registerBidHandlers(bot) {
 
             if (!res.success) {
                 if (res.reason === 'not_found') {
-                    await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    try {
+                        await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    } catch (e) {
+                        console.error('Error answering not_found callback:', e.message);
+                    }
                     return bot.deleteMessage(chatId, messageId).catch(() => {});
                 }
 
                 if (res.reason === 'finished') {
                     await closeAuction(bot, target_chat_id, target_message_id);
-                    await bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
+                    try {
+                        await bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
+                    } catch (e) {
+                        console.error('Error answering finished callback:', e.message);
+                    }
                     await bot.deleteMessage(chatId, messageId).catch(() => {});
                     return;
                 }
@@ -103,7 +121,11 @@ export function registerBidHandlers(bot) {
                         ? t('bid.bid_exists_alert', { price, expectedPrice })
                         : t('bid.price_changed_alert', { expectedPrice });
 
-                    await bot.answerCallbackQuery(query.id, { text: alertText, show_alert: true });
+                    try {
+                        await bot.answerCallbackQuery(query.id, { text: alertText, show_alert: true });
+                    } catch (e) {
+                        console.error('Error answering price_changed/bid_exists callback:', e.message);
+                    }
                     
                     const row = q.getAuction.get(target_chat_id, target_message_id);
                     if (!row) {
@@ -135,11 +157,20 @@ export function registerBidHandlers(bot) {
                     return;
                 }
 
-                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
+                try {
+                    await bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
+                } catch (e) {
+                    console.error('Error answering error_try_again callback:', e.message);
+                }
+                return;
             }
 
             // Success
-            await bot.answerCallbackQuery(query.id, { text: t('bid.accepted_alert', { price }), show_alert: true });
+            try {
+                await bot.answerCallbackQuery(query.id, { text: t('bid.accepted_alert', { price }), show_alert: true });
+            } catch (e) {
+                console.error('Error answering accepted_alert callback:', e.message);
+            }
 
             // Notify previous leader if outbid
             if (res.previousLeaderId && res.previousLeaderId !== user.id) {
@@ -176,6 +207,62 @@ export function registerBidHandlers(bot) {
                 chat_id: target_chat_id,
                 message_id: target_message_id
             });
+
+            if (res.timeExtended) {
+                const auction = q.getAuction.get(target_chat_id, target_message_id);
+                if (auction) {
+                    const newEndDate = new Date(res.newEndAt);
+                    const formattedDate = formatInTimeZone(newEndDate, TZ, 'dd.MM.yyyy HH:mm');
+                    
+                    // Update the channel post text with new end date
+                    // We need to find the old date in the text and replace it.
+                    // The text format is usually based on the template.
+                    const endDateLabel = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
+                    const oldText = auction.full_text;
+                    
+                    // Find the line starting with the end date label
+                    const lines = oldText.split('\n');
+                    const newLines = lines.map(line => {
+                        if (line.includes(endDateLabel)) {
+                            return `${endDateLabel}: <b>${formattedDate}</b>`;
+                        }
+                        return line;
+                    });
+                    const newText = newLines.join('\n');
+                    
+                    try {
+                        if (auction.photo_id) {
+                            await bot.editMessageCaption(newText, {
+                                chat_id: target_chat_id,
+                                message_id: target_message_id,
+                                parse_mode: 'HTML',
+                                reply_markup: kb
+                            });
+                        } else {
+                            await bot.editMessageText(newText, {
+                                chat_id: target_chat_id,
+                                message_id: target_message_id,
+                                parse_mode: 'HTML',
+                                reply_markup: kb
+                            });
+                        }
+                        
+                        // Save the updated text back to the DB so subsequent updates don't use the old text
+                        db.prepare(`UPDATE auctions SET full_text=? WHERE chat_id=? AND message_id=?`).run(newText, target_chat_id, target_message_id);
+                        
+                        // Notify in the channel that the auction was extended (optional, but requested by "time in post shpoud be updated")
+                        // Wait, "time in post shpoud be updated" probably means the original post. 
+                        // Let's also send a short notification message or just update the post.
+                        // I'll just update the post as it's cleaner.
+                        
+                        // Reschedule
+                        scheduleClose(bot, target_chat_id, target_message_id, newEndDate);
+                        
+                    } catch (e) {
+                        console.error('Error updating extended auction post:', e.message);
+                    }
+                }
+            }
         }
     });
 }

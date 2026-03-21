@@ -57,7 +57,12 @@ export function registerAuthHandlers(bot) {
                 chat_id: query.message.chat.id,
                 message_id: query.message.message_id
             }).catch(() => {});
-            return bot.answerCallbackQuery(query.id, { text: t('admin.cancelled'), show_alert: true });
+            try {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.cancelled'), show_alert: true });
+            } catch (e) {
+                console.error('Error answering cancel_otp callback:', e.message);
+                return;
+            }
         }
     });
 }
