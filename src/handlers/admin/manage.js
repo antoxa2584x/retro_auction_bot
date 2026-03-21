@@ -1,6 +1,6 @@
 import { q, undoLastBidTransaction } from '../../services/db.js';
 import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminPanelKb, winnerKeyboard, makeEmptyFinishKb } from '../../utils/keyboards.js';
-import { TZ, getAdminNickname } from "../../config/env.js";
+import { TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
 import { getAuctionLink, formatUserLink } from '../../utils/utils.js';
@@ -350,7 +350,7 @@ export function registerManageHandlers(bot) {
                         newKb = winnerKeyboard(res.newLeaderId, res.newLeaderName, res.newPrice);
                         
                         // Notify new winner
-                        const nickname = a.admin_contact || getAdminNickname();
+                        const nickname = a.admin_contact || getContactNickname();
                         const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
                         const winnerText = t('scheduler.winner_notify', {
                             link: auctionLink,

@@ -8,7 +8,7 @@ import {
     makeAdminPostAIConfirmKb,
     makeAdminPostContinuousKb
 } from '../../utils/keyboards.js';
-import { TZ, getChannelId, getAdminNickname } from "../../config/env.js";
+import { TZ, getChannelId, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { scheduleClose } from '../../services/scheduler.js';
@@ -245,7 +245,7 @@ export function registerPostHandlers(bot) {
 
             const val = contactMatch[1];
             if (val === 'default') {
-                session.data.admin_contact = getAdminNickname();
+                session.data.admin_contact = getContactNickname();
                 await goToConfirmStep(bot, chatId, session);
             } else {
                 session.step = 'CONTACT_MANUAL';
@@ -506,7 +506,7 @@ async function goToContinuousStep(bot, chatId, session) {
 
 async function goToContactStep(bot, chatId, session) {
     session.step = 'CONTACT';
-    const defaultContact = getAdminNickname();
+    const defaultContact = getContactNickname();
     await bot.sendMessage(chatId, t('admin.post_step_contact', { default: defaultContact }), {
         parse_mode: 'HTML',
         reply_markup: makeAdminPostContactKb()

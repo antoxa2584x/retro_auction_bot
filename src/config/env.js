@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { q } from '../services/db.js';
+import {q} from '../services/db.js';
 
 function getSetting(key, defaultValue) {
     try {
@@ -10,27 +10,25 @@ function getSetting(key, defaultValue) {
     }
 }
 
-export const BOT_TOKEN   = process.env.BOT_TOKEN;
-export const TZ          = process.env.TZ || 'Europe/Kyiv';
-export const BOT_USERNAME = process.env.BOT_USERNAME || 'RetroAuctionTestBot';
-export const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
+export const BOT_TOKEN = process.env.BOT_TOKEN;
+export const TZ = getSetting('TZ', 'UTC');
+export let BOT_USERNAME = null;
+export const setBotUsername = (username) => {
+    BOT_USERNAME = username;
+};
+export const CHANNEL_USERNAME = getSetting('CHANNEL_USERNAME', null);
 
 // Dynamic settings
 export const getChannelId = () => {
-    const val = getSetting('CHANNEL_ID', process.env.CHANNEL_ID);
+    const val = getSetting('CHANNEL_ID', null);
     return val ? Number(val) : null;
 };
-export const getAdminId = () => {
-    const val = getSetting('ADMIN_ID', process.env.ADMIN_ID);
-    return val ? Number(val) : null;
-};
-export const getAdminNickname = () => getSetting('ADMIN_NICKNAME', process.env.ADMIN_NICKNAME || 'admin');
+export const getContactNickname = () => getSetting('CONTACT_NICKNAME', null);
 
 // For backward compatibility or one-time checks
-export const CHANNEL_ID  = process.env.CHANNEL_ID ? Number(process.env.CHANNEL_ID) : null;
-export const ADMIN_ID = process.env.ADMIN_ID ? Number(process.env.ADMIN_ID) : null;
-export const ADMIN_NICKNAME = process.env.ADMIN_NICKNAME || 'admin';
-export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+export const CHANNEL_ID = getChannelId();
+export const CONTACT_NICKNAME = getContactNickname();
+export const OPENAI_API_KEY = getSetting('OPENAI_API_KEY', null);
 
 if (!BOT_TOKEN) {
     console.error('Please set BOT_TOKEN in .env');

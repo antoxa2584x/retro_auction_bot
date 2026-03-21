@@ -1,7 +1,7 @@
 import schedule from 'node-schedule';
 import { q } from './db.js';
 import { makeEmptyFinishKb, winnerKeyboard } from '../utils/keyboards.js';
-import { getAdminNickname, CHANNEL_USERNAME } from "../config/env.js";
+import { getContactNickname, CHANNEL_USERNAME } from "../config/env.js";
 import { getAuctionLink, escapeHtml, formatUserLink } from '../utils/utils.js';
 import { t } from './i18n.js';
 
@@ -100,7 +100,7 @@ export async function closeAuction(bot, chat_id, message_id) {
 
             if (!alreadyFinished) {
                 // Notify winner
-                const nickname = row.admin_contact || getAdminNickname();
+                const nickname = row.admin_contact || getContactNickname();
                 const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
                 const winnerText = t('scheduler.winner_notify', {
                     link: auctionLink,

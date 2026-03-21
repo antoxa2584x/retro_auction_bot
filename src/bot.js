@@ -3,7 +3,7 @@
  * Initializes the bot, loads settings, registers handlers, and restores jobs.
  */
 import TelegramBot from 'node-telegram-bot-api';
-import { BOT_TOKEN, TZ } from './config/env.js';
+import { BOT_TOKEN, TZ, setBotUsername } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
 import { registerAdminHandlers } from './handlers/admin.js';
@@ -25,6 +25,14 @@ if (dbCurrency) {
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
+// Get and set bot username
+bot.getMe().then((me) => {
+    setBotUsername(me.username);
+    console.log(`Bot username set to: @${me.username}`);
+}).catch((err) => {
+    console.error('Error fetching bot info:', err.message);
+});
 
 // Handlers
 registerCallbackHandler(bot);

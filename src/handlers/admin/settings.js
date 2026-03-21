@@ -7,7 +7,7 @@ import {
     makeAdminSettingsDefaultsKb,
     makeAdminListKb
 } from '../../utils/keyboards.js';
-import { getAdminId, getChannelId, getAdminNickname } from "../../config/env.js";
+import { getChannelId, getContactNickname } from "../../config/env.js";
 import { formatUserLink } from '../../utils/utils.js';
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
 
@@ -288,16 +288,14 @@ export async function sendSettingsPanel(bot, chatId, userId, isEdit = false, mes
  */
 export async function sendSettingsMainPanel(bot, chatId, userId, isEdit = false, messageId = null) {
     userSessions.set(`${userId}:last_panel`, 'adm_settings_main');
-    const channelId = getChannelId() || 'Not set';
-    const adminId = getAdminId() || 'Not set';
-    const adminNickname = getAdminNickname();
-    const openAiKey = q.getSetting.get('OPENAI_API_KEY')?.value ? '********' : 'Not set';
+    const channelId = getChannelId() || t('admin.not_set');
+    const adminNickname = getContactNickname() || t('admin.not_set');
+    const openAiKey = q.getSetting.get('OPENAI_API_KEY')?.value ? '********' : t('admin.not_set');
 
     const text = t('admin.panel_settings_main') + '\n\n' +
-        `📺 <b>Channel ID:</b> <code>${channelId}</code>\n` +
-        `👤 <b>Admin ID:</b> <code>${adminId}</code>\n` +
-        `🏷 <b>Admin Nickname:</b> <code>${adminNickname}</code>\n` +
-        `🤖 <b>OpenAI API Key:</b> <code>${openAiKey}</code>\n\n` +
+        t('admin.panel_settings_main_channel', { id: channelId }) + '\n' +
+        t('admin.panel_settings_main_contact_nickname', { nickname: adminNickname }) + '\n' +
+        t('admin.panel_settings_main_openai', { key: openAiKey }) + '\n\n' +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsMainKb();
@@ -316,11 +314,11 @@ export async function sendSettingsMainPanel(bot, chatId, userId, isEdit = false,
 export async function sendSettingsTemplatePanel(bot, chatId, userId, isEdit = false, messageId = null) {
     userSessions.set(`${userId}:last_panel`, 'adm_settings_template');
     const text = t('admin.panel_settings_template') + '\n\n' +
-        `📢 <b>Header:</b> <code>${q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header')}</code>\n` +
-        `💰 <b>Min Bid Text:</b> <code>${q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid')}</code>\n` +
-        `📈 <b>Bid Step Text:</b> <code>${q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step')}</code>\n` +
-        `🕘 <b>End Date Text:</b> <code>${q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date')}</code>\n` +
-        `📝 <b>Footer:</b> <code>${q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer')}</code>\n\n` +
+        t('admin.panel_settings_template_header', { value: q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header') }) + '\n' +
+        t('admin.panel_settings_template_min_bid', { value: q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid') }) + '\n' +
+        t('admin.panel_settings_template_bid_step', { value: q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step') }) + '\n' +
+        t('admin.panel_settings_template_end_date', { value: q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date') }) + '\n' +
+        t('admin.panel_settings_template_footer', { value: q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer') }) + '\n\n' +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsTemplateKb();
@@ -339,9 +337,9 @@ export async function sendSettingsTemplatePanel(bot, chatId, userId, isEdit = fa
 export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = false, messageId = null) {
     userSessions.set(`${userId}:last_panel`, 'adm_settings_defaults');
     const text = t('admin.panel_settings_defaults') + '\n\n' +
-        `📅 <b>Default End Days:</b> <code>${q.getSetting.get('DEFAULT_END_DAYS')?.value || '5'}</code>\n` +
-        `🕒 <b>Default End Time:</b> <code>${q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00'}</code>\n` +
-        `⏳ <b>Continuous Extension (min):</b> <code>${q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5'}</code>\n\n` +
+        t('admin.panel_settings_defaults_days', { value: q.getSetting.get('DEFAULT_END_DAYS')?.value || '5' }) + '\n' +
+        t('admin.panel_settings_defaults_time', { value: q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00' }) + '\n' +
+        t('admin.panel_settings_defaults_continuous', { value: q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5' }) + '\n\n' +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsDefaultsKb();

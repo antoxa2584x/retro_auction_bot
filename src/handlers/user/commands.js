@@ -19,8 +19,8 @@ function formatMyAuctionCaption(a, userId) {
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
 
     return `🔹 <a href="${link}">${a.title}</a>\n` +
-           `${t('admin.auction_min_bid_text').replace('🔸 ', '')}: <b>${a.current_price} грн</b>\n` +
-           `${t('admin.auction_end_date_text').replace('🕘 ', '')}: <b>${endDate}</b>\n` +
+           `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
+           `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>\n` +
            `Статус: ${status}`;
 }
 

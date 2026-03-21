@@ -402,8 +402,18 @@ export const q = {
    */
   initDefaults: () => {
     const defaults = [
-      { key: 'CONTINUOUS_MINUTES', value: '5' }
+      { key: 'CONTINUOUS_MINUTES', value: '5' },
+      { key: 'TZ', value: 'UTC' },
+      { key: 'LOCALE', value: 'uk' },
+      { key: 'CURRENCY', value: 'грн' },
+      { key: 'CONTACT_NICKNAME', value: null }
     ];
+    // Migrate legacy ADMIN_NICKNAME to CONTACT_NICKNAME
+    const legacy = q.getSetting.get('ADMIN_NICKNAME');
+    if (legacy) {
+        q.setSetting.run('CONTACT_NICKNAME', legacy.value);
+        db.prepare("DELETE FROM settings WHERE key='ADMIN_NICKNAME'").run();
+    }
     for (const d of defaults) {
       const exists = q.getSetting.get(d.key);
       if (!exists) {

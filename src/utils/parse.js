@@ -18,7 +18,7 @@ function escapeRegExp(string) {
  * Dynamically builds regular expressions based on configured settings.
  * 
  * @param {string} text - The post text to parse.
- * @param {string} tz - Timezone for date calculation (e.g., 'Europe/Kyiv').
+ * @param {string} tz - Timezone for date calculation (e.g., 'UTC').
  * @returns {{minBid: number, step: number, end: Date}} Parsed auction data.
  * @throws {Error} If required fields are not found in the text.
  */

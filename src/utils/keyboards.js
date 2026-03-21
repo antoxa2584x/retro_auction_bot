@@ -22,7 +22,8 @@ export function makeKb(chatId, msgId, price, bidsCount) {
     }
 
     const absChatId = Math.abs(chatId);
-    const url = `https://t.me/${BOT_USERNAME}?start=bid_${absChatId}_${msgId}`;
+    const username = BOT_USERNAME || 'bot'; // Fallback if not yet set
+    const url = `https://t.me/${username}?start=bid_${absChatId}_${msgId}`;
 
     return {
         inline_keyboard: [
@@ -126,8 +127,7 @@ export function makeAdminSettingsMainKb() {
     return {
         inline_keyboard: [
             [{ text: '📺 Channel ID', callback_data: 'set_conf:CHANNEL_ID' }],
-            [{ text: '👤 Admin ID', callback_data: 'set_conf:ADMIN_ID' }],
-            [{ text: '🏷 Admin Nickname', callback_data: 'set_conf:ADMIN_NICKNAME' }],
+            [{ text: '🏷 Contact Nickname', callback_data: 'set_conf:CONTACT_NICKNAME' }],
             [{ text: '🤖 OpenAI API Key', callback_data: 'set_conf:OPENAI_API_KEY' }],
             [{ text: t('common.back'), callback_data: 'adm_settings', style: 'primary' }]
         ]
