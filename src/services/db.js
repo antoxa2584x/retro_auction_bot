@@ -194,6 +194,12 @@ export const q = {
   finish: db.prepare(`UPDATE auctions SET status='finished' WHERE chat_id=? AND message_id=?`),
 
   /**
+   * Deletes an auction record.
+   * @type {import('better-sqlite3').Statement}
+   */
+  deleteAuction: db.prepare(`DELETE FROM auctions WHERE chat_id=? AND message_id=?`),
+
+  /**
    * Inserts a new bid into the history.
    * @type {import('better-sqlite3').Statement}
    */

@@ -309,6 +309,7 @@ export function makeAdminAuctionActionKb(chatId, messageId, status) {
     const buttons = [];
     if (status === 'finished') {
         buttons.push([{ text: t('admin.kb.restart'), callback_data: `adm_restart:${chatId}:${messageId}`, style: 'primary' }]);
+        buttons.push([{ text: t('admin.kb.delete_auction'), callback_data: `adm_delete:${chatId}:${messageId}`, style: 'danger' }]);
     } else if (status === 'active') {
         buttons.push([{ text: t('admin.kb.finish_now'), callback_data: `adm_finish_now:${chatId}:${messageId}`, style: 'danger' }]);
     }

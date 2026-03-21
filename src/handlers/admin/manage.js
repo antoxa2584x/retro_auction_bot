@@ -139,8 +139,23 @@ export function registerManageHandlers(bot) {
 
             const newEndStr = formatInTimeZone(newEnd, TZ, 'dd.MM');
             const newTimeStr = formatInTimeZone(newEnd, TZ, 'HH:mm');
-            const reEnd = /Завершення\s+аукціону:\s*([0-3]?\d\.[01]?\d)\s*о\s*([0-2]?\d:[0-5]\d)/i;
-            const updatedFullText = a.full_text.replace(reEnd, `Завершення аукціону: ${newEndStr} о ${newTimeStr}`);
+
+            // Find the line that starts with what's in admin.auction_end_date_text ("Завершення аукціону")
+            const endDateText = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
+            const reEnd = new RegExp(`(${endDateText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:?\\s*)[0-3]?\\d\\.[01]?\\d\\s*о\\s*[0-2]?\\d:[0-5]\\d`, 'i');
+            
+            let updatedFullText;
+            if (reEnd.test(a.full_text)) {
+                updatedFullText = a.full_text.replace(reEnd, `$1${newEndStr} о ${newTimeStr}`);
+            } else {
+                // If regex doesn't match for some reason, we might need a more generic fallback 
+                const fallbackRe = /([0-3]?\d\.[01]?\d)\s*о\s*([0-2]?\d:[0-5]\d)/;
+                if (fallbackRe.test(a.full_text)) {
+                    updatedFullText = a.full_text.replace(fallbackRe, `${newEndStr} о ${newTimeStr}`);
+                } else {
+                    updatedFullText = a.full_text;
+                }
+            }
 
             let newMsg;
             try {
@@ -297,6 +312,20 @@ export function registerManageHandlers(bot) {
                 cur: getCurrency()
             }), { parse_mode: 'HTML' });
             
+            await sendAdminPanel(bot, chatId, true, messageId);
+        }
+        
+        const deleteMatch = data.match(/^adm_delete:(.+):(.+)$/);
+        if (deleteMatch) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+            await bot.answerCallbackQuery(query.id);
+
+            const targetChatId = Number(deleteMatch[1]);
+            const targetMsgId = Number(deleteMatch[2]);
+            
+            q.deleteAuction.run(targetChatId, targetMsgId);
+            
+            await bot.sendMessage(chatId, "Аукціон видалено з бази даних.");
             await sendAdminPanel(bot, chatId, true, messageId);
         }
     });

@@ -120,13 +120,13 @@ export async function closeAuction(bot, chat_id, message_id) {
                 }
 
                 // Notify admins
-                const escapedWinnerName = escapeHtml(row.leader_name);
                 const adminNotifyText = t('scheduler.admin_finished_notify', {
                     link: auctionLink,
                     title: row.title,
                     price: row.current_price,
                     user_id: row.leader_id,
-                    name: escapedWinnerName
+                    name: escapedWinnerName,
+                    mention: formatUserLink(row.leader_id, row.leader_name)
                 });
                 for (const admin of admins) {
                     try {
