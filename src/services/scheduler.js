@@ -120,6 +120,7 @@ export async function closeAuction(bot, chat_id, message_id) {
                 }
 
                 // Notify admins
+                const escapedWinnerName = escapeHtml(row.leader_name);
                 const adminNotifyText = t('scheduler.admin_finished_notify', {
                     link: auctionLink,
                     title: row.title,
