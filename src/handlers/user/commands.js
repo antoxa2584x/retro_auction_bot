@@ -5,6 +5,14 @@ import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
 import { t } from '../../services/i18n.js';
 import { confirmBidKb, makeMyCarouselKb } from '../../utils/keyboards.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf8'));
+const BOT_VERSION = packageJson.version;
 
 /**
  * Formats a single auction for the /my carousel.
@@ -91,6 +99,10 @@ export function registerUserCommands(bot) {
         } else {
             await bot.sendMessage(chatId, t('bid.welcome'), { parse_mode: 'HTML' });
         }
+    });
+
+    bot.onText(/^\/about$/, async (msg) => {
+        await bot.sendMessage(msg.chat.id, t('bid.about_text', { version: BOT_VERSION }), { parse_mode: 'HTML' });
     });
 
     bot.onText(/^\/my$/, async (msg) => {
