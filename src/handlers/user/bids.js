@@ -1,5 +1,5 @@
 import { db, q, placeBidTransaction } from '../../services/db.js';
-import { makeKb, confirmBidKb, confirmManualBidKb } from '../../utils/keyboards.js';
+import { makeKb, confirmBidKb, confirmManualBidKb, makeOutbidKb } from '../../utils/keyboards.js';
 import { scheduleClose, closeAuction } from "../../services/scheduler.js";
 import { getAuctionLink } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
@@ -181,7 +181,12 @@ export function registerBidHandlers(bot) {
                         title: res.auctionTitle,
                         price: price
                     });
-                    await bot.sendMessage(res.previousLeaderId, outbidText, { parse_mode: 'HTML' });
+                    const nextPrice = price + (res.auctionStep || 0);
+                    const outbidKb = makeOutbidKb(target_chat_id, target_message_id, nextPrice);
+                    await bot.sendMessage(res.previousLeaderId, outbidText, { 
+                        parse_mode: 'HTML',
+                        reply_markup: outbidKb
+                    });
                 } catch (err) {
                     console.error(`Failed to notify previous leader ${res.previousLeaderId}:`, err.message);
                 }

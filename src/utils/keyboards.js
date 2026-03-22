@@ -432,7 +432,28 @@ export function makeAdminListKb(admins) {
 }
 
 /**
- * Creates the confirmation keyboard for broadcast.
+ * Creates a keyboard for outbid notification.
+ * 
+ * @param {number} chatId - Chat ID.
+ * @param {number} msgId - Message ID.
+ * @param {number} nextPrice - Recommended next bid amount.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeOutbidKb(chatId, msgId, nextPrice) {
+    const absChatId = Math.abs(chatId);
+    const username = BOT_USERNAME || 'bot';
+    const url = `https://t.me/${username}?start=bid_${absChatId}_${msgId}`;
+    const cur = getCurrency();
+
+    return {
+        inline_keyboard: [
+            [{ text: t('bid.kb.increase_bid', { price: nextPrice, cur }), url: url, style: 'success' }]
+        ]
+    };
+}
+
+/**
+ * Creates a confirmation keyboard for broadcast.
  * 
  * @returns {Object} Inline keyboard object.
  */

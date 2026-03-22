@@ -155,6 +155,7 @@
     "info_item": "{{index}}. {{name}} — {{price}} {{cur}}\n",
     "info_more": "…та ще {{count}}",
     "kb": {
+      "increase_bid": "➕ Підвищити ставку ({{price}} {{cur}})",
       "confirm": "✅ Підтвердити {{price}} {{cur}}",
       "manual": "⌨️ Інша сума",
       "cancel": "Скасувати",

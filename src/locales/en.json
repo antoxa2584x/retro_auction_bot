@@ -147,6 +147,7 @@
     "info_item": "{{index}}. {{name}} — {{price}} {{cur}}\n",
     "info_more": "…and {{count}} more",
     "kb": {
+      "increase_bid": "➕ Increase bid ({{price}} {{cur}})",
       "confirm": "✅ Confirm {{price}} {{cur}}",
       "manual": "⌨️ Other amount",
       "cancel": "Cancel",

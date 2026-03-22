@@ -583,6 +583,7 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         success: true, 
         previousLeaderId: auction.leader_id,
         auctionTitle: auction.title,
+        auctionStep: auction.step,
         participantsCount: finalParticipants,
         timeExtended,
         newEndAt
