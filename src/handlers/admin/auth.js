@@ -41,7 +41,7 @@ export function registerAuthHandlers(bot) {
         await bot.sendMessage(msg.chat.id, t('admin.enter_otp'), {
             parse_mode: 'HTML',
             reply_markup: {
-                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_otp', style: 'danger' }]]
+                inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_otp' }]]
             }
         });
     });

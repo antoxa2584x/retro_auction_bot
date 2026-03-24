@@ -48,7 +48,7 @@ export function registerManageHandlers(bot) {
                     message_id: messageId,
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list', style: 'primary' }]]
+                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
                     }
                 });
                 return;
@@ -78,7 +78,7 @@ export function registerManageHandlers(bot) {
                     message_id: messageId,
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list', style: 'primary' }]]
+                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
                     }
                 });
                 return;

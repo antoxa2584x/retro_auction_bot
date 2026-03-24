@@ -4,7 +4,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
 import { t } from '../../services/i18n.js';
-import { confirmBidKb, makeMyCarouselKb } from '../../utils/keyboards.js';
+import { confirmBidKb, makeMyCarouselKb, makeNotifyKb } from '../../utils/keyboards.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -95,6 +95,32 @@ export function registerUserCommands(bot) {
                         reply_markup: replyMarkup
                     });
                 }
+            }
+        } else if (payload && payload.startsWith('notify_')) {
+            const parts = payload.split('_');
+            if (parts.length === 3) {
+                const targetChatId = -Math.abs(Number(parts[1]));
+                const targetMessageId = Number(parts[2]);
+
+                const row = q.getAuction.get(targetChatId, targetMessageId);
+                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' });
+
+                const now = new Date();
+                const end = new Date(row.end_at);
+                if (now >= end || row.status !== 'active') {
+                    await closeAuction(bot, targetChatId, targetMessageId);
+                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' });
+                }
+
+                const existing = q.getNotification.get(targetChatId, targetMessageId, msg.from.id);
+                const text = existing 
+                    ? t('admin.notify_already_set', { title: row.title, hours: existing.hours })
+                    : t('admin.notify_welcome', { title: row.title, hours: 1 });
+                
+                await bot.sendMessage(chatId, text, {
+                    parse_mode: 'HTML',
+                    reply_markup: makeNotifyKb(targetChatId, targetMessageId, !!existing)
+                });
             }
         } else {
             await bot.sendMessage(chatId, t('bid.welcome'), { parse_mode: 'HTML' });

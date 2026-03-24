@@ -158,7 +158,7 @@ export function registerSettingsHandlers(bot) {
             await bot.sendMessage(chatId, text, {
                 parse_mode: 'HTML',
                 reply_markup: {
-                    inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings', style: 'danger' }]]
+                    inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings' }]]
                 }
             });
         }
@@ -199,7 +199,7 @@ export function registerSettingsHandlers(bot) {
             await bot.sendMessage(chatId, t('admin.enter_new_value', { key }), { 
                 parse_mode: 'HTML',
                 reply_markup: {
-                    inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings', style: 'danger' }]]
+                    inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings' }]]
                 }
             });
         }

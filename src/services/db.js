@@ -75,6 +75,15 @@ db.exec(`
         locale TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS notifications
+    (
+        chat_id INTEGER,
+        message_id INTEGER,
+        user_id INTEGER,
+        hours INTEGER,
+        PRIMARY KEY (chat_id, message_id, user_id)
+    );
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -456,7 +465,19 @@ export const q = {
    * Retrieves all unique user IDs who have interacted with auctions.
    * @type {import('better-sqlite3').Statement}
    */
-  getAllUsers: db.prepare(`SELECT DISTINCT user_id FROM participants`)
+  getAllUsers: db.prepare(`SELECT DISTINCT user_id FROM participants`),
+
+  // Notifications
+  getNotification: db.prepare(`SELECT hours FROM notifications WHERE chat_id = ? AND message_id = ? AND user_id = ?`),
+  setNotification: db.prepare(`INSERT OR REPLACE INTO notifications (chat_id, message_id, user_id, hours) VALUES (?, ?, ?, ?)`),
+  deleteNotification: db.prepare(`DELETE FROM notifications WHERE chat_id = ? AND message_id = ? AND user_id = ?`),
+  getAuctionNotifications: db.prepare(`SELECT user_id, hours FROM notifications WHERE chat_id = ? AND message_id = ?`),
+  getAllActiveNotifications: db.prepare(`
+    SELECT n.chat_id, n.message_id, n.user_id, n.hours, a.end_at, a.title
+    FROM notifications n
+    JOIN auctions a ON n.chat_id = a.chat_id AND n.message_id = a.message_id
+    WHERE a.status = 'active'
+  `)
 };
 
 /**
