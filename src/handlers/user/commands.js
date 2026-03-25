@@ -4,7 +4,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
 import { t } from '../../services/i18n.js';
-import { confirmBidKb, makeMyCarouselKb, makeNotifyKb } from '../../utils/keyboards.js';
+import { confirmBidKb, makeMyCarouselKb, makeNotifyKb, makeUserMenuKb } from '../../utils/keyboards.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -51,6 +51,21 @@ function formatWonAuctionCaption(a) {
 }
 
 /**
+ * Formats a single auction for the watchlist carousel.
+ * 
+ * @param {Object} a - Auction object.
+ * @returns {string} Formatted caption.
+ */
+function formatWatchlistAuctionCaption(a) {
+    const link = getAuctionLink(a.chat_id, a.message_id);
+    const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
+
+    return `🔔 <a href="${link}">${a.title}</a>\n` +
+           `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
+           `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>`;
+}
+
+/**
  * Registers user commands (/start, /my, /won).
  * 
  * @param {TelegramBot} bot - Telegram bot instance.
@@ -59,6 +74,8 @@ export function registerUserCommands(bot) {
     bot.onText(/^\/start(?:\s+(.+))?$/, async (msg, match) => {
         const payload = match[1];
         const chatId = msg.chat.id;
+
+        bot.deleteMessage(chatId, msg.message_id).catch(() => {});
 
         if (payload && payload.startsWith('bid_')) {
             const parts = payload.split('_');
@@ -131,9 +148,17 @@ export function registerUserCommands(bot) {
         await bot.sendMessage(msg.chat.id, t('bid.about_text', { version: BOT_VERSION }), { parse_mode: 'HTML' });
     });
 
+    bot.onText(/^\/menu$/, async (msg) => {
+        await bot.sendMessage(msg.chat.id, t('bid.menu_header'), {
+            parse_mode: 'HTML',
+            reply_markup: makeUserMenuKb()
+        });
+    });
+
     bot.onText(/^\/my$/, async (msg) => {
         const userId = msg.from.id;
         const chatId = msg.chat.id;
+
         const auctions = q.getParticipatingAuctions.all(userId);
 
         if (auctions.length === 0) {
@@ -167,15 +192,26 @@ export function registerUserCommands(bot) {
 
         const myCarouselMatch = data.match(/^my_(prev|next):(\d+)$/);
         const wonCarouselMatch = data.match(/^won_(prev|next):(\d+)$/);
+        const watchlistCarouselMatch = data.match(/^watchlist_(prev|next):(\d+)$/);
 
-        if (myCarouselMatch || wonCarouselMatch) {
+        if (myCarouselMatch || wonCarouselMatch || watchlistCarouselMatch) {
             const isWon = !!wonCarouselMatch;
-            const match = isWon ? wonCarouselMatch : myCarouselMatch;
+            const isWatchlist = !!watchlistCarouselMatch;
+            const match = isWon ? wonCarouselMatch : (isWatchlist ? watchlistCarouselMatch : myCarouselMatch);
             const action = match[1];
             const currentIndex = parseInt(match[2], 10);
             
-            const auctions = isWon ? q.getWonAuctions.all(userId) : q.getParticipatingAuctions.all(userId);
-            const noItemsKey = isWon ? 'bid.no_won' : 'bid.no_my_active';
+            let auctions, noItemsKey;
+            if (isWon) {
+                auctions = q.getWonAuctions.all(userId);
+                noItemsKey = 'bid.no_won';
+            } else if (isWatchlist) {
+                auctions = q.getWatchlistAuctions.all(userId);
+                noItemsKey = 'bid.no_watchlist';
+            } else {
+                auctions = q.getParticipatingAuctions.all(userId);
+                noItemsKey = 'bid.no_my_active';
+            }
 
             if (auctions.length === 0) {
                 try {
@@ -203,8 +239,17 @@ export function registerUserCommands(bot) {
             }
 
             const a = auctions[nextIndex];
-            const caption = isWon ? formatWonAuctionCaption(a) : formatMyAuctionCaption(a, userId);
-            const prefix = isWon ? 'won' : 'my';
+            let caption, prefix;
+            if (isWon) {
+                caption = formatWonAuctionCaption(a);
+                prefix = 'won';
+            } else if (isWatchlist) {
+                caption = formatWatchlistAuctionCaption(a);
+                prefix = 'watchlist';
+            } else {
+                caption = formatMyAuctionCaption(a, userId);
+                prefix = 'my';
+            }
             const replyMarkup = makeMyCarouselKb(nextIndex, auctions.length, prefix);
 
             try {
@@ -262,11 +307,61 @@ export function registerUserCommands(bot) {
                 // Fallback: if editing fails (e.g. content is the same), just answer callback
             }
         }
+
+        if (data === 'menu_won' || data === 'menu_my' || data === 'menu_watchlist') {
+            try {
+                await bot.answerCallbackQuery(query.id);
+            } catch (e) {}
+
+            let auctions, noItemsKey, headerKey, prefix, formatter;
+            if (data === 'menu_won') {
+                auctions = q.getWonAuctions.all(userId);
+                noItemsKey = 'bid.no_won';
+                headerKey = 'bid.won_header';
+                prefix = 'won';
+                formatter = formatWonAuctionCaption;
+            } else if (data === 'menu_watchlist') {
+                auctions = q.getWatchlistAuctions.all(userId);
+                noItemsKey = 'bid.no_watchlist';
+                headerKey = 'bid.watchlist_header';
+                prefix = 'watchlist';
+                formatter = formatWatchlistAuctionCaption;
+            } else {
+                auctions = q.getParticipatingAuctions.all(userId);
+                noItemsKey = 'bid.no_my_active';
+                headerKey = 'bid.my_active_header';
+                prefix = 'my';
+                formatter = (a) => formatMyAuctionCaption(a, userId);
+            }
+
+            if (auctions.length === 0) {
+                return bot.sendMessage(chatId, t(noItemsKey), { parse_mode: 'HTML' });
+            }
+
+            const a = auctions[0];
+            const caption = formatter(a);
+            const replyMarkup = makeMyCarouselKb(0, auctions.length, prefix);
+
+            if (a.photo_id) {
+                await bot.sendPhoto(chatId, a.photo_id, {
+                    caption,
+                    parse_mode: 'HTML',
+                    reply_markup: replyMarkup
+                });
+            } else {
+                await bot.sendMessage(chatId, caption, {
+                    parse_mode: 'HTML',
+                    reply_markup: replyMarkup,
+                    disable_web_page_preview: true
+                });
+            }
+        }
     });
 
     bot.onText(/^\/won$/, async (msg) => {
         const userId = msg.from.id;
         const chatId = msg.chat.id;
+
         const auctions = q.getWonAuctions.all(userId);
 
         if (auctions.length === 0) {

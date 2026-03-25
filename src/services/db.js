@@ -302,6 +302,18 @@ export const q = {
      LIMIT 10
   `),
 
+  /**
+   * Retrieves active auctions that a specific user has notifications for.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getWatchlistAuctions: db.prepare(`
+    SELECT DISTINCT a.*
+      FROM auctions a
+      JOIN notifications n ON a.chat_id=n.chat_id AND a.message_id=n.message_id
+     WHERE n.user_id=? AND a.status='active'
+     ORDER BY a.message_id DESC
+  `),
+
   // Admin related
 
   /**

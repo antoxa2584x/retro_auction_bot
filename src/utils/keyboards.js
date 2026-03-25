@@ -76,6 +76,21 @@ export function makeNotifyKb(chatId, messageId, alreadySet = false) {
 }
 
 /**
+ * Creates the user menu keyboard.
+ *
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserMenuKb() {
+    return {
+        inline_keyboard: [
+            [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
+            [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
+            [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}]
+        ]
+    };
+}
+
+/**
  * Creates the main admin panel keyboard.
  *
  * @returns {Object} Inline keyboard object.
