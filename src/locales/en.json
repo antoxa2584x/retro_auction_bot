@@ -173,7 +173,8 @@
       "no_bids": "🏁 No bids were made",
       "menu_won": "🏆 Won auctions",
       "menu_my": "🚀 My bids",
-      "menu_watchlist": "🔔 My watch list"
+      "menu_watchlist": "🔔 My watch list",
+      "menu_open_app": "📱 Open Mini App"
     },
     "manual_prompt": "Enter your bid amount:",
     "error_invalid_amount": "⚠️ Please enter a number.",

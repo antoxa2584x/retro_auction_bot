@@ -15,7 +15,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
 * **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
-* **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated.
+* **User Portfolio & Watchlist (Mini App)** — `/menu` command or a specialized button to see active bids, auction history, and a watchlist in a modern Telegram Mini App interface.
 * **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
 * **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
@@ -75,6 +75,8 @@ Create a `.env` file with the following:
 
 ```env
 BOT_TOKEN=your_bot_token   # Required
+WEBAPP_URL=https://your-domain.com/ # Optional, URL to hosted Mini App
+PORT=3000                  # Optional, server port (default 3000)
 ```
 
 All other settings (Channel ID, Timezone, Contact Nickname, OpenAI Key, etc.) are configured directly via the **Admin Panel** in the bot and stored in the database.

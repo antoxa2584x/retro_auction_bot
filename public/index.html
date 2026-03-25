@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Auctions</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #fff;
+            --tg-theme-text-color: #000;
+            --tg-theme-hint-color: #999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #2481cc;
+            --tg-theme-button-text-color: #fff;
+            --tg-theme-secondary-bg-color: #efeff3;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+        }
+
+        .container {
+            padding: 16px;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: var(--tg-theme-secondary-bg-color);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            color: var(--tg-theme-hint-color);
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .auction-card {
+            background-color: var(--tg-theme-bg-color);
+            border: 1px solid var(--tg-theme-secondary-bg-color);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .auction-card img {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-right: 12px;
+            background-color: #eee;
+        }
+
+        .auction-info {
+            flex: 1;
+        }
+
+        .auction-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .auction-price {
+            font-size: 14px;
+            color: var(--tg-theme-link-color);
+            font-weight: 700;
+        }
+
+        .auction-status {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color);
+            margin-top: 4px;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--tg-theme-hint-color);
+        }
+
+        #empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            display: none;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('participating')">Active</div>
+            <div class="tab" onclick="showTab('won')">Won</div>
+            <div class="tab" onclick="showTab('watchlist')">Watchlist</div>
+        </div>
+
+        <div id="loading">Loading...</div>
+        <div id="auction-list"></div>
+        <div id="empty-state">
+            <div class="empty-icon">📦</div>
+            <div id="empty-text">No auctions found here yet.</div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        let allData = {
+            participating: [],
+            won: [],
+            watchlist: []
+        };
+        let currentTab = 'participating';
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/user/auctions', {
+                    headers: {
+                        'x-init-data': tg.initData
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch data');
+                
+                allData = await response.json();
+                document.getElementById('loading').style.display = 'none';
+                renderList();
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loading').innerText = 'Error loading auctions. Please try again later.';
+            }
+        }
+
+        function showTab(tabName) {
+            currentTab = tabName;
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.innerText.toLowerCase().includes(tabName.substring(0, 3))) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Fix tab active class based on tabName
+            const tabs = document.querySelectorAll('.tab');
+            tabs[0].classList.toggle('active', tabName === 'participating');
+            tabs[1].classList.toggle('active', tabName === 'won');
+            tabs[2].classList.toggle('active', tabName === 'watchlist');
+
+            renderList();
+        }
+
+        function renderList() {
+            const list = document.getElementById('auction-list');
+            const emptyState = document.getElementById('empty-state');
+            const auctions = allData[currentTab];
+            
+            list.innerHTML = '';
+            
+            if (auctions.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            auctions.forEach(auction => {
+                const card = document.createElement('div');
+                card.className = 'auction-card';
+                card.onclick = () => {
+                    tg.openTelegramLink(`https://t.me/${auction.channel_username || 'c'}/${auction.message_id}`);
+                };
+                
+                const img = auction.photo_id ? `<img src="/api/photo/${auction.photo_id}" onerror="this.src='https://via.placeholder.com/80?text=Auction'">` : '<div style="width:80px;height:80px;background:#eee;border-radius:8px;margin-right:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>';
+                
+                card.innerHTML = `
+                    ${img}
+                    <div class="auction-info">
+                        <div class="auction-title">${auction.title || 'Auction'}</div>
+                        <div class="auction-price">${auction.current_price} ${auction.currency || ''}</div>
+                        <div class="auction-status">${currentTab === 'won' ? 'You won!' : (auction.status === 'active' ? 'Ends: ' + new Date(auction.end_at).toLocaleString() : 'Closed')}</div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>

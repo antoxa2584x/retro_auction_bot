@@ -10,6 +10,7 @@ import { registerAdminHandlers } from './handlers/admin.js';
 import { restoreJobs } from './services/scheduler.js';
 import { q } from './services/db.js';
 import { setLocale, setCurrency } from './services/i18n.js';
+import { startServer } from './server.js';
 
 // Load global locale from DB
 q.initDefaults();
@@ -46,5 +47,9 @@ bot.on('polling_error', (error) => {
 
 // Restore scheduled jobs
 restoreJobs(bot);
+
+// Start Mini App server
+const PORT = process.env.PORT || 3000;
+startServer(PORT);
 
 console.log('Auction bot started. Timezone:', TZ);

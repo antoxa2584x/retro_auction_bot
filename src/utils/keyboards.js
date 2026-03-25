@@ -1,4 +1,4 @@
-import {BOT_USERNAME} from '../config/env.js';
+import {BOT_USERNAME, WEBAPP_URL} from '../config/env.js';
 import {t, getCurrency} from '../services/i18n.js';
 
 /**
@@ -81,12 +81,19 @@ export function makeNotifyKb(chatId, messageId, alreadySet = false) {
  * @returns {Object} Inline keyboard object.
  */
 export function makeUserMenuKb() {
+    const buttons = [
+        [{text: t('bid.kb.menu_open_app'), web_app: {url: WEBAPP_URL}}],
+        [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
+        [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
+        [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}]
+    ];
+
+    if (!WEBAPP_URL) {
+        buttons.shift(); // Remove web_app button if URL is not configured
+    }
+
     return {
-        inline_keyboard: [
-            [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
-            [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
-            [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}]
-        ]
+        inline_keyboard: buttons
     };
 }
 
