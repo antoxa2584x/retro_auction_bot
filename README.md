@@ -12,9 +12,10 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Multi-language Support** — supports both **Ukrainian** and **English**, with easy switching via the admin panel.
 * **Custom Currency** — admins can set any custom currency symbol or name (e.g., ₴, $, €, BTC) to be used across all auctions.
 * **One-tap bidding with confirmation** — users are redirected from the channel to the bot's private chat to confirm their bid, preventing accidental clicks.
+* **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
 * **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
-* **User Portfolio** — `/my` command to see active bids and `/won` to see auction history.
+* **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated.
 * **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
 * **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
@@ -116,7 +117,7 @@ The bot extracts the **Title** as the first non-empty line between the configure
 * `src/services/i18n.js` — Internationalization service for UK/EN support.
 * `src/services/scheduler.js` — Auction closing logic and notifications.
 * `src/handlers/channelPost.js` — Processes new auctions from the channel.
-* `src/handlers/user/` — Commands (`/start`, `/my`, `/won`), bidding logic, and info.
+* `src/handlers/user/` — Commands (`/start`, `/menu`, `/my`, `/won`), bidding logic, and info.
 * `src/handlers/admin/` — Admin panel navigation, authentication, settings, and posting wizard.
 * `src/locales/` — Translation files (`uk.json`, `en.json`).
 * `src/utils/` — Shared utility functions and keyboards.
