@@ -16,6 +16,8 @@ export function registerAdminHandlers(bot) {
     // Handle messages (text and photo)
     bot.on('message', async (msg) => {
         if (msg.chat.type !== 'private') return;
+        if (msg.text?.startsWith('/')) return; // Let bot.onText handle commands
+
         const text = msg.text?.trim();
 
         const admin = q.getAdmin.get(msg.from.id);
@@ -24,24 +26,32 @@ export function registerAdminHandlers(bot) {
         if (!isAdmin) {
             if (text) {
                 const otpHandled = handleOtpInput(bot, msg, text);
-                if (otpHandled) return;
+                if (otpHandled) {
+                    return;
+                }
             }
             return;
         }
 
         // Auction posting input handling
         const postHandled = await handlePostInput(bot, msg);
-        if (postHandled) return;
+        if (postHandled) {
+            return;
+        }
 
         // Broadcast input handling
         const broadcastHandled = await handleBroadcastInput(bot, msg);
-        if (broadcastHandled) return;
+        if (broadcastHandled) {
+            return;
+        }
 
         // Settings input handling
         if (userSessions.has(msg.from.id)) {
             if (text) {
                 const handled = await handleSettingsInput(bot, msg, text);
-                if (handled) return;
+                if (handled) {
+                    return;
+                }
             }
         }
     });
