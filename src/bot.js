@@ -3,7 +3,7 @@
  * Initializes the bot, loads settings, registers handlers, and restores jobs.
  */
 import TelegramBot from 'node-telegram-bot-api';
-import { BOT_TOKEN, TZ, setBotUsername } from './config/env.js';
+import { BOT_TOKEN, TZ, setBotUsername, WEBAPP_URL } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
 import { registerAdminHandlers } from './handlers/admin.js';
@@ -25,7 +25,12 @@ if (dbCurrency) {
     setCurrency(dbCurrency);
 }
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN, { polling: false });
+
+// Set webhook
+bot.setWebHook(`${WEBAPP_URL}/bot${BOT_TOKEN}`)
+    .then(() => console.log(`Webhook set to ${WEBAPP_URL}/bot${BOT_TOKEN}`))
+    .catch((err) => console.error('Error setting webhook:', err.message));
 
 // Get and set bot username
 bot.getMe().then((me) => {
@@ -48,8 +53,7 @@ bot.on('polling_error', (error) => {
 // Restore scheduled jobs
 restoreJobs(bot);
 
-// Start Mini App server
-const PORT = process.env.PORT || 3000;
-startServer(PORT);
+// Start Mini App & Webhook server
+startServer(bot);
 
 console.log('Auction bot started. Timezone:', TZ);

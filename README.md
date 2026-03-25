@@ -75,8 +75,7 @@ Create a `.env` file with the following:
 
 ```env
 BOT_TOKEN=your_bot_token   # Required
-WEBAPP_URL=https://your-domain.com/ # Optional, URL to hosted Mini App
-PORT=3000                  # Optional, server port (default 3000)
+WEBAPP_URL=https://your-domain.com/ # Required, URL to hosted Mini App and Webhook
 ```
 
 All other settings (Channel ID, Timezone, Contact Nickname, OpenAI Key, etc.) are configured directly via the **Admin Panel** in the bot and stored in the database.

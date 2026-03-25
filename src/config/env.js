@@ -35,3 +35,8 @@ if (!BOT_TOKEN) {
     console.error('Please set BOT_TOKEN in .env');
     process.exit(1);
 }
+
+if (!WEBAPP_URL) {
+    console.error('Please set WEBAPP_URL in .env');
+    process.exit(1);
+}

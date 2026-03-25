@@ -103,7 +103,16 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
     }
 });
 
-export function startServer(port = 3000) {
+export function startServer(bot) {
+    const port = process.env.PORT || 3000;
+
+    if (bot) {
+        app.post(`/bot${BOT_TOKEN}`, (req, res) => {
+            bot.processUpdate(req.body);
+            res.sendStatus(200);
+        });
+    }
+
     app.listen(port, () => {
         console.log(`Mini App server running on port ${port}`);
     });
