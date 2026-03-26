@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import crypto from 'crypto';
 import path from 'path';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import { q } from './services/db.js';
 import { BOT_TOKEN } from './config/env.js';
@@ -16,7 +17,7 @@ app.use(helmet({
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
             "script-src": ["'self'", "https://telegram.org"],
-            "img-src": ["'self'", "data:", "https://via.placeholder.com"]
+            "img-src": ["'self'", "data:", "https://via.placeholder.com", "https://*.telegram.org"]
         }
     }
 }));
@@ -92,12 +93,15 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
         const won = q.getWonAuctions.all(userId);
         const watchlist = q.getWatchlistAuctions.all(userId);
         
-        // Add channel_username to each auction object
-        const channelUsername = q.getSetting.get('CHANNEL_USERNAME')?.value || 'c';
+        // Add channel_username and chat_id to each auction object
+        const channelUsername = q.getSetting.get('CHANNEL_USERNAME')?.value || null;
         
+        // For private channels, use t.me/c/ID/MSG_ID. 
+        // Note: chat_id needs to be stripped of -100 prefix for t.me/c/ links
         const mapAuction = (a) => ({
             ...a,
             channel_username: channelUsername,
+            chat_id: a.chat_id?.toString().replace('-100', ''),
             currency: q.getSetting.get('CURRENCY')?.value || '₴'
         });
 
@@ -112,8 +116,33 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
     }
 });
 
+app.get('/api/photo/:fileId', async (req, res) => {
+    const { fileId } = req.params;
+    const bot = app.get('bot');
+
+    if (!bot) {
+        return res.status(500).send('Bot not initialized');
+    }
+
+    try {
+        const fileLink = await bot.getFileLink(fileId);
+        https.get(fileLink, (proxyRes) => {
+            res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'image/jpeg');
+            res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+            proxyRes.pipe(res);
+        }).on('error', (e) => {
+            console.error('Error fetching file from Telegram:', e);
+            res.status(500).send('Error fetching image');
+        });
+    } catch (error) {
+        console.error('Error getting file link:', error);
+        res.status(404).send('Image not found');
+    }
+});
+
 export function startServer(bot) {
     const port = process.env.PORT || 3000;
+    app.set('bot', bot);
 
     if (bot) {
         app.post(`/bot${BOT_TOKEN}`, (req, res) => {
