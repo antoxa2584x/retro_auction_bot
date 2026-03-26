@@ -18,15 +18,19 @@ export function registerAdminHandlers(bot) {
         if (msg.chat.type !== 'private') return;
         if (msg.text?.startsWith('/')) return; // Let bot.onText handle commands
 
+        console.log(`[Admin Handler] Received message from ${msg.from.id} (${msg.from.username}): ${msg.text || '[media]'}`);
+
         const text = msg.text?.trim();
 
         const admin = q.getAdmin.get(msg.from.id);
         const isAdmin = admin && admin.otp_code === null;
 
         if (!isAdmin) {
+            console.log(`[Admin Handler] User ${msg.from.id} is NOT an authenticated admin`);
             if (text) {
                 const otpHandled = handleOtpInput(bot, msg, text);
                 if (otpHandled) {
+                    console.log(`[Admin Handler] OTP input handled for ${msg.from.id}`);
                     return;
                 }
             }

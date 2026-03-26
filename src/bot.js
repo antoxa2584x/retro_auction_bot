@@ -50,6 +50,14 @@ bot.getMe().then((me) => {
 });
 
 // Handlers
+bot.on('message', (msg) => {
+    console.log(`[Bot] Message from ${msg.from.username || msg.from.id}: ${msg.text || '[non-text message]'}`);
+});
+
+bot.on('callback_query', (query) => {
+    console.log(`[Bot] Callback from ${query.from.username || query.from.id}: ${query.data}`);
+});
+
 registerCallbackHandler(bot);
 registerChannelPostHandler(bot);
 registerAdminHandlers(bot);
@@ -57,6 +65,14 @@ registerAdminHandlers(bot);
 // Error handling
 bot.on('polling_error', (error) => {
     console.error('Polling error:', error.code, error.message);
+});
+
+bot.on('webhook_error', (error) => {
+    console.error('Webhook error:', error.message);
+});
+
+bot.on('error', (error) => {
+    console.error('General bot error:', error.message);
 });
 
 // Restore scheduled jobs

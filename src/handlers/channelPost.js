@@ -14,14 +14,21 @@ import { t } from '../services/i18n.js';
 export function registerChannelPostHandler(bot) {
     bot.on('channel_post', async (post) => {
         const currentChannelId = getChannelId();
-        if (!post || post.chat.id !== currentChannelId) return;
+        console.log(`[Channel Post] Received post in ${post.chat.id}. Current target: ${currentChannelId}`);
+        if (!post || post.chat.id !== currentChannelId) {
+            console.log(`[Channel Post] Ignoring post from ${post.chat.id}`);
+            return;
+        }
 
         const text = post.text || post.caption || '';
+        console.log(`[Channel Post] Text: ${text.substring(0, 50)}...`);
 
         let parsed;
         try {
             parsed = parsePost(text, TZ);
-        } catch {
+            console.log(`[Channel Post] Parsed successfully:`, parsed);
+        } catch (err) {
+            console.log(`[Channel Post] Failed to parse: ${err.message}`);
             return; // пост не у форматі аукціону — ігноруємо
         }
 

@@ -229,18 +229,20 @@
                     }
                     
                     let url;
-                    if (auction.channel_username) {
-                        url = `https://t.me/${auction.channel_username.replace('@', '')}/${auction.message_id}`;
+                    const username = auction.channel_username ? auction.channel_username.replace('@', '') : null;
+                    
+                    if (username && username !== 'c') {
+                        url = `https://t.me/${username}/${auction.message_id}`;
                     } else if (auction.chat_id) {
                         url = `https://t.me/c/${auction.chat_id}/${auction.message_id}`;
                     } else {
-                        // Fallback
                         url = `https://t.me/c/0/${auction.message_id}`;
                     }
+                    console.log('Opening auction link:', url);
                     tg.openTelegramLink(url);
                 };
                 
-                const img = auction.photo_id ? `<img src="/api/photo/${auction.photo_id}" onerror="this.src='https://via.placeholder.com/80?text=Auction'">` : '<div style="width:80px;height:80px;background:var(--tg-theme-secondary-bg-color);border-radius:8px;margin-right:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>';
+                const img = auction.photo_id ? `<img src="/api/photo/${auction.photo_id}" onerror="this.onerror=null; this.src='https://via.placeholder.com/80?text=No+Img'; console.log('Failed to load image:', '${auction.photo_id}')">` : '<div style="width:80px;height:80px;background:var(--tg-theme-secondary-bg-color);border-radius:8px;margin-right:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>';
                 
                 card.innerHTML = `
                     ${img}
