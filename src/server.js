@@ -92,10 +92,19 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
         const won = q.getWonAuctions.all(userId);
         const watchlist = q.getWatchlistAuctions.all(userId);
         
+        // Add channel_username to each auction object
+        const channelUsername = q.getSetting.get('CHANNEL_USERNAME')?.value || 'c';
+        
+        const mapAuction = (a) => ({
+            ...a,
+            channel_username: channelUsername,
+            currency: q.getSetting.get('CURRENCY')?.value || '₴'
+        });
+
         res.json({
-            participating,
-            won,
-            watchlist
+            participating: participating.map(mapAuction),
+            won: won.map(mapAuction),
+            watchlist: watchlist.map(mapAuction)
         });
     } catch (error) {
         console.error('API Error:', error);

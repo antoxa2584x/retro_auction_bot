@@ -30,6 +30,7 @@ export const CHANNEL_ID = getChannelId();
 export const CONTACT_NICKNAME = getContactNickname();
 export const OPENAI_API_KEY = getSetting('OPENAI_API_KEY', null);
 export const WEBAPP_URL = getSetting('WEBAPP_URL', process.env.WEBAPP_URL || '');
+export const POLLING = process.env.POLLING === 'true';
 
 if (!BOT_TOKEN) {
     console.error('Please set BOT_TOKEN in .env');

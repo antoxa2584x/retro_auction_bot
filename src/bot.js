@@ -3,7 +3,7 @@
  * Initializes the bot, loads settings, registers handlers, and restores jobs.
  */
 import TelegramBot from 'node-telegram-bot-api';
-import { BOT_TOKEN, TZ, setBotUsername, WEBAPP_URL } from './config/env.js';
+import { BOT_TOKEN, TZ, setBotUsername, WEBAPP_URL, POLLING } from './config/env.js';
 import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
 import { registerAdminHandlers } from './handlers/admin.js';
@@ -27,10 +27,19 @@ if (dbCurrency) {
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: false });
 
-// Set webhook
-bot.setWebHook(`${WEBAPP_URL}/bot${BOT_TOKEN}`)
-    .then(() => console.log(`Webhook set to ${WEBAPP_URL}/bot${BOT_TOKEN}`))
-    .catch((err) => console.error('Error setting webhook:', err.message));
+// Set webhook or start polling
+if (!POLLING) {
+    bot.setWebHook(`${WEBAPP_URL}/bot${BOT_TOKEN}`)
+        .then(() => console.log(`Webhook set to ${WEBAPP_URL}/bot${BOT_TOKEN}`))
+        .catch((err) => console.error('Error setting webhook:', err.message));
+} else {
+    bot.deleteWebHook()
+        .then(() => {
+            bot.startPolling();
+            console.log('Polling started (POLLING=true)');
+        })
+        .catch((err) => console.error('Error deleting webhook for polling:', err.message));
+}
 
 // Get and set bot username
 bot.getMe().then((me) => {
