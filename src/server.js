@@ -118,19 +118,21 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
         
         // Add channel_username and chat_id to each auction object
         const channelUsername = q.getSetting.get('CHANNEL_USERNAME')?.value || null;
+        console.log(`[API] Fetching auctions for user ${userId}, channelUsername: ${channelUsername}`);
         
         const mapAuction = (a) => {
             let chat_id_str = a.chat_id?.toString() || '';
             // For private channels, we need to remove -100 prefix for t.me/c/ links
-            // But for public channels with username, we don't strictly need it, but it doesn't hurt.
             const clean_chat_id = chat_id_str.startsWith('-100') ? chat_id_str.substring(4) : chat_id_str;
             
-            return {
+            const auctionData = {
                 ...a,
                 channel_username: channelUsername,
                 chat_id: clean_chat_id,
                 currency: q.getSetting.get('CURRENCY')?.value || '₴'
             };
+            console.log(`[API] Auction ${a.message_id} in chat ${a.chat_id} -> clean_chat_id: ${clean_chat_id}`);
+            return auctionData;
         };
 
         res.json({

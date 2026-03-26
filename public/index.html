@@ -231,6 +231,9 @@
                     let url;
                     const username = auction.channel_username ? auction.channel_username.replace('@', '') : null;
                     
+                    console.log('Auction data:', JSON.stringify(auction));
+                    console.log('Processed username:', username);
+
                     if (username && username !== 'c') {
                         url = `https://t.me/${username}/${auction.message_id}`;
                     } else if (auction.chat_id) {
@@ -238,8 +241,14 @@
                     } else {
                         url = `https://t.me/c/0/${auction.message_id}`;
                     }
-                    console.log('Opening auction link:', url);
-                    tg.openTelegramLink(url);
+                    console.log('Attempting to open auction link:', url);
+                    
+                    try {
+                        tg.openTelegramLink(url);
+                    } catch (e) {
+                        console.error('Error with openTelegramLink:', e);
+                        tg.openLink(url);
+                    }
                 };
                 
                 const img = auction.photo_id ? `<img src="/api/photo/${auction.photo_id}" onerror="this.onerror=null; this.src='https://via.placeholder.com/80?text=No+Img'; console.log('Failed to load image:', '${auction.photo_id}')">` : '<div style="width:80px;height:80px;background:var(--tg-theme-secondary-bg-color);border-radius:8px;margin-right:12px;display:flex;align-items:center;justify-content:center;font-size:24px;">📦</div>';
