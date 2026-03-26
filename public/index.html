@@ -245,6 +245,23 @@
                     
                     try {
                         tg.openTelegramLink(url);
+                        
+                        // If it's a private chat and we have an invite link, remind the user
+                        if (!username || username === 'c') {
+                            if (auction.channel_link) {
+                                tg.MainButton.setText('View in Channel');
+                                tg.MainButton.onClick(() => {
+                                    tg.openTelegramLink(auction.channel_link);
+                                    tg.MainButton.hide();
+                                });
+                                tg.MainButton.show();
+                                
+                                // Reset MainButton after some time if user hasn't clicked it
+                                setTimeout(() => {
+                                    tg.MainButton.hide();
+                                }, 10000);
+                            }
+                        }
                     } catch (e) {
                         console.error('Error with openTelegramLink:', e);
                         tg.openLink(url);

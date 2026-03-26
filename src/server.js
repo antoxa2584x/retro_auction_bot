@@ -116,9 +116,10 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
         const won = q.getWonAuctions.all(userId);
         const watchlist = q.getWatchlistAuctions.all(userId);
         
-        // Add channel_username and chat_id to each auction object
+        // Add channel_username, channel_link and chat_id to each auction object
         const channelUsername = q.getSetting.get('CHANNEL_USERNAME')?.value || null;
-        console.log(`[API] Fetching auctions for user ${userId}, channelUsername: ${channelUsername}`);
+        const channelLink = q.getSetting.get('CHANNEL_LINK')?.value || null;
+        console.log(`[API] Fetching auctions for user ${userId}, channelUsername: ${channelUsername}, channelLink: ${channelLink}`);
         
         const mapAuction = (a) => {
             let chat_id_str = a.chat_id?.toString() || '';
@@ -128,6 +129,7 @@ app.get('/api/user/auctions', authMiddleware, (req, res) => {
             const auctionData = {
                 ...a,
                 channel_username: channelUsername,
+                channel_link: channelLink,
                 chat_id: clean_chat_id,
                 currency: q.getSetting.get('CURRENCY')?.value || '₴'
             };
