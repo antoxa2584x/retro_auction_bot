@@ -518,6 +518,7 @@ export const undoLastBidTransaction = db.transaction((chat_id, message_id) => {
             newLeader.user_id,
             leaderName,
             finalParticipants,
+            auction.end_at,
             chat_id, message_id
         );
         return {
