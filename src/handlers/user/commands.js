@@ -5,6 +5,7 @@ import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
 import { t } from '../../services/i18n.js';
 import { confirmBidKb, makeMyCarouselKb, makeNotifyKb, makeUserMenuKb } from '../../utils/keyboards.js';
+import { registerUserPostHandlers, handleUserPostInput } from './post.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -71,6 +72,16 @@ function formatWatchlistAuctionCaption(a) {
  * @param {TelegramBot} bot - Telegram bot instance.
  */
 export function registerUserCommands(bot) {
+    registerUserPostHandlers(bot);
+
+    bot.on('message', async (msg) => {
+        if (msg.chat.type !== 'private') return;
+        if (msg.text?.startsWith('/')) return;
+
+        const handled = await handleUserPostInput(bot, msg);
+        if (handled) return;
+    });
+
     bot.onText(/^\/start(?:\s+(.+))?$/, async (msg, match) => {
         const payload = match[1];
         const chatId = msg.chat.id;
@@ -149,6 +160,7 @@ export function registerUserCommands(bot) {
     });
 
     bot.onText(/^\/menu$/, async (msg) => {
+        bot.deleteMessage(msg.chat.id, msg.message_id).catch(() => {});
         await bot.sendMessage(msg.chat.id, t('bid.menu_header'), {
             parse_mode: 'HTML',
             reply_markup: makeUserMenuKb()
@@ -214,11 +226,7 @@ export function registerUserCommands(bot) {
             }
 
             if (auctions.length === 0) {
-                try {
-                    await bot.answerCallbackQuery(query.id, { text: t(noItemsKey), show_alert: true });
-                } catch (e) {
-                    console.error('Error answering carousel empty callback:', e.message);
-                }
+                await bot.answerCallbackQuery(query.id, { text: t(noItemsKey), show_alert: true }).catch(() => {});
                 return bot.deleteMessage(chatId, messageId).catch(() => {});
             }
 
@@ -231,7 +239,7 @@ export function registerUserCommands(bot) {
 
             if (nextIndex === currentIndex && auctions.length > 1) {
                 try {
-                    return bot.answerCallbackQuery(query.id);
+                    return bot.answerCallbackQuery(query.id).catch(() => {});
                 } catch (e) {
                     console.error('Error answering carousel same index callback:', e.message);
                     return;
@@ -253,7 +261,7 @@ export function registerUserCommands(bot) {
             const replyMarkup = makeMyCarouselKb(nextIndex, auctions.length, prefix);
 
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering carousel update callback:', e.message);
             }
@@ -310,7 +318,7 @@ export function registerUserCommands(bot) {
 
         if (data === 'menu_won' || data === 'menu_my' || data === 'menu_watchlist') {
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {}
 
             let auctions, noItemsKey, headerKey, prefix, formatter;

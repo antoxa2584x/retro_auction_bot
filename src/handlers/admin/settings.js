@@ -9,7 +9,7 @@ import {
     makeAdminListKb
 } from '../../utils/keyboards.js';
 import { getChannelId, getContactNickname } from "../../config/env.js";
-import { formatUserLink } from '../../utils/utils.js';
+import { formatUserLink, sanitizeHtml } from '../../utils/utils.js';
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
 
 export const userSessions = new Map();
@@ -38,52 +38,32 @@ export function registerSettingsHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_settings') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_settings callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendSettingsPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_main') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_settings_main callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendSettingsMainPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_template') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_settings_template callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendSettingsTemplatePanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'adm_settings_defaults') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_settings_defaults callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendSettingsDefaultsPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data === 'clear_openai_key') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering clear_openai_key callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             q.setSetting.run('OPENAI_API_KEY', null);
             await bot.sendMessage(chatId, t('admin.openai_key_deleted'), { parse_mode: 'HTML' });
@@ -91,18 +71,14 @@ export function registerSettingsHandlers(bot) {
         }
 
         if (data === 'adm_admins') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_admins callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
 
         if (data.startsWith('adm_del:')) {
             try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             } catch (e) {
                 console.error('Error answering adm_del perm check callback:', e.message);
             }
@@ -113,7 +89,7 @@ export function registerSettingsHandlers(bot) {
             
             q.deleteAdmin.run(delUserId);
             try {
-                await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true });
+                await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true }).catch(() => {});
             } catch (e) {
                 console.error('Error answering admin_deleted callback:', e.message);
             }
@@ -121,32 +97,34 @@ export function registerSettingsHandlers(bot) {
         }
 
         if (data === 'adm_lang') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_lang callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const text = t('admin.panel_language') + '\n\n' +
                 t('admin.current_language', { lang: getLocale() === 'uk' ? t('admin.lang_uk') : t('admin.lang_en') }) + '\n\n' +
                 t('admin.choose_language');
 
-            await bot.editMessageText(text, {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'HTML',
-                reply_markup: makeAdminLangKb()
-            });
+            const kb = makeAdminLangKb();
+            try {
+                await bot.editMessageText(text, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: kb
+                });
+            } catch (e) {
+                if (e.message.includes('there is no text in the message to edit')) {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
+                } else {
+                    await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
+                }
+            }
         }
 
         if (data === 'adm_cur') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_cur callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             userSessions.set(from.id, 'CURRENCY');
 
@@ -165,19 +143,15 @@ export function registerSettingsHandlers(bot) {
 
         const setLangMatch = data.match(/^set_lang:(.+)$/);
         if (setLangMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering set_lang callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const lang = setLangMatch[1];
             setLocale(lang);
             q.setSetting.run('LOCALE', lang);
 
             try {
-                await bot.answerCallbackQuery(query.id, { text: t('admin.language_changed'), show_alert: true });
+                await bot.answerCallbackQuery(query.id, { text: t('admin.language_changed'), show_alert: true }).catch(() => {});
             } catch (e) {
                 console.error('Error answering language_changed callback:', e.message);
             }
@@ -187,8 +161,8 @@ export function registerSettingsHandlers(bot) {
         const setConfMatch = data.match(/^set_conf:(.+)$/);
         if (setConfMatch) {
             try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering set_conf callback:', e.message);
             }
@@ -206,8 +180,8 @@ export function registerSettingsHandlers(bot) {
 
         if (data === 'cancel_settings') {
             try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
+                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering cancel_settings callback:', e.message);
             }
@@ -242,19 +216,24 @@ export async function handleSettingsInput(bot, msg, text) {
     const chatId = msg.chat.id;
 
     try {
+        let finalValue = text;
+        if (['AUCTION_HEADER', 'AUCTION_FOOTER', 'AUCTION_MIN_BID_TEXT', 'AUCTION_BID_STEP_TEXT', 'AUCTION_END_DATE_TEXT'].includes(settingKey)) {
+            finalValue = sanitizeHtml(text);
+        }
+
         if (settingKey === 'CURRENCY') {
-            setCurrency(text);
+            setCurrency(finalValue);
         }
         if (settingKey === 'TZ') {
             try {
-                formatInTimeZone(new Date(), text, 'yyyy-MM-dd HH:mm:ss');
+                formatInTimeZone(new Date(), finalValue, 'yyyy-MM-dd HH:mm:ss');
             } catch (e) {
                 throw new Error(t('admin.setting_error_tz'));
             }
         }
-        q.setSetting.run(settingKey, text);
+        q.setSetting.run(settingKey, finalValue);
         userSessions.delete(userId);
-        await bot.sendMessage(chatId, t('admin.setting_updated', { key: settingKey, value: text }), { parse_mode: 'HTML' });
+        await bot.sendMessage(chatId, t('admin.setting_updated', { key: settingKey, value: finalValue }), { parse_mode: 'HTML' });
         
         const lastPanel = userSessions.get(`${userId}:last_panel`) || 'adm_settings';
         if (lastPanel === 'adm_settings_main') await sendSettingsMainPanel(bot, chatId, userId, false);
@@ -399,7 +378,10 @@ async function updateOrSendMessage(bot, chatId, text, kb, isEdit, messageId = nu
         try {
             await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', reply_markup: kb });
         } catch (e) {
-            if (!e.message.includes('message is not modified')) {
+            if (e.message.includes('there is no text in the message to edit')) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
+            } else if (!e.message.includes('message is not modified')) {
                 await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
             }
         }

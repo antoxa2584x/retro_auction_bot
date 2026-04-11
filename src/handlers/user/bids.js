@@ -18,11 +18,7 @@ export function registerBidHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'cancelbid') {
-            try {
-                await bot.answerCallbackQuery(query.id, { text: t('bid.cancel_bid'), show_alert: true });
-            } catch (e) {
-                console.error('Error answering cancelbid callback:', e.message);
-            }
+            await bot.answerCallbackQuery(query.id, { text: t('bid.cancel_bid'), show_alert: true }).catch(() => {});
             return bot.deleteMessage(chatId, messageId).catch(() => {});
         }
 
@@ -34,7 +30,7 @@ export function registerBidHandlers(bot) {
             const targetMsgId = Number(targetMsgIdStr);
 
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering manualbid callback:', e.message);
             }
@@ -44,11 +40,16 @@ export function registerBidHandlers(bot) {
             });
 
             bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
-                const amount = Number(replyMsg.text.replace(/[^0-9.]/g, ''));
+                const amountText = replyMsg.text.replace(/[^0-9.]/g, '');
+                const amount = Number(amountText);
                 const cur = getCurrency();
 
-                if (isNaN(amount) || amount <= 0) {
+                if (isNaN(amount) || amount <= 0 || amountText === '') {
                     return bot.sendMessage(chatId, t('bid.error_invalid_amount'));
+                }
+
+                if (amount > Number.MAX_SAFE_INTEGER) {
+                    return bot.sendMessage(chatId, t('bid.error_too_high'));
                 }
 
                 const auction = q.getAuction.get(targetChatId, targetMsgId);
@@ -96,21 +97,13 @@ export function registerBidHandlers(bot) {
 
             if (!res.success) {
                 if (res.reason === 'not_found') {
-                    try {
-                        await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-                    } catch (e) {
-                        console.error('Error answering not_found callback:', e.message);
-                    }
+                    await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
                     return bot.deleteMessage(chatId, messageId).catch(() => {});
                 }
 
                 if (res.reason === 'finished') {
                     await closeAuction(bot, target_chat_id, target_message_id);
-                    try {
-                        await bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
-                    } catch (e) {
-                        console.error('Error answering finished callback:', e.message);
-                    }
+                    await bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true }).catch(() => {});
                     await bot.deleteMessage(chatId, messageId).catch(() => {});
                     return;
                 }
@@ -121,11 +114,7 @@ export function registerBidHandlers(bot) {
                         ? t('bid.bid_exists_alert', { price, expectedPrice })
                         : t('bid.price_changed_alert', { expectedPrice });
 
-                    try {
-                        await bot.answerCallbackQuery(query.id, { text: alertText, show_alert: true });
-                    } catch (e) {
-                        console.error('Error answering price_changed/bid_exists callback:', e.message);
-                    }
+                    await bot.answerCallbackQuery(query.id, { text: alertText, show_alert: true }).catch(() => {});
                     
                     const row = q.getAuction.get(target_chat_id, target_message_id);
                     if (!row) {
@@ -157,20 +146,12 @@ export function registerBidHandlers(bot) {
                     return;
                 }
 
-                try {
-                    await bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
-                } catch (e) {
-                    console.error('Error answering error_try_again callback:', e.message);
-                }
+                await bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
                 return;
             }
 
             // Success
-            try {
-                await bot.answerCallbackQuery(query.id, { text: t('bid.accepted_alert', { price }), show_alert: true });
-            } catch (e) {
-                console.error('Error answering accepted_alert callback:', e.message);
-            }
+            await bot.answerCallbackQuery(query.id, { text: t('bid.accepted_alert', { price }), show_alert: true }).catch(() => {});
 
             // Notify previous leader if outbid
             if (res.previousLeaderId && res.previousLeaderId !== user.id) {

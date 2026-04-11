@@ -16,6 +16,7 @@ import { makeKb } from '../../utils/keyboards.js';
 import { t, getCurrency, getLocale } from '../../services/i18n.js';
 import { sendAdminPanel } from './manage.js';
 import { generateAuctionDetails, calculateImageHash } from '../../services/openai.js';
+import { buildAuctionText, sendAuctionGallery, getDefaultEndDate, sanitizeHtml } from '../../utils/utils.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -35,12 +36,8 @@ export function registerPostHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_post') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_post callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             
             postSessions.set(from.id, { step: 'IMAGE', data: {} });
             await bot.editMessageText(t('admin.post_step_img'), {
@@ -51,17 +48,16 @@ export function registerPostHandlers(bot) {
             });
         }
 
-        if (data === 'post_skip') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_skip callback:', e.message);
-            }
+        if (data === 'post_skip' || data === 'post_continue') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session) return;
 
             if (session.step === 'IMAGE' || session.step === 'AI_PROMPT') {
+                if (session.data.photo_ids && session.data.photo_ids.length > 0) {
+                    session.data.photo_id = session.data.photo_ids[0];
+                }
                 session.step = 'TITLE';
                 await bot.editMessageText(t('admin.post_step_title'), {
                     chat_id: chatId,
@@ -76,12 +72,8 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_cancel') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_cancel callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             postSessions.delete(from.id);
             await bot.editMessageText(t('admin.post_cancelled'), {
                 chat_id: chatId,
@@ -92,25 +84,12 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_gen') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            } catch (e) {
-                console.error('Error answering post_ai_gen perm check callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_PROMPT' || !session.data.photo_id) {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
-                } catch (e) {
-                    console.error('Error answering post_ai_gen error callback:', e.message);
-                    return;
-                }
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') }).catch(() => {});
             }
-            try {
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_ai_gen callback:', e.message);
-            }
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const statusMsg = await bot.sendMessage(chatId, t('admin.kb.ai_generating'), { parse_mode: 'HTML' });
 
@@ -121,7 +100,7 @@ export function registerPostHandlers(bot) {
                 const imageHash = calculateImageHash(tempPath);
                 session.data.image_hash = imageHash;
 
-                const aiText = await generateAuctionDetails(tempPath, getLocale());
+                const aiText = sanitizeHtml(await generateAuctionDetails(tempPath, getLocale()));
                 
                 fs.unlinkSync(tempPath);
 
@@ -149,25 +128,12 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_confirm') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            } catch (e) {
-                console.error('Error answering post_ai_confirm perm check callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_CONFIRM') {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
-                } catch (e) {
-                    console.error('Error answering post_ai_confirm error callback:', e.message);
-                    return;
-                }
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') }).catch(() => {});
             }
-            try {
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_ai_confirm callback:', e.message);
-            }
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             // Save confirmed text for training
             if (session.data.image_hash && session.data.full_text) {
@@ -182,25 +148,12 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_ai_edit') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-            } catch (e) {
-                console.error('Error answering post_ai_edit perm check callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'AI_CONFIRM') {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') });
-                } catch (e) {
-                    console.error('Error answering post_ai_edit error callback:', e.message);
-                    return;
-                }
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again') }).catch(() => {});
             }
-            try {
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_ai_edit callback:', e.message);
-            }
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             session.step = 'AI_EDIT';
             await bot.sendMessage(chatId, t('admin.kb.ai_edit_prompt'), {
@@ -211,12 +164,8 @@ export function registerPostHandlers(bot) {
 
         const stepMatch = data.match(/^post_step:(.+)$/);
         if (stepMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_step callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'STEP') return;
 
@@ -234,12 +183,8 @@ export function registerPostHandlers(bot) {
 
         const contactMatch = data.match(/^post_contact:(.+)$/);
         if (contactMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_contact callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'CONTACT') return;
 
@@ -259,12 +204,8 @@ export function registerPostHandlers(bot) {
         }
 
         if (data.startsWith('post_cont:')) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_cont callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session) return;
 
@@ -275,12 +216,8 @@ export function registerPostHandlers(bot) {
         }
 
         if (data === 'post_confirm') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering post_confirm perm check callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'CONFIRM') return;
 
@@ -301,11 +238,7 @@ export function registerPostHandlers(bot) {
 
                 const formattedEnd = formatInTimeZone(sessionData.end_at, TZ, 'dd.MM о HH:mm');
 
-                const auctionPost = `${header}\n\n${sessionData.full_text}\n\n` +
-                    `${minBidText}: <b>${sessionData.min_bid} ${cur}</b>\n` +
-                    `${bidStepText}: <b>${sessionData.step} ${cur}</b>\n` +
-                    `${endDateText}: <b>${formattedEnd}</b>\n\n` +
-                    `${footer}`;
+                const auctionPost = buildAuctionText(sessionData);
 
                 const kb = makeKb(channelId, 0, sessionData.min_bid, 0);
                 let sentMsg;
@@ -315,6 +248,8 @@ export function registerPostHandlers(bot) {
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });
+
+                    await sendAuctionGallery(bot, channelId, sessionData.photo_ids, sentMsg.message_id);
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
                         parse_mode: 'HTML',
@@ -338,7 +273,7 @@ export function registerPostHandlers(bot) {
                     min_bid: sessionData.min_bid,
                     step: sessionData.step,
                     current_price: sessionData.min_bid,
-                    admin_contact: sessionData.admin_contact,
+                    admin_contact: sessionData.admin_contact || getContactNickname(),
                     end_at: sessionData.end_at.toISOString(),
                     is_continuous: sessionData.is_continuous || 0,
                     continuous_minutes: sessionData.continuous_minutes || 5
@@ -379,21 +314,31 @@ export async function handlePostInput(bot, msg) {
     switch (session.step) {
         case 'IMAGE':
             if (photo) {
-                session.data.photo_id = photo[photo.length - 1].file_id;
+                const fileId = photo[photo.length - 1].file_id;
+                const mediaGroupId = msg.media_group_id;
                 
-                const hasApiKey = !!q.getSetting.get('OPENAI_API_KEY')?.value || !!process.env.OPENAI_API_KEY;
-                if (hasApiKey) {
-                    session.step = 'AI_PROMPT';
-                    await bot.sendMessage(chatId, t('admin.kb.ai_received'), {
-                        parse_mode: 'HTML',
-                        reply_markup: makeAdminPostAIGenKb()
-                    });
+                if (!session.data.photo_ids) {
+                    session.data.photo_ids = [fileId];
                 } else {
-                    session.step = 'TITLE';
-                    await bot.sendMessage(chatId, t('admin.post_step_title'), {
-                        parse_mode: 'HTML',
-                        reply_markup: makeAdminPostCancelKb()
-                    });
+                    if (session.data.photo_ids.length >= 11) {
+                        // Only send one notification if we exceed the limit
+                        if (!session.limit_alert_sent) {
+                            session.limit_alert_sent = true;
+                            await bot.sendMessage(chatId, t('admin.error_too_many_photos'), { parse_mode: 'HTML' });
+                        }
+                        return true;
+                    }
+                    session.data.photo_ids.push(fileId);
+                }
+
+                if (mediaGroupId) {
+                    if (session.media_timer) clearTimeout(session.media_timer);
+                    session.media_timer = setTimeout(async () => {
+                        await showPhotoReceivedOptions(bot, chatId, session);
+                        delete session.media_timer;
+                    }, 500);
+                } else {
+                    await showPhotoReceivedOptions(bot, chatId, session);
                 }
                 return true;
             }
@@ -402,13 +347,14 @@ export async function handlePostInput(bot, msg) {
         case 'TITLE':
         case 'AI_EDIT':
             if (text) {
+                const sanitizedText = sanitizeHtml(text);
                 // Save edited text for training if it was an AI edit
                 if (session.step === 'AI_EDIT' && session.data.image_hash) {
-                    q.insertAiTrainingData.run(session.data.image_hash, text, getLocale());
+                    q.insertAiTrainingData.run(session.data.image_hash, sanitizedText, getLocale());
                 }
 
-                session.data.full_text = text;
-                session.data.title = text.split('\n')[0].substring(0, 50);
+                session.data.full_text = sanitizedText;
+                session.data.title = sanitizedText.split('\n')[0].substring(0, 50);
                 session.step = 'MIN_BID';
                 await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
                     parse_mode: 'HTML',
@@ -421,8 +367,12 @@ export async function handlePostInput(bot, msg) {
         case 'MIN_BID':
             if (text) {
                 const val = parseInt(text);
-                if (isNaN(val)) {
+                if (isNaN(val) || val < 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
+                if (val > Number.MAX_SAFE_INTEGER) {
+                    await bot.sendMessage(chatId, t('bid.error_too_high'), { parse_mode: 'HTML' });
                     return true;
                 }
                 session.data.min_bid = val;
@@ -438,8 +388,12 @@ export async function handlePostInput(bot, msg) {
         case 'STEP':
             if (text) {
                 const val = parseInt(text);
-                if (isNaN(val)) {
+                if (isNaN(val) || val <= 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
+                if (val > Number.MAX_SAFE_INTEGER) {
+                    await bot.sendMessage(chatId, t('bid.error_too_high'), { parse_mode: 'HTML' });
                     return true;
                 }
                 session.data.step = val;
@@ -476,15 +430,36 @@ export async function handlePostInput(bot, msg) {
     return false;
 }
 
+async function showPhotoReceivedOptions(bot, chatId, session) {
+    if (session.data.photo_ids.length > 1) {
+        await bot.sendMessage(chatId, t('admin.post_photo_added', { count: session.data.photo_ids.length }), {
+            reply_markup: makeAdminPostCancelKb(false, false, true)
+        });
+        return;
+    }
+
+    const hasApiKey = !!q.getSetting.get('OPENAI_API_KEY')?.value || !!process.env.OPENAI_API_KEY;
+    if (hasApiKey) {
+        session.step = 'AI_PROMPT';
+        session.data.photo_id = session.data.photo_ids[0]; // For AI gen
+        await bot.sendMessage(chatId, t('admin.kb.ai_received'), {
+            parse_mode: 'HTML',
+            reply_markup: makeAdminPostAIGenKb()
+        });
+    } else {
+        session.step = 'TITLE';
+        await bot.sendMessage(chatId, t('admin.post_step_title'), {
+            parse_mode: 'HTML',
+            reply_markup: makeAdminPostCancelKb()
+        });
+    }
+}
+
 async function goToDateStep(bot, chatId, session) {
     session.step = 'DATE';
-    const defDays = parseInt(q.getSetting.get('DEFAULT_END_DAYS')?.value || '5');
-    const defTime = q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00';
     
     // Calculate default date
-    let defDate = addDays(new Date(), defDays);
-    const [hours, minutes] = defTime.split(':').map(Number);
-    defDate = set(defDate, { hours, minutes, seconds: 0, milliseconds: 0 });
+    const defDate = getDefaultEndDate();
     
     session.data.default_date = defDate;
     const formattedDef = formatInTimeZone(defDate, TZ, 'dd.MM.yyyy HH:mm');
@@ -527,7 +502,7 @@ async function goToConfirmStep(bot, chatId, session) {
     session.step = 'CONFIRM';
     const { data } = session;
     const text = t('admin.post_confirm', {
-        full_text: data.full_text,
+        full_text: buildAuctionText(data, false, false),
         min_bid: data.min_bid,
         step: data.step,
         end_at: formatInTimeZone(data.end_at, TZ, 'dd.MM.yyyy HH:mm'),

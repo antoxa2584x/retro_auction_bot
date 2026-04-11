@@ -1,9 +1,19 @@
 import { q, undoLastBidTransaction } from '../../services/db.js';
-import { makeKb, makeAdminActiveKb, makeAdminFinishedKb, makeAdminAuctionActionKb, makeAdminPanelKb, winnerKeyboard, makeEmptyFinishKb } from '../../utils/keyboards.js';
-import { TZ, getContactNickname } from "../../config/env.js";
+import { 
+    makeKb, 
+    makeAdminActiveKb, 
+    makeAdminFinishedKb, 
+    makeAdminAuctionActionKb, 
+    makeAdminPanelKb, 
+    winnerKeyboard, 
+    makeEmptyFinishKb,
+    makeAdminPendingKb,
+    makeAdminPendingViewKb
+} from '../../utils/keyboards.js';
+import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink, formatUserLink } from '../../utils/utils.js';
+import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 
 function isAdmin(userId) {
@@ -23,83 +33,249 @@ export function registerManageHandlers(bot) {
         const messageId = message.message_id;
 
         if (data === 'adm_list') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_list callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             await sendAdminPanel(bot, chatId, true, messageId);
         }
 
-        if (data === 'adm_active') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_active callback:', e.message);
+        if (data === 'adm_pending') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+
+            const pending = q.getPendingAuctions.all();
+            if (pending.length === 0) {
+                const noPendingText = t('admin.no_pending_auctions') || "No pending auctions.";
+                const noPendingKb = makeAdminPanelKb();
+                try {
+                    return await bot.editMessageText(noPendingText, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'HTML',
+                        reply_markup: noPendingKb
+                    });
+                } catch (e) {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                    return await bot.sendMessage(chatId, noPendingText, {
+                        parse_mode: 'HTML',
+                        reply_markup: noPendingKb
+                    });
+                }
             }
+
+            const pendingHeader = t('admin.pending_auctions_header') || "Pending auctions:";
+            const pendingKb = makeAdminPendingKb(pending);
+            try {
+                await bot.editMessageText(pendingHeader, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: pendingKb
+                });
+            } catch (e) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, pendingHeader, {
+                    parse_mode: 'HTML',
+                    reply_markup: pendingKb
+                });
+            }
+        }
+
+        if (data.startsWith('adm_pen_view:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+
+            const id = data.split(':')[1];
+            const p = q.getPendingAuction.get(id);
+            if (!p) return bot.sendMessage(chatId, "Not found.");
+
+            const userContact = formatContactLink(p.user_id ? `tg://user?id=${p.user_id}` : null);
+            const headerText = t('admin.pending_auction_view_header', { contact: userContact });
+
+            const text = headerText + '\n\n' + buildAuctionText(p, true, false);
+
+            const photoIds = p.photo_ids ? p.photo_ids.split(',') : [];
+            if (photoIds.length > 0) {
+                await bot.sendPhoto(chatId, photoIds[0], {
+                    caption: text,
+                    parse_mode: 'HTML',
+                    reply_markup: makeAdminPendingViewKb(id)
+                });
+            } else {
+                await bot.sendMessage(chatId, text, {
+                    parse_mode: 'HTML',
+                    reply_markup: makeAdminPendingViewKb(id)
+                });
+            }
+        }
+
+        if (data.startsWith('adm_pen_approve:')) {
+            const id = data.split(':')[1];
+            const p = q.getPendingAuction.get(id);
+            if (!p) return;
+
+            try {
+                const channelId = getChannelId();
+                const auctionPost = buildAuctionText(p);
+
+                const kb = makeKb(channelId, 0, p.min_bid, 0);
+                const photoIds = p.photo_ids ? p.photo_ids.split(',') : [];
+                let sentMsg;
+
+                if (photoIds.length > 0) {
+                    sentMsg = await bot.sendPhoto(channelId, photoIds[0], {
+                        caption: auctionPost,
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
+
+                    await sendAuctionGallery(bot, channelId, photoIds, sentMsg.message_id);
+                } else {
+                    sentMsg = await bot.sendMessage(channelId, auctionPost, {
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
+                }
+
+                const finalKb = makeKb(channelId, sentMsg.message_id, p.min_bid, 0);
+                await bot.editMessageReplyMarkup(finalKb, {
+                    chat_id: channelId,
+                    message_id: sentMsg.message_id
+                });
+
+                q.insertAuction.run({
+                    chat_id: channelId,
+                    message_id: sentMsg.message_id,
+                    title: p.title,
+                    full_text: auctionPost,
+                    photo_id: photoIds[0] || null,
+                    min_bid: p.min_bid,
+                    step: p.step,
+                    current_price: p.min_bid,
+                    admin_contact: p.user_id ? `tg://user?id=${p.user_id}` : getContactNickname(),
+                    end_at: new Date(p.end_at).toISOString(),
+                    is_continuous: p.is_continuous,
+                    continuous_minutes: p.continuous_minutes
+                });
+
+                scheduleClose(bot, channelId, sentMsg.message_id, new Date(p.end_at));
+                q.updatePendingAuctionStatus.run('approved', id);
+
+                await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_approved') }).catch(() => {});
+                await bot.sendMessage(p.user_id, t('admin.pending_auction_approved')).catch(() => {});
+                await sendAdminPanel(bot, chatId, false);
+            } catch (e) {
+                console.error(e);
+                await bot.answerCallbackQuery(query.id, { text: "Error: " + e.message });
+            }
+        }
+
+        if (data.startsWith('adm_pen_reject:')) {
+            const id = data.split(':')[1];
+            const p = q.getPendingAuction.get(id);
+            if (!p) return;
+
+            q.updatePendingAuctionStatus.run('rejected', id);
+            await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
+            await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected')).catch(() => {});
+            await sendAdminPanel(bot, chatId, false);
+        }
+
+        if (data === 'adm_active') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const auctions = q.getAllActiveAuctions.all();
 
             if (auctions.length === 0) {
-                await bot.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.no_active_auctions'), {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
-                    }
-                });
+                const noActiveText = t('admin.panel_header') + '\n\n' + t('admin.no_active_auctions');
+                const noActiveKb = {
+                    inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
+                };
+                try {
+                    await bot.editMessageText(noActiveText, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'HTML',
+                        reply_markup: noActiveKb
+                    });
+                } catch (e) {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                    await bot.sendMessage(chatId, noActiveText, {
+                        parse_mode: 'HTML',
+                        reply_markup: noActiveKb
+                    });
+                }
                 return;
             }
 
-            await bot.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.active_auctions_header'), {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'HTML',
-                reply_markup: makeAdminActiveKb(auctions)
-            });
+            const activeHeaderText = t('admin.panel_header') + '\n\n' + t('admin.active_auctions_header');
+            const activeHeaderKb = makeAdminActiveKb(auctions);
+            try {
+                await bot.editMessageText(activeHeaderText, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: activeHeaderKb
+                });
+            } catch (e) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, activeHeaderText, {
+                    parse_mode: 'HTML',
+                    reply_markup: activeHeaderKb
+                });
+            }
         }
 
         if (data === 'adm_finished') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_finished callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const auctions = q.getRecentlyFinishedAuctions.all();
 
             if (auctions.length === 0) {
-                await bot.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.no_finished_auctions'), {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'HTML',
-                    reply_markup: {
-                        inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
-                    }
-                });
+                const noFinishedText = t('admin.panel_header') + '\n\n' + t('admin.no_finished_auctions');
+                const noFinishedKb = {
+                    inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
+                };
+                try {
+                    await bot.editMessageText(noFinishedText, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'HTML',
+                        reply_markup: noFinishedKb
+                    });
+                } catch (e) {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                    await bot.sendMessage(chatId, noFinishedText, {
+                        parse_mode: 'HTML',
+                        reply_markup: noFinishedKb
+                    });
+                }
                 return;
             }
 
-            await bot.editMessageText(t('admin.panel_header') + '\n\n' + t('admin.finished_auctions_header'), {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'HTML',
-                reply_markup: makeAdminFinishedKb(auctions)
-            });
+            const finishedHeaderText = t('admin.panel_header') + '\n\n' + t('admin.finished_auctions_header');
+            const finishedHeaderKb = makeAdminFinishedKb(auctions);
+            try {
+                await bot.editMessageText(finishedHeaderText, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: finishedHeaderKb
+                });
+            } catch (e) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, finishedHeaderText, {
+                    parse_mode: 'HTML',
+                    reply_markup: finishedHeaderKb
+                });
+            }
         }
 
         const viewMatch = data.match(/^adm_view:(.+):(.+)$/);
         if (viewMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_view callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(viewMatch[1]);
             const targetMsgId = Number(viewMatch[2]);
@@ -107,7 +283,7 @@ export function registerManageHandlers(bot) {
 
             if (!a) {
                 try {
-                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
                 } catch (e) {
                     console.error('Error answering adm_view not_found callback:', e.message);
                     return;
@@ -123,6 +299,8 @@ export function registerManageHandlers(bot) {
                 ? formatUserLink(a.leader_id, a.leader_name)
                 : t('bid.no_bids');
 
+            const contactLink = formatContactLink(a.admin_contact);
+
             const text = t('admin.panel_header') + '\n\n' +
                 t('admin.auction_details', {
                     title: a.title,
@@ -132,25 +310,31 @@ export function registerManageHandlers(bot) {
                     status: statusText,
                     end_at: endDate,
                     winner: winner,
+                    contact_link: contactLink,
                     link: link
                 });
 
-            await bot.editMessageText(text, {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'HTML',
-                reply_markup: makeAdminAuctionActionKb(targetChatId, targetMsgId, a.status)
-            });
+            const kb = makeAdminAuctionActionKb(targetChatId, targetMsgId, a.status);
+            try {
+                await bot.editMessageText(text, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML',
+                    reply_markup: kb
+                });
+            } catch (e) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, text, {
+                    parse_mode: 'HTML',
+                    reply_markup: kb
+                });
+            }
         }
 
         const restartMatch = data.match(/^adm_restart:(.+):(.+)$/);
         if (restartMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_restart callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(restartMatch[1]);
             const targetMsgId = Number(restartMatch[2]);
@@ -259,12 +443,8 @@ export function registerManageHandlers(bot) {
 
         const finishNowMatch = data.match(/^adm_finish_now:(.+):(.+)$/);
         if (finishNowMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_finish_now callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(finishNowMatch[1]);
             const targetMsgId = Number(finishNowMatch[2]);
@@ -295,12 +475,8 @@ export function registerManageHandlers(bot) {
 
         const undoBidMatch = data.match(/^adm_undo_bid:(.+):(.+)$/);
         if (undoBidMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_undo_bid callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(undoBidMatch[1]);
             const targetMsgId = Number(undoBidMatch[2]);
@@ -351,12 +527,13 @@ export function registerManageHandlers(bot) {
                         
                         // Notify new winner
                         const nickname = a.admin_contact || getContactNickname();
-                        const adminContact = nickname.startsWith('@') ? nickname : `@${nickname}`;
+                        const adminLink = formatContactLink(nickname);
+                        
                         const winnerText = t('scheduler.winner_notify', {
                             link: auctionLink,
                             title: res.auctionTitle,
                             price: res.newPrice,
-                            admin: adminContact
+                            admin_link: adminLink
                         });
                         try {
                             if (a.photo_id) {
@@ -387,12 +564,8 @@ export function registerManageHandlers(bot) {
         
         const deleteMatch = data.match(/^adm_delete:(.+):(.+)$/);
         if (deleteMatch) {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_delete callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(deleteMatch[1]);
             const targetMsgId = Number(deleteMatch[2]);
@@ -430,7 +603,10 @@ export async function sendAdminPanel(bot, chatId, isEdit = false, messageId = nu
         try {
             await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', reply_markup: kb });
         } catch (e) {
-            if (!e.message.includes('message is not modified')) {
+            if (e.message.includes('there is no text in the message to edit')) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
+            } else if (!e.message.includes('message is not modified')) {
                 await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: kb });
             }
         }

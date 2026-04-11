@@ -15,12 +15,8 @@ export function registerBroadcastHandlers(bot) {
         const chatId = message.chat.id;
 
         if (data === 'adm_broadcast') {
-            try {
-                if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true });
-                await bot.answerCallbackQuery(query.id);
-            } catch (e) {
-                console.error('Error answering adm_broadcast callback:', e.message);
-            }
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
             broadcastSessions.set(from.id, { step: 'text' });
             await bot.sendMessage(chatId, t('admin.broadcast_start'), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'broadcast_cancel' }]] } });
         }
@@ -30,7 +26,7 @@ export function registerBroadcastHandlers(bot) {
             if (!session || session.step !== 'image') return;
 
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering broadcast_skip_img callback:', e.message);
             }
@@ -42,7 +38,7 @@ export function registerBroadcastHandlers(bot) {
             if (!session || session.step !== 'confirm') return;
 
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering broadcast_confirm callback:', e.message);
             }
@@ -85,7 +81,7 @@ export function registerBroadcastHandlers(bot) {
         if (data === 'broadcast_cancel') {
             broadcastSessions.delete(from.id);
             try {
-                await bot.answerCallbackQuery(query.id);
+                await bot.answerCallbackQuery(query.id).catch(() => {});
             } catch (e) {
                 console.error('Error answering broadcast_cancel callback:', e.message);
             }

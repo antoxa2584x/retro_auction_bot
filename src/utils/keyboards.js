@@ -85,7 +85,43 @@ export function makeUserMenuKb() {
         inline_keyboard: [
             [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
             [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
-            [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}]
+            [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}],
+            [{text: t('bid.kb.post_new'), callback_data: 'user_post', style: 'success'}]
+        ]
+    };
+}
+
+/**
+ * Creates the keyboard for managing pending auctions.
+ * 
+ * @param {Array} pending - List of pending auctions.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPendingKb(pending) {
+    const buttons = pending.map(p => ([{
+        text: `⏳ ${p.title} (${p.user_id})`,
+        callback_data: `adm_pen_view:${p.id}`
+    }]));
+
+    buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
+
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the keyboard for a single pending auction view.
+ * 
+ * @param {number} id - Pending auction ID.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPendingViewKb(id) {
+    return {
+        inline_keyboard: [
+            [
+                { text: t('admin.kb.approve'), callback_data: `adm_pen_approve:${id}`, style: 'success' },
+                { text: t('admin.kb.reject'), callback_data: `adm_pen_reject:${id}`, style: 'danger' }
+            ],
+            [{ text: t('common.back'), callback_data: 'adm_pending' }]
         ]
     };
 }
@@ -100,6 +136,7 @@ export function makeAdminPanelKb() {
         inline_keyboard: [
             [{text: t('admin.kb.view_active'), callback_data: 'adm_active'}],
             [{text: t('admin.kb.view_finished'), callback_data: 'adm_finished'}],
+            [{text: t('admin.kb.pending_auctions'), callback_data: 'adm_pending'}],
             [{text: t('admin.post_new'), callback_data: 'adm_post', style: 'success'}],
             [{text: t('admin.kb.broadcast'), callback_data: 'adm_broadcast', style: 'primary'}],
             [{text: t('admin.kb.settings'), callback_data: 'adm_settings', style: 'danger'}]
@@ -269,17 +306,87 @@ export function makeAdminPostStepKb() {
 }
 
 /**
+ * Creates the "is continuous" keyboard for post creation for users.
+ *
+ * @param {number} min - Extension minutes.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserPostContinuousKb(min) {
+    return {
+        inline_keyboard: [
+            [
+                {text: t('admin.continuous_yes', {min}), callback_data: 'user_post_cont:1', style: 'success'},
+                {text: t('admin.continuous_no'), callback_data: 'user_post_cont:0', style: 'primary'}
+            ],
+            [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
+        ]
+    };
+}
+
+/**
+ * Creates the keyboard for selecting a bid step for users.
+ *
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserPostStepKb() {
+    return {
+        inline_keyboard: [
+            [
+                {text: '50', callback_data: 'user_post_step:50'},
+                {text: '100', callback_data: 'user_post_step:100'},
+                {text: '200', callback_data: 'user_post_step:200'}
+            ],
+            [
+                {text: '500', callback_data: 'user_post_step:500'},
+                {text: t('admin.kb.custom'), callback_data: 'user_post_step:custom', style: 'primary'}
+            ],
+            [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
+        ]
+    };
+}
+
+/**
+ * Creates the confirmation keyboard for user auction posting.
+ *
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserPostConfirmKb() {
+    return {
+        inline_keyboard: [
+            [{text: t('admin.kb.ai_confirm'), callback_data: 'user_post_confirm', style: 'success'}],
+            [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
+        ]
+    };
+}
+
+/**
  * Creates a simple cancel keyboard for auction posting.
  *
  * @param {boolean} [includeSkip=false] - Whether to include a skip button.
+ * @param {boolean} [isUser=false] - Whether this is for a user post.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminPostCancelKb(includeSkip = false) {
+export function makeAdminPostCancelKb(includeSkip = false, isUser = false, includeContinue = false) {
     const row = [];
     if (includeSkip) {
-        row.push({text: t('admin.kb.skip'), callback_data: 'post_skip', style: 'primary'});
+        row.push({
+            text: t('admin.kb.skip'), 
+            callback_data: isUser ? 'user_post_skip' : 'post_skip', 
+            style: 'primary'
+        });
     }
-    row.push({text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger'});
+    if (includeContinue) {
+        row.push({
+            text: t('admin.kb.continue'), 
+            callback_data: isUser ? 'user_post_continue' : 'post_continue', 
+            style: 'success'
+        });
+    }
+    row.push({
+        text: t('common.cancel'), 
+        callback_data: isUser ? 'user_post_cancel' : 'post_cancel', 
+        style: 'danger'
+    });
     return {inline_keyboard: [row]};
 }
 

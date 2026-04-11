@@ -76,13 +76,20 @@ db.exec(`
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS notifications
+    CREATE TABLE IF NOT EXISTS pending_auctions
     (
-        chat_id INTEGER,
-        message_id INTEGER,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
-        hours INTEGER,
-        PRIMARY KEY (chat_id, message_id, user_id)
+        title TEXT,
+        full_text TEXT,
+        photo_ids TEXT, -- Comma-separated file_ids
+        min_bid INTEGER,
+        step INTEGER,
+        end_at TEXT,
+        is_continuous INTEGER DEFAULT 0,
+        continuous_minutes INTEGER DEFAULT 5,
+        status TEXT DEFAULT 'pending', -- pending, approved, rejected
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 `);
 
@@ -321,6 +328,8 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAdmin: db.prepare(`SELECT * FROM admins WHERE user_id=?`),
+  getAdmins: db.prepare(`SELECT * FROM admins WHERE otp_code IS NULL`),
+  getAllAdmins: db.prepare(`SELECT * FROM admins`),
 
   /**
    * Stores or updates an OTP code for an admin.
@@ -478,6 +487,28 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAllUsers: db.prepare(`SELECT DISTINCT user_id FROM participants`),
+
+  // Users
+  getUserFromAnywhere: db.prepare(`
+    SELECT COALESCE(
+      (SELECT first_name || (CASE WHEN last_name IS NOT NULL THEN ' ' || last_name ELSE '' END) FROM admins WHERE user_id = ?),
+      (SELECT first_name || (CASE WHEN last_name IS NOT NULL THEN ' ' || last_name ELSE '' END) FROM participants WHERE user_id = ? LIMIT 1),
+      (SELECT '@' || username FROM admins WHERE user_id = ? AND username IS NOT NULL),
+      (SELECT '@' || username FROM participants WHERE user_id = ? AND username IS NOT NULL LIMIT 1)
+    ) as name
+  `),
+
+  // Pending Auctions
+  getPendingAuctions: db.prepare("SELECT * FROM pending_auctions WHERE status = 'pending' ORDER BY created_at DESC"),
+  getPendingAuction: db.prepare("SELECT * FROM pending_auctions WHERE id = ?"),
+  countApprovedAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'approved'"),
+  countPendingAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'pending'"),
+  insertPendingAuction: db.prepare(`
+    INSERT INTO pending_auctions (user_id, title, full_text, photo_ids, min_bid, step, end_at, is_continuous, continuous_minutes)
+    VALUES (:user_id, :title, :full_text, :photo_ids, :min_bid, :step, :end_at, :is_continuous, :continuous_minutes)
+  `),
+  updatePendingAuctionStatus: db.prepare("UPDATE pending_auctions SET status = ? WHERE id = ?"),
+  deletePendingAuction: db.prepare("DELETE FROM pending_auctions WHERE id = ?"),
 
   // Notifications
   getNotification: db.prepare(`SELECT hours FROM notifications WHERE chat_id = ? AND message_id = ? AND user_id = ?`),
