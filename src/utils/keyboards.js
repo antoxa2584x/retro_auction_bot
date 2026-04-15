@@ -649,7 +649,7 @@ export function winnerKeyboard(leaderId, leaderName, price, includeLink = true) 
     const cur = getCurrency();
     const button = {text: `🏆 ${price} ${cur} : ${leaderName}`, style: 'success'};
     if (includeLink) {
-        button.url = `tg://user?id=${leaderId}`;
+        button.callback_data = `winner_info:${leaderId}`;
     } else {
         button.callback_data = 'none';
     }

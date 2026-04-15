@@ -23,6 +23,17 @@ export function registerInfoHandlers(bot) {
             }
         }
 
+        if (data.startsWith('winner_info:')) {
+            const userId = data.split(':')[1];
+            try {
+                const text = `${t('bid.privacy_warning_alert')}\n\nID: ${userId}\nLink: tg://user?id=${userId}`;
+                return bot.answerCallbackQuery(query.id, { text, show_alert: true });
+            } catch (e) {
+                console.error('Error answering winner_info callback:', e.message);
+                return;
+            }
+        }
+
         const infoMatch = data.match(/^info:(.+)$/);
         if (infoMatch) {
             const params = infoMatch[1];

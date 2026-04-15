@@ -188,6 +188,7 @@
     "bid_removed_notify": "⚠️ Your bid in auction <a href=\"{{link}}\">\"{{title}}\"</a> has been removed by an administrator.",
     "new_winner_notify": "🏆 The previous bid was removed. You are now the leader in auction <a href=\"{{link}}\">\"{{title}}\"</a>!\nPrice: <b>{{price}} {{cur}}</b>",
     "no_bids": "There were no bids",
+    "privacy_warning_alert": "User privacy settings don't allow to use a direct link to his profile.",
     "info_header": "Last bids (total: {{total}}):\n\n",
     "info_item": "{{index}}. {{name}} — {{price}} {{cur}}\n",
     "info_more": "…and {{count}} more",
