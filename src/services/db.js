@@ -398,10 +398,30 @@ export const q = {
   getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id ASC`),
 
   /**
+   * Retrieves active auctions with pagination.
+   */
+  getActiveAuctionsPaginated: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id ASC LIMIT ? OFFSET ?`),
+
+  /**
+   * Counts all active auctions.
+   */
+  countActiveAuctions: db.prepare(`SELECT COUNT(*) as count FROM auctions WHERE status='active'`),
+
+  /**
    * Retrieves recently finished auctions for the admin panel.
    * @type {import('better-sqlite3').Statement}
    */
   getRecentlyFinishedAuctions: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY message_id DESC LIMIT 10`),
+
+  /**
+   * Retrieves finished auctions with pagination.
+   */
+  getFinishedAuctionsPaginated: db.prepare(`SELECT * FROM auctions WHERE status='finished' ORDER BY message_id DESC LIMIT ? OFFSET ?`),
+
+  /**
+   * Counts all finished auctions.
+   */
+  countFinishedAuctions: db.prepare(`SELECT COUNT(*) as count FROM auctions WHERE status='finished'`),
 
   /**
    * Restarts a finished auction.

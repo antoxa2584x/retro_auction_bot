@@ -127,6 +127,21 @@ export function makeAdminPendingViewKb(id) {
 }
 
 /**
+ * Creates the keyboard for entering rejection reason.
+ * 
+ * @param {number} id - Pending auction ID.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPendingRejectKb(id) {
+    return {
+        inline_keyboard: [
+            [{ text: t('pending_auction_reject_no_reason'), callback_data: `adm_pen_reject_confirm:${id}` }],
+            [{ text: t('common.cancel'), callback_data: 'adm_pen_reject_cancel', style: 'danger' }]
+        ]
+    };
+}
+
+/**
  * Creates the main admin panel keyboard.
  *
  * @returns {Object} Inline keyboard object.
@@ -148,9 +163,11 @@ export function makeAdminPanelKb() {
  * Creates the admin panel keyboard with a list of active auctions.
  *
  * @param {Array} auctions - List of active auction objects.
+ * @param {number} page - Current page number.
+ * @param {number} totalCount - Total count of active auctions.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminActiveKb(auctions) {
+export function makeAdminActiveKb(auctions, page = 0, totalCount = 0) {
     const cur = getCurrency();
     const buttons = auctions.map(a => {
         let emoji = '🚀';
@@ -166,6 +183,21 @@ export function makeAdminActiveKb(auctions) {
             callback_data: `adm_view:${a.chat_id}:${a.message_id}`
         }];
     });
+
+    // Pagination
+    const totalPages = Math.ceil(totalCount / 10);
+    if (totalPages > 1) {
+        const row = [];
+        if (page > 0) {
+            row.push({ text: '⬅️', callback_data: `adm_active:${page - 1}` });
+        }
+        row.push({ text: `${page + 1} / ${totalPages}`, callback_data: 'none' });
+        if (page < totalPages - 1) {
+            row.push({ text: '➡️', callback_data: `adm_active:${page + 1}` });
+        }
+        buttons.push(row);
+    }
+
     buttons.push([{text: t('admin.kb.back_to_panel'), callback_data: 'adm_list', style: 'primary'}]);
     return {inline_keyboard: buttons};
 }
@@ -471,13 +503,30 @@ export function makeAdminLangKb() {
  * Creates the keyboard with a list of recently finished auctions.
  *
  * @param {Array} auctions - List of finished auction objects.
+ * @param {number} page - Current page number.
+ * @param {number} totalCount - Total count of finished auctions.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminFinishedKb(auctions) {
+export function makeAdminFinishedKb(auctions, page = 0, totalCount = 0) {
     const cur = getCurrency();
     const buttons = auctions.map(a => ([
         {text: `🏁 ${a.title} - ${a.current_price} ${cur}`, callback_data: `adm_view:${a.chat_id}:${a.message_id}`}
     ]));
+
+    // Pagination
+    const totalPages = Math.ceil(totalCount / 10);
+    if (totalPages > 1) {
+        const row = [];
+        if (page > 0) {
+            row.push({ text: '⬅️', callback_data: `adm_finished:${page - 1}` });
+        }
+        row.push({ text: `${page + 1} / ${totalPages}`, callback_data: 'none' });
+        if (page < totalPages - 1) {
+            row.push({ text: '➡️', callback_data: `adm_finished:${page + 1}` });
+        }
+        buttons.push(row);
+    }
+
     buttons.push([{text: t('admin.kb.back_to_panel'), callback_data: 'adm_list', style: 'primary'}]);
     return {inline_keyboard: buttons};
 }

@@ -8,7 +8,8 @@ import {
     winnerKeyboard, 
     makeEmptyFinishKb,
     makeAdminPendingKb,
-    makeAdminPendingViewKb
+    makeAdminPendingViewKb,
+    makeAdminPendingRejectKb
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
@@ -20,6 +21,9 @@ function isAdmin(userId) {
     const admin = q.getAdmin.get(userId);
     return admin && admin.otp_code === null;
 }
+
+/** @type {Map<number, {pending_id: string}>} */
+const adminSessions = new Map();
 
 /**
  * Registers handlers for managing auctions in the admin panel.
@@ -170,23 +174,52 @@ export function registerManageHandlers(bot) {
         }
 
         if (data.startsWith('adm_pen_reject:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            const id = data.split(':')[1];
+            const p = q.getPendingAuction.get(id);
+            if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
+
+            bot.answerCallbackQuery(query.id).catch(() => {});
+            adminSessions.set(from.id, { pending_id: id });
+
+            const text = t('admin.pending_auction_reject_prompt', { title: p.title });
+            await bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'HTML',
+                reply_markup: makeAdminPendingRejectKb(id)
+            });
+        }
+
+        if (data.startsWith('adm_pen_reject_confirm:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             const id = data.split(':')[1];
             const p = q.getPendingAuction.get(id);
             if (!p) return;
 
+            adminSessions.delete(from.id);
             q.updatePendingAuctionStatus.run('rejected', id);
             await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
-            await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected')).catch(() => {});
+            await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected'), { parse_mode: 'HTML' }).catch(() => {});
             await sendAdminPanel(bot, chatId, false);
         }
 
-        if (data === 'adm_active') {
+        if (data === 'adm_pen_reject_cancel') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            adminSessions.delete(from.id);
+            bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_reject_cancelled') }).catch(() => {});
+            await sendAdminPanel(bot, chatId, false);
+        }
+
+        if (data.startsWith('adm_active')) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
 
-            const auctions = q.getAllActiveAuctions.all();
+            const page = data.includes(':') ? parseInt(data.split(':')[1]) : 0;
+            const auctions = q.getActiveAuctionsPaginated.all(10, page * 10);
+            const totalCount = q.countActiveAuctions.get().count;
 
-            if (auctions.length === 0) {
+            if (auctions.length === 0 && page === 0) {
                 const noActiveText = t('admin.panel_header') + '\n\n' + t('admin.no_active_auctions');
                 const noActiveKb = {
                     inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
@@ -209,7 +242,7 @@ export function registerManageHandlers(bot) {
             }
 
             const activeHeaderText = t('admin.panel_header') + '\n\n' + t('admin.active_auctions_header');
-            const activeHeaderKb = makeAdminActiveKb(auctions);
+            const activeHeaderKb = makeAdminActiveKb(auctions, page, totalCount);
             try {
                 await bot.editMessageText(activeHeaderText, {
                     chat_id: chatId,
@@ -226,13 +259,15 @@ export function registerManageHandlers(bot) {
             }
         }
 
-        if (data === 'adm_finished') {
+        if (data.startsWith('adm_finished')) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
 
-            const auctions = q.getRecentlyFinishedAuctions.all();
+            const page = data.includes(':') ? parseInt(data.split(':')[1]) : 0;
+            const auctions = q.getFinishedAuctionsPaginated.all(10, page * 10);
+            const totalCount = q.countFinishedAuctions.get().count;
 
-            if (auctions.length === 0) {
+            if (auctions.length === 0 && page === 0) {
                 const noFinishedText = t('admin.panel_header') + '\n\n' + t('admin.no_finished_auctions');
                 const noFinishedKb = {
                     inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
@@ -255,7 +290,7 @@ export function registerManageHandlers(bot) {
             }
 
             const finishedHeaderText = t('admin.panel_header') + '\n\n' + t('admin.finished_auctions_header');
-            const finishedHeaderKb = makeAdminFinishedKb(auctions);
+            const finishedHeaderKb = makeAdminFinishedKb(auctions, page, totalCount);
             try {
                 await bot.editMessageText(finishedHeaderText, {
                     chat_id: chatId,
@@ -574,6 +609,35 @@ export function registerManageHandlers(bot) {
             
             await bot.sendMessage(chatId, "Аукціон видалено з бази даних.");
             await sendAdminPanel(bot, chatId, true, messageId);
+        }
+    });
+
+    bot.on('message', async (msg) => {
+        if (msg.chat.type !== 'private') return;
+        if (msg.text?.startsWith('/')) return;
+
+        const session = adminSessions.get(msg.from.id);
+        if (session && session.pending_id) {
+            if (!isAdmin(msg.from.id)) {
+                adminSessions.delete(msg.from.id);
+                return;
+            }
+
+            const reason = msg.text;
+            const id = session.pending_id;
+            const p = q.getPendingAuction.get(id);
+
+            if (p) {
+                adminSessions.delete(msg.from.id);
+                q.updatePendingAuctionStatus.run('rejected', id);
+                
+                await bot.sendMessage(msg.chat.id, t('admin.pending_auction_alert_rejected'), { parse_mode: 'HTML' }).catch(() => {});
+                await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected_reason', { reason }), { parse_mode: 'HTML' }).catch(() => {});
+                await sendAdminPanel(bot, msg.chat.id, false);
+            } else {
+                adminSessions.delete(msg.from.id);
+                await bot.sendMessage(msg.chat.id, "Auction not found.").catch(() => {});
+            }
         }
     });
 }

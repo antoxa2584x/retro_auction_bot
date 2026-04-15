@@ -149,49 +149,57 @@ export async function closeAuction(bot, chat_id, message_id) {
         q.finish.run(chat_id, message_id);
     }
 
+    // Refresh data to get current price and leader if it just changed
+    const freshRow = q.getAuction.get(chat_id, message_id);
+    if (!freshRow) return;
+
     const auctionLink = getAuctionLink(chat_id, message_id);
     const admins = q.getAllAdmins.all();
 
-    if (row.leader_id) {
+    if (freshRow.leader_id) {
         try {
             await bot.editMessageReplyMarkup(
-                winnerKeyboard(row.leader_id, row.leader_name, row.current_price),
+                winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price),
                 { chat_id: chat_id, message_id: message_id }
-            ).catch(() => {});
+            ).catch((err) => {
+                if (!err.message.includes('message is not modified')) {
+                    console.error(`Failed to update winner keyboard for auction ${chat_id}:${message_id}:`, err.message);
+                }
+            });
 
             if (!alreadyFinished) {
                 // Notify winner
-                const nickname = row.admin_contact || getContactNickname();
+                const nickname = freshRow.admin_contact || getContactNickname();
                 const adminLink = formatContactLink(nickname);
                 
                 const winnerText = t('scheduler.winner_notify', {
                     link: auctionLink,
-                    title: row.title,
-                    price: row.current_price,
+                    title: freshRow.title,
+                    price: freshRow.current_price,
                     admin_link: adminLink
                 });
                 try {
-                    if (row.photo_id) {
-                        await bot.sendPhoto(row.leader_id, row.photo_id, {
+                    if (freshRow.photo_id) {
+                        await bot.sendPhoto(freshRow.leader_id, freshRow.photo_id, {
                             caption: winnerText,
                             parse_mode: 'HTML'
                         });
                     } else {
-                        await bot.sendMessage(row.leader_id, winnerText, { parse_mode: 'HTML' });
+                        await bot.sendMessage(freshRow.leader_id, winnerText, { parse_mode: 'HTML' });
                     }
                 } catch (err) {
-                    console.error(`Failed to notify winner ${row.leader_id}:`, err.message);
+                    console.error(`Failed to notify winner ${freshRow.leader_id}:`, err.message);
                 }
 
                 // Notify admins
-                const escapedWinnerName = escapeHtml(row.leader_name);
+                const escapedWinnerName = escapeHtml(freshRow.leader_name);
                 const adminNotifyText = t('scheduler.admin_finished_notify', {
                     link: auctionLink,
-                    title: row.title,
-                    price: row.current_price,
-                    user_id: row.leader_id,
+                    title: freshRow.title,
+                    price: freshRow.current_price,
+                    user_id: freshRow.leader_id,
                     name: escapedWinnerName,
-                    mention: formatUserLink(row.leader_id, row.leader_name)
+                    mention: formatUserLink(freshRow.leader_id, freshRow.leader_name)
                 });
                 for (const admin of admins) {
                     try {
@@ -209,13 +217,17 @@ export async function closeAuction(bot, chat_id, message_id) {
             await bot.editMessageReplyMarkup(
                 makeEmptyFinishKb(),
                 { chat_id: chat_id, message_id: message_id }
-            ).catch(() => {});
+            ).catch((err) => {
+                if (!err.message.includes('message is not modified')) {
+                    console.error(`Failed to update empty finish keyboard for auction ${chat_id}:${message_id}:`, err.message);
+                }
+            });
 
             if (!alreadyFinished) {
                 // Notify admins about no bids
                 const adminNotifyText = t('scheduler.admin_no_bids_notify', {
                     link: auctionLink,
-                    title: row.title
+                    title: freshRow.title
                 });
                 for (const admin of admins) {
                     try {
