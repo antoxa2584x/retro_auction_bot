@@ -149,9 +149,18 @@ export async function closeAuction(bot, chat_id, message_id) {
         q.finish.run(chat_id, message_id);
     }
 
-    // Refresh data to get current price and leader if it just changed
     const freshRow = q.getAuction.get(chat_id, message_id);
     if (!freshRow) return;
+
+    const rescheduleIfLimit = async (err) => {
+        if (err.message.includes('Too Many Requests') || (err.response && err.response.statusCode === 429)) {
+            const delay = Math.floor(Math.random() * (60 - 30 + 1) + 30) * 1000;
+            console.warn(`Too Many Requests while updating keyboard for auction ${chat_id}:${message_id}. Rescheduling in ${delay / 1000}s`);
+            setTimeout(() => closeAuction(bot, chat_id, message_id), delay);
+            return true;
+        }
+        return false;
+    };
 
     const auctionLink = getAuctionLink(chat_id, message_id);
     const admins = q.getAllAdmins.all();
@@ -162,12 +171,14 @@ export async function closeAuction(bot, chat_id, message_id) {
                 winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price),
                 { chat_id: chat_id, message_id: message_id }
             ).catch(async (err) => {
+                if (await rescheduleIfLimit(err)) return;
                 if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
                     // Privacy settings prevent profile link, retry without it
                     await bot.editMessageReplyMarkup(
                         winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price, false),
                         { chat_id: chat_id, message_id: message_id }
-                    ).catch(e => {
+                    ).catch(async (e) => {
+                        if (await rescheduleIfLimit(e)) return;
                         console.error(`Failed to update winner keyboard (no-link) for auction ${chat_id}:${message_id}:`, e.message);
                     });
                 } else if (!err.message.includes('message is not modified')) {
@@ -225,7 +236,8 @@ export async function closeAuction(bot, chat_id, message_id) {
             await bot.editMessageReplyMarkup(
                 makeEmptyFinishKb(),
                 { chat_id: chat_id, message_id: message_id }
-            ).catch((err) => {
+            ).catch(async (err) => {
+                if (await rescheduleIfLimit(err)) return;
                 if (!err.message.includes('message is not modified')) {
                     console.error(`Failed to update empty finish keyboard for auction ${chat_id}:${message_id}:`, err.message);
                 }

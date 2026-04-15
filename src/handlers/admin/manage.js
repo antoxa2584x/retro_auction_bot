@@ -587,7 +587,16 @@ export function registerManageHandlers(bot) {
                         newKb = makeEmptyFinishKb();
                     }
                 }
-                await bot.editMessageReplyMarkup(newKb, { chat_id: targetChatId, message_id: targetMsgId });
+                await bot.editMessageReplyMarkup(newKb, { chat_id: targetChatId, message_id: targetMsgId }).catch(async (err) => {
+                    if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
+                        const fallbackKb = winnerKeyboard(res.newLeaderId, res.newLeaderName, res.newPrice, false);
+                        await bot.editMessageReplyMarkup(fallbackKb, { chat_id: targetChatId, message_id: targetMsgId }).catch(e => {
+                            console.error(`Failed to update fallback winner keyboard after undo bid:`, e.message);
+                        });
+                    } else if (!err.message.includes('message is not modified')) {
+                        throw err;
+                    }
+                });
             } catch (err) {
                 console.error('Failed to update channel post keyboard after undo bid:', err.message);
             }
