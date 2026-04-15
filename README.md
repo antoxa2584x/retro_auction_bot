@@ -13,9 +13,12 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Custom Currency** — admins can set any custom currency symbol or name (e.g., ₴, $, €, BTC) to be used across all auctions.
 * **One-tap bidding with confirmation** — users are redirected from the channel to the bot's private chat to confirm their bid, preventing accidental clicks.
 * **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
+* **Auction Subscriptions & Custom Notifications** — users can subscribe to any auction and set personalized reminders (1h, 2h, 3h, 6h, or 12h before closing) to never miss a deadline.
+* **Automatic End-of-Auction Reminders** — the bot automatically sends a 30-minute warning to all active participants before an auction closes.
+* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
 * **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
-* **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated.
+* **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated or subscribed.
 * **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
 * **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
 * **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
@@ -23,31 +26,48 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Auction Posting Wizard** — create and post new auctions to the channel directly via a step-by-step bot interface (upload photo, set title, price, step, and end date).
 * **AI Auction Generation** — integrate OpenAI's GPT-4o-mini to automatically generate professional auction titles and descriptions from uploaded photos. Just set your `OPENAI_API_KEY` in the admin settings.
 * **Smart Parsing** — extracts lot name, min bid, step, and end time from channel posts, with dynamic regex that adapts to your custom template labels.
-* **Advanced Admin Panel** — OTP-authenticated private panel to manage auctions, post new ones, and configure all bot settings (IDs, Language, Currency, Default End Times, and Post Templates).
+* **Advanced Admin Panel** — OTP-authenticated private panel to manage auctions (including pending user submissions), post new ones, and configure all bot settings (IDs, Language, Currency, Default End Times, and Post Templates).
 
 ---
 
 ## 🧠 How it works (high level)
 
-1. **Admin posts an auction to the channel** following the template. The bot listens to `channel_post`, parses details, saves the auction (including full text and photo), and attaches the "Bid" button.
+1. **An auction is posted to the channel**: Either by an Admin using the wizard/manual post, or by a User whose submission was approved by an Admin. The bot listens to `channel_post`, parses details, saves the auction, and attaches the "Bid" and "Info" buttons.
 2. **User taps “Bid” in the channel**: They are redirected to the bot with a deep link (`/start bid_CHATID_MSGID`).
 3. **Confirmation in Bot**: The bot shows the item's photo/text and the required bid amount. The user clicks "Confirm".
-4. **Processing**: The bot validates the price (handling changes if someone else bid in the meantime), updates the database, refreshes the channel keyboard, and notifies the previous leader.
-5. **Auction End**: The scheduler (or an interaction after expiration) triggers the closing sequence, updating the channel post with the winner's name and notifying the winner privately.
+4. **Processing**: The bot validates the price, updates the database, refreshes the channel keyboard, and notifies the previous leader.
+5. **Subscriptions**: Users can click "Subscribe" in the channel to set custom reminders.
+6. **Auction End**: The scheduler (or an interaction after expiration) triggers the closing sequence, updating the channel post with the winner's name and notifying the winner privately.
+
+---
+
+## 🤖 Bot Commands
+
+### 👤 User Commands
+* `/start` — Start the bot and see the welcome message.
+* `/menu` — Main user menu. Access your active bids, won auctions, watchlist, and submit new auctions.
+* `/my` — View your active bids where you are either leading or outbid.
+* `/won` — View the list of auctions you have won.
+* `/about` — Information about the bot and its current version.
+
+### 🔐 Admin Commands
+* `/admin` — Request an OTP code for admin authentication.
+* `/admin_panel` — Open the main admin management interface (requires authentication).
 
 ---
 
 ## 🛠️ Admin Functions
 
-The bot provides powerful administrative tools accessible via private messages and directly in the channel.
+The bot provides powerful administrative tools accessible via private messages.
 
-### 🔐 Admin Panel (Private Messages)
+### 🔐 Admin Panel
 To access the admin panel:
 1. Send `/admin` to the bot in a private chat.
-2. Retrieve the **OTP code** and send it to the bot.
+2. Retrieve the **OTP code** and send it back to the bot.
 3. Use `/admin_panel` to open the management interface.
 
 **Features:**
+* **⏳ Pending Submissions**: Review, edit, and approve auctions submitted by users.
 * **➕ Post New Auction**: Wizard-style step-by-step creation:
     1. **Image**: Upload a photo or skip for text-only.
     2. **Title & Description**: Enter manually or use **AI Generate** to create them from the photo.
