@@ -262,6 +262,10 @@ export function registerPostHandlers(bot) {
                 await bot.editMessageReplyMarkup(finalKb, {
                     chat_id: channelId,
                     message_id: sentMsg.message_id
+                }).catch(err => {
+                    if (!err.message.includes('message is not modified')) {
+                        console.error(`Failed to update keyboard for admin post ${channelId}:${sentMsg.message_id}:`, err.message);
+                    }
                 });
 
                 q.insertAuction.run({

@@ -161,8 +161,16 @@ export async function closeAuction(bot, chat_id, message_id) {
             await bot.editMessageReplyMarkup(
                 winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price),
                 { chat_id: chat_id, message_id: message_id }
-            ).catch((err) => {
-                if (!err.message.includes('message is not modified')) {
+            ).catch(async (err) => {
+                if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
+                    // Privacy settings prevent profile link, retry without it
+                    await bot.editMessageReplyMarkup(
+                        winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price, false),
+                        { chat_id: chat_id, message_id: message_id }
+                    ).catch(e => {
+                        console.error(`Failed to update winner keyboard (no-link) for auction ${chat_id}:${message_id}:`, e.message);
+                    });
+                } else if (!err.message.includes('message is not modified')) {
                     console.error(`Failed to update winner keyboard for auction ${chat_id}:${message_id}:`, err.message);
                 }
             });

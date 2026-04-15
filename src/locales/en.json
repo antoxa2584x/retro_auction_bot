@@ -109,6 +109,7 @@
     "user_post_confirm": "📦 <b>Confirm Your Auction Submission</b>\n\n{{full_text}}\n\nMin Bid: <b>{{min_bid}} {{cur}}</b>\nStep: <b>{{step}} {{cur}}</b>\nEnds at: <b>{{end_at}}</b>\nContinuous: <b>{{continuous}}</b>",
     "user_post_too_many": "⚠️ You cannot have more than 3 pending auctions at a time. Please wait until your previous submissions are reviewed by an administrator.",
     "post_cancelled": "❌ Auction creation cancelled.",
+    "privacy_warning": "⚠️ <b>Note:</b> If your profile is private (link to account in forwarded messages is disabled), others might not be able to see your profile link in the winner banner. This won't prevent you from bidding or winning.",
     "error_too_many_photos": "You can add a maximum of 11 photos per auction.",
     "post_photo_received": "✅ Photo received! You can send more photos or click Continue to proceed to title.",
     "post_photo_added": "✅ Photo added (Total: {{count}})",

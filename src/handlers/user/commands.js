@@ -105,10 +105,13 @@ export function registerUserCommands(bot) {
                 }
 
                 const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
-                const messageText = t('bid.confirm_text', {
+                let messageText = t('bid.confirm_text', {
                     title: row.full_text || row.title,
                     price: newPrice
                 });
+                if (!msg.from.username) {
+                    messageText += `\n\n${t('admin.privacy_warning')}`;
+                }
                 const replyMarkup = confirmBidKb(targetChatId, targetMessageId, newPrice);
 
                 if (row.photo_id) {

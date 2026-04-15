@@ -642,15 +642,19 @@ export function makeEmptyFinishKb() {
  * @param {number} leaderId - Winner's user ID.
  * @param {string} leaderName - Winner's display name.
  * @param {number} price - Final price.
+ * @param {boolean} includeLink - Whether to include the link to the winner's profile.
  * @returns {Object} Inline keyboard object.
  */
-export function winnerKeyboard(leaderId, leaderName, price) {
-    const url = `tg://user?id=${leaderId}`;
+export function winnerKeyboard(leaderId, leaderName, price, includeLink = true) {
     const cur = getCurrency();
+    const button = {text: `🏆 ${price} ${cur} : ${leaderName}`, style: 'success'};
+    if (includeLink) {
+        button.url = `tg://user?id=${leaderId}`;
+    } else {
+        button.callback_data = 'none';
+    }
     return {
-        inline_keyboard: [
-            [{text: `🏆 ${price} ${cur} : ${leaderName}`, url: url, style: 'success'}]
-        ]
+        inline_keyboard: [[button]]
     };
 }
 

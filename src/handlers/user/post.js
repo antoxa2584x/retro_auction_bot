@@ -275,7 +275,7 @@ async function goToConfirmStep(bot, chatId, session) {
     session.step = 'CONFIRM';
     const { data } = session;
     
-    const confirmText = t('admin.user_post_confirm', {
+    let confirmText = t('admin.user_post_confirm', {
         full_text: buildAuctionText(data, false, false),
         min_bid: data.min_bid,
         step: data.step,
@@ -283,6 +283,11 @@ async function goToConfirmStep(bot, chatId, session) {
         continuous: data.is_continuous ? t('admin.kb.yes') : t('admin.kb.no'),
         cur: q.getSetting.get('CURRENCY')?.value || '₴'
     });
+
+    const user = q.getUserFromAnywhere.get(data.user_id, data.user_id, data.user_id, data.user_id);
+    if (user && !user.username) {
+        confirmText += `\n\n${t('admin.privacy_warning')}`;
+    }
 
     await bot.sendMessage(chatId, confirmText, {
         parse_mode: 'HTML',

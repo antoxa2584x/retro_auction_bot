@@ -34,6 +34,10 @@ export function formatUserLink(userId, name, username) {
     if (username) {
         return `<a href="https://t.me/${username}">${displayName}</a>`;
     }
+    // tg://user?id= link can fail if the user has privacy restrictions.
+    // However, in HTML messages, Telegram usually just hides the link or 
+    // makes it unclickable rather than failing the whole message send.
+    // The BUTTON_USER_PRIVACY_RESTRICTED error is specific to inline buttons.
     return `<a href="tg://user?id=${userId}">${displayName}</a>`;
 }
 

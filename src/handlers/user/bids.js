@@ -192,6 +192,13 @@ export function registerBidHandlers(bot) {
             await bot.editMessageReplyMarkup(kb, {
                 chat_id: target_chat_id,
                 message_id: target_message_id
+            }).catch(async (err) => {
+                if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
+                    // This can happen if makeKb is modified to include user links in buttons
+                    console.error(`Privacy restriction when updating keyboard for ${target_chat_id}:${target_message_id}`);
+                } else if (!err.message.includes('message is not modified')) {
+                    console.error(`Failed to update keyboard for auction ${target_chat_id}:${target_message_id}:`, err.message);
+                }
             });
 
             if (res.timeExtended) {

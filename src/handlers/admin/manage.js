@@ -144,6 +144,10 @@ export function registerManageHandlers(bot) {
                 await bot.editMessageReplyMarkup(finalKb, {
                     chat_id: channelId,
                     message_id: sentMsg.message_id
+                }).catch(err => {
+                    if (!err.message.includes('message is not modified')) {
+                        console.error(`Failed to update keyboard after approval:`, err.message);
+                    }
                 });
 
                 q.insertAuction.run({
