@@ -14,7 +14,7 @@ import {
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery } from '../../utils/utils.js';
+import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery, safeEditMessage } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 
 function isAdmin(userId) {
@@ -22,8 +22,25 @@ function isAdmin(userId) {
     return admin && admin.otp_code === null;
 }
 
-/** @type {Map<number, {pending_id: string}>} */
+/** @type {Map<number, {pending_id: string, gallery_msg_ids: number[]}>} */
 const adminSessions = new Map();
+
+/**
+ * Cleanup gallery if exists for the user.
+ * 
+ * @param {TelegramBot} bot 
+ * @param {number} chatId 
+ * @param {number} userId 
+ */
+async function cleanupGallery(bot, chatId, userId) {
+    const session = adminSessions.get(userId);
+    if (session?.gallery_msg_ids) {
+        for (const msgId of session.gallery_msg_ids) {
+            await bot.deleteMessage(chatId, msgId).catch(() => {});
+        }
+        session.gallery_msg_ids = [];
+    }
+}
 
 /**
  * Registers handlers for managing auctions in the admin panel.
@@ -39,21 +56,40 @@ export function registerManageHandlers(bot) {
         if (data === 'adm_list') {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
-            await sendAdminPanel(bot, chatId, true, messageId);
+
+            // Cleanup gallery if exists
+            await cleanupGallery(bot, chatId, from.id);
+            adminSessions.delete(from.id);
+
+            // Always delete if previous message had a photo, ensuring text-only panel
+            const isPhoto = !!message.photo;
+            await sendAdminPanel(bot, chatId, !isPhoto, messageId);
         }
 
         if (data === 'adm_pending') {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
 
+            // Cleanup gallery if exists
+            await cleanupGallery(bot, chatId, from.id);
+            adminSessions.delete(from.id);
+
             const pending = q.getPendingAuctions.all();
             if (pending.length === 0) {
                 const noPendingText = t('admin.no_pending_auctions') || "No pending auctions.";
                 const noPendingKb = makeAdminPanelKb();
+                
+                // If previous message was photo, delete it to keep list text-only
+                if (message.photo) {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                    return await bot.sendMessage(chatId, noPendingText, {
+                        parse_mode: 'HTML',
+                        reply_markup: noPendingKb
+                    });
+                }
+
                 try {
-                    return await bot.editMessageText(noPendingText, {
-                        chat_id: chatId,
-                        message_id: messageId,
+                    return await safeEditMessage(bot, chatId, messageId, noPendingText, {
                         parse_mode: 'HTML',
                         reply_markup: noPendingKb
                     });
@@ -68,10 +104,18 @@ export function registerManageHandlers(bot) {
 
             const pendingHeader = t('admin.pending_auctions_header') || "Pending auctions:";
             const pendingKb = makeAdminPendingKb(pending);
+
+            // If previous message was photo, delete it to keep list text-only
+            if (message.photo) {
+                await bot.deleteMessage(chatId, messageId).catch(() => {});
+                return await bot.sendMessage(chatId, pendingHeader, {
+                    parse_mode: 'HTML',
+                    reply_markup: pendingKb
+                });
+            }
+
             try {
-                await bot.editMessageText(pendingHeader, {
-                    chat_id: chatId,
-                    message_id: messageId,
+                await safeEditMessage(bot, chatId, messageId, pendingHeader, {
                     parse_mode: 'HTML',
                     reply_markup: pendingKb
                 });
@@ -99,16 +143,40 @@ export function registerManageHandlers(bot) {
 
             const photoIds = p.photo_ids ? p.photo_ids.split(',') : [];
             if (photoIds.length > 0) {
-                await bot.sendPhoto(chatId, photoIds[0], {
+                // If it's already a photo message with caption, we might want to update it
+                // But adm_pen_view: usually sends a NEW message with the photo.
+                // If we are coming from 'adm_pending' list, we are editing the message.
+                try {
+                    await bot.deleteMessage(chatId, messageId).catch(() => {});
+                } catch (e) {}
+                
+                const sentMsg = await bot.sendPhoto(chatId, photoIds[0], {
                     caption: text,
                     parse_mode: 'HTML',
                     reply_markup: makeAdminPendingViewKb(id)
                 });
+
+                if (photoIds.length > 1) {
+                    const galleryMsgs = await sendAuctionGallery(bot, chatId, photoIds, sentMsg.message_id);
+                    if (galleryMsgs && Array.isArray(galleryMsgs)) {
+                        adminSessions.set(from.id, { 
+                            ...adminSessions.get(from.id),
+                            gallery_msg_ids: galleryMsgs.map(m => m.message_id)
+                        });
+                    }
+                }
             } else {
-                await bot.sendMessage(chatId, text, {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPendingViewKb(id)
-                });
+                try {
+                    await safeEditMessage(bot, chatId, messageId, text, {
+                        parse_mode: 'HTML',
+                        reply_markup: makeAdminPendingViewKb(id)
+                    });
+                } catch (e) {
+                    await bot.sendMessage(chatId, text, {
+                        parse_mode: 'HTML',
+                        reply_markup: makeAdminPendingViewKb(id)
+                    });
+                }
             }
         }
 
@@ -116,6 +184,10 @@ export function registerManageHandlers(bot) {
             const id = data.split(':')[1];
             const p = q.getPendingAuction.get(id);
             if (!p) return;
+
+            // Cleanup gallery if exists
+            await cleanupGallery(bot, chatId, from.id);
+            adminSessions.delete(from.id);
 
             try {
                 const channelId = getChannelId();
@@ -184,12 +256,13 @@ export function registerManageHandlers(bot) {
             if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
 
             bot.answerCallbackQuery(query.id).catch(() => {});
+            
+            // Cleanup gallery if exists
+            await cleanupGallery(bot, chatId, from.id);
             adminSessions.set(from.id, { pending_id: id });
 
             const text = t('admin.pending_auction_reject_prompt', { title: p.title });
-            await bot.editMessageText(text, {
-                chat_id: chatId,
-                message_id: messageId,
+            await safeEditMessage(bot, chatId, messageId, text, {
                 parse_mode: 'HTML',
                 reply_markup: makeAdminPendingRejectKb(id)
             });
@@ -201,6 +274,7 @@ export function registerManageHandlers(bot) {
             const p = q.getPendingAuction.get(id);
             if (!p) return;
 
+            await cleanupGallery(bot, chatId, from.id);
             adminSessions.delete(from.id);
             q.updatePendingAuctionStatus.run('rejected', id);
             await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
@@ -210,6 +284,7 @@ export function registerManageHandlers(bot) {
 
         if (data === 'adm_pen_reject_cancel') {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            await cleanupGallery(bot, chatId, from.id);
             adminSessions.delete(from.id);
             bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_reject_cancelled') }).catch(() => {});
             await sendAdminPanel(bot, chatId, false);
@@ -229,9 +304,7 @@ export function registerManageHandlers(bot) {
                     inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
                 };
                 try {
-                    await bot.editMessageText(noActiveText, {
-                        chat_id: chatId,
-                        message_id: messageId,
+                    await safeEditMessage(bot, chatId, messageId, noActiveText, {
                         parse_mode: 'HTML',
                         reply_markup: noActiveKb
                     });
@@ -248,9 +321,7 @@ export function registerManageHandlers(bot) {
             const activeHeaderText = t('admin.panel_header') + '\n\n' + t('admin.active_auctions_header');
             const activeHeaderKb = makeAdminActiveKb(auctions, page, totalCount);
             try {
-                await bot.editMessageText(activeHeaderText, {
-                    chat_id: chatId,
-                    message_id: messageId,
+                await safeEditMessage(bot, chatId, messageId, activeHeaderText, {
                     parse_mode: 'HTML',
                     reply_markup: activeHeaderKb
                 });
@@ -277,9 +348,7 @@ export function registerManageHandlers(bot) {
                     inline_keyboard: [[{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]]
                 };
                 try {
-                    await bot.editMessageText(noFinishedText, {
-                        chat_id: chatId,
-                        message_id: messageId,
+                    await safeEditMessage(bot, chatId, messageId, noFinishedText, {
                         parse_mode: 'HTML',
                         reply_markup: noFinishedKb
                     });
@@ -296,9 +365,7 @@ export function registerManageHandlers(bot) {
             const finishedHeaderText = t('admin.panel_header') + '\n\n' + t('admin.finished_auctions_header');
             const finishedHeaderKb = makeAdminFinishedKb(auctions, page, totalCount);
             try {
-                await bot.editMessageText(finishedHeaderText, {
-                    chat_id: chatId,
-                    message_id: messageId,
+                await safeEditMessage(bot, chatId, messageId, finishedHeaderText, {
                     parse_mode: 'HTML',
                     reply_markup: finishedHeaderKb
                 });
@@ -355,9 +422,7 @@ export function registerManageHandlers(bot) {
 
             const kb = makeAdminAuctionActionKb(targetChatId, targetMsgId, a.status);
             try {
-                await bot.editMessageText(text, {
-                    chat_id: chatId,
-                    message_id: messageId,
+                await safeEditMessage(bot, chatId, messageId, text, {
                     parse_mode: 'HTML',
                     reply_markup: kb
                 });
@@ -641,6 +706,7 @@ export function registerManageHandlers(bot) {
             const p = q.getPendingAuction.get(id);
 
             if (p) {
+                await cleanupGallery(bot, msg.chat.id, msg.from.id);
                 adminSessions.delete(msg.from.id);
                 q.updatePendingAuctionStatus.run('rejected', id);
                 
@@ -648,6 +714,7 @@ export function registerManageHandlers(bot) {
                 await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected_reason', { reason }), { parse_mode: 'HTML' }).catch(() => {});
                 await sendAdminPanel(bot, msg.chat.id, false);
             } else {
+                await cleanupGallery(bot, msg.chat.id, msg.from.id);
                 adminSessions.delete(msg.from.id);
                 await bot.sendMessage(msg.chat.id, "Auction not found.").catch(() => {});
             }
@@ -678,7 +745,7 @@ export async function sendAdminPanel(bot, chatId, isEdit = false, messageId = nu
 
     if (isEdit && messageId) {
         try {
-            await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, parse_mode: 'HTML', reply_markup: kb });
+            await safeEditMessage(bot, chatId, messageId, text, { parse_mode: 'HTML', reply_markup: kb });
         } catch (e) {
             if (e.message.includes('there is no text in the message to edit')) {
                 await bot.deleteMessage(chatId, messageId).catch(() => {});

@@ -66,6 +66,34 @@ export function formatContactLink(nickname) {
 }
 
 /**
+ * Safely updates a message, using either editMessageText or editMessageCaption
+ * depending on whether the message has a photo/video.
+ * 
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number|string} chatId - Chat ID.
+ * @param {number} messageId - Message ID.
+ * @param {string} text - New text or caption.
+ * @param {Object} [options={}] - Additional options (reply_markup, parse_mode, etc.).
+ * @returns {Promise<Message|boolean>}
+ */
+export async function safeEditMessage(bot, chatId, messageId, text, options = {}) {
+    try {
+        // We first try editMessageText. If it fails with "there is no text in the message to edit",
+        // it means it's a media message, so we use editMessageCaption.
+        return await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, ...options });
+    } catch (e) {
+        if (e.message.includes('there is no text in the message to edit')) {
+            const { parse_mode, reply_markup } = options;
+            return await bot.editMessageCaption(text, { caption: text, chat_id: chatId, message_id: messageId, parse_mode, reply_markup });
+        }
+        if (e.message.includes('message is not modified')) {
+            return true;
+        }
+        throw e;
+    }
+}
+
+/**
  * Escapes HTML special characters to prevent injection when using HTML parse mode.
  * 
  * @param {string} str - String to escape.

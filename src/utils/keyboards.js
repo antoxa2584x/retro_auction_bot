@@ -135,7 +135,7 @@ export function makeAdminPendingViewKb(id) {
 export function makeAdminPendingRejectKb(id) {
     return {
         inline_keyboard: [
-            [{ text: t('pending_auction_reject_no_reason'), callback_data: `adm_pen_reject_confirm:${id}` }],
+            [{ text: t('admin.pending_auction_reject_no_reason'), callback_data: `adm_pen_reject_confirm:${id}` }],
             [{ text: t('common.cancel'), callback_data: 'adm_pen_reject_cancel', style: 'danger' }]
         ]
     };
