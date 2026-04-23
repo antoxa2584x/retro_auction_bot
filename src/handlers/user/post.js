@@ -10,7 +10,7 @@ import { TZ } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, getDefaultEndDate, sanitizeHtml } from '../../utils/utils.js';
+import { buildAuctionText, getDefaultEndDate, sanitizeHtml, truncateCaption } from '../../utils/utils.js';
 
 /** @type {Map<number, {step: string, data: any}>} */
 const userSessions = new Map();
@@ -293,7 +293,7 @@ async function goToConfirmStep(bot, chatId, session) {
         confirmText += `\n\n${t('admin.privacy_warning')}`;
     }
 
-    await bot.sendMessage(chatId, confirmText, {
+    await bot.sendMessage(chatId, truncateCaption(confirmText), {
         parse_mode: 'HTML',
         reply_markup: makeUserPostConfirmKb()
     });

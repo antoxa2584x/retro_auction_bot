@@ -14,7 +14,7 @@ import {
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery, safeEditMessage } from '../../utils/utils.js';
+import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery, safeEditMessage, truncateCaption } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 
 function isAdmin(userId) {
@@ -641,9 +641,9 @@ export function registerManageHandlers(bot) {
                         });
                         try {
                             if (a.photo_id) {
-                                await bot.sendPhoto(res.newLeaderId, a.photo_id, { caption: winnerText, parse_mode: 'HTML' });
+                                await bot.sendPhoto(res.newLeaderId, a.photo_id, { caption: truncateCaption(winnerText), parse_mode: 'HTML' });
                             } else {
-                                await bot.sendMessage(res.newLeaderId, winnerText, { parse_mode: 'HTML' });
+                                await bot.sendMessage(res.newLeaderId, truncateCaption(winnerText), { parse_mode: 'HTML' });
                             }
                         } catch (err) {
                             console.error(`Failed to notify new winner ${res.newLeaderId}:`, err.message);

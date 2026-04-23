@@ -16,7 +16,7 @@ import { makeKb } from '../../utils/keyboards.js';
 import { t, getCurrency, getLocale } from '../../services/i18n.js';
 import { sendAdminPanel } from './manage.js';
 import { generateAuctionDetails, calculateImageHash } from '../../services/openai.js';
-import { buildAuctionText, sendAuctionGallery, getDefaultEndDate, sanitizeHtml } from '../../utils/utils.js';
+import { buildAuctionText, sendAuctionGallery, getDefaultEndDate, sanitizeHtml, truncateCaption } from '../../utils/utils.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -244,7 +244,7 @@ export function registerPostHandlers(bot) {
                 let sentMsg;
                 if (sessionData.photo_id) {
                     sentMsg = await bot.sendPhoto(channelId, sessionData.photo_id, {
-                        caption: auctionPost,
+                        caption: truncateCaption(auctionPost),
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });
