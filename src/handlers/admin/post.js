@@ -352,6 +352,10 @@ export async function handlePostInput(bot, msg) {
         case 'AI_EDIT':
             if (text) {
                 const sanitizedText = sanitizeHtml(text);
+                if (sanitizedText.length > 1024) {
+                    await bot.sendMessage(chatId, t('admin.error_too_long', { length: sanitizedText.length }), { parse_mode: 'HTML' });
+                    return true;
+                }
                 // Save edited text for training if it was an AI edit
                 if (session.step === 'AI_EDIT' && session.data.image_hash) {
                     q.insertAiTrainingData.run(session.data.image_hash, sanitizedText, getLocale());

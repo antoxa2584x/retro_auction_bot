@@ -111,6 +111,7 @@
     "post_cancelled": "❌ Auction creation cancelled.",
     "privacy_warning": "⚠️ <b>Note:</b> If your profile is private (link to account in forwarded messages is disabled), others might not be able to see your profile link in the winner banner. This won't prevent you from bidding or winning.",
     "error_too_many_photos": "You can add a maximum of 11 photos per auction.",
+    "error_too_long": "⚠️ Maximum length is 1024 characters. You entered {{length}} characters.",
     "post_photo_received": "✅ Photo received! You can send more photos or click Continue to proceed to title.",
     "post_photo_added": "✅ Photo added (Total: {{count}})",
     "invalid_number": "⚠️ Please enter a valid number.",

@@ -207,6 +207,58 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
 }
 
 /**
+ * Truncates a caption to fit within Telegram's character limit (1024 for photos),
+ * while attempting to preserve HTML tags.
+ * 
+ * @param {string} caption - The caption to truncate.
+ * @param {number} [limit=1024] - Character limit.
+ * @returns {string} Truncated caption.
+ */
+export function truncateCaption(caption, limit = 1024) {
+    if (!caption || caption.length <= limit) return caption;
+
+    // A very simple approach: truncate the string and then close any unclosed tags.
+    // This isn't perfect but covers common cases for this bot.
+    let truncated = caption.substring(0, limit - 3);
+    
+    // Basic fix for split HTML tags at the end of truncation
+    const lastOpen = truncated.lastIndexOf('<');
+    const lastClose = truncated.lastIndexOf('>');
+    if (lastOpen > lastClose) {
+        truncated = truncated.substring(0, lastOpen);
+    }
+
+    truncated += '...';
+
+    // List of tags we care about (based on sanitizeHtml)
+    const tags = ['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'a', 'code', 'pre'];
+    const stack = [];
+    
+    // Simple regex to find all tags
+    const tagRegex = /<(\/?)([a-z1-6]+)([^>]*)>/gi;
+    let match;
+    while ((match = tagRegex.exec(truncated)) !== null) {
+        const isClosing = !!match[1];
+        const tagName = match[2].toLowerCase();
+        
+        if (isClosing) {
+            if (stack.length > 0 && stack[stack.length - 1] === tagName) {
+                stack.pop();
+            }
+        } else {
+            stack.push(tagName);
+        }
+    }
+
+    // Close remaining tags in reverse order
+    while (stack.length > 0) {
+        truncated += `</${stack.pop()}>`;
+    }
+
+    return truncated;
+}
+
+/**
  * Sends a media group (gallery) as a reply to a main message.
  * 
  * @param {TelegramBot} bot - Telegram bot instance.

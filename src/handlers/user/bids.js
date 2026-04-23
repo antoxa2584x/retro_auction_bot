@@ -1,7 +1,7 @@
 import { db, q, placeBidTransaction } from '../../services/db.js';
 import { makeKb, confirmBidKb, confirmManualBidKb, makeOutbidKb } from '../../utils/keyboards.js';
 import { scheduleClose, closeAuction } from "../../services/scheduler.js";
-import { getAuctionLink } from '../../utils/utils.js';
+import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from '../../config/env.js';
@@ -70,7 +70,7 @@ export function registerBidHandlers(bot) {
 
                 if (auction.photo_id) {
                     await bot.sendPhoto(chatId, auction.photo_id, {
-                        caption: messageText,
+                        caption: truncateCaption(messageText),
                         parse_mode: 'HTML',
                         reply_markup: replyMarkup
                     });
@@ -225,7 +225,7 @@ export function registerBidHandlers(bot) {
                     
                     try {
                         if (auction.photo_id) {
-                            await bot.editMessageCaption(newText, {
+                            await bot.editMessageCaption(truncateCaption(newText), {
                                 chat_id: target_chat_id,
                                 message_id: target_message_id,
                                 parse_mode: 'HTML',

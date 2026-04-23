@@ -151,7 +151,7 @@ export function registerManageHandlers(bot) {
                 } catch (e) {}
                 
                 const sentMsg = await bot.sendPhoto(chatId, photoIds[0], {
-                    caption: text,
+                    caption: truncateCaption(text),
                     parse_mode: 'HTML',
                     reply_markup: makeAdminPendingViewKb(id)
                 });
@@ -199,7 +199,7 @@ export function registerManageHandlers(bot) {
 
                 if (photoIds.length > 0) {
                     sentMsg = await bot.sendPhoto(channelId, photoIds[0], {
-                        caption: auctionPost,
+                        caption: truncateCaption(auctionPost),
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });
@@ -491,7 +491,7 @@ export function registerManageHandlers(bot) {
                 const kb = makeKb(targetChatId, 0, a.min_bid, 0);
                 if (a.photo_id) {
                     newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
-                        caption: updatedFullText,
+                        caption: truncateCaption(updatedFullText),
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });

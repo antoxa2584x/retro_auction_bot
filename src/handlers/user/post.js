@@ -183,6 +183,10 @@ export async function handleUserPostInput(bot, msg) {
         case 'TITLE':
             if (text) {
                 const sanitizedText = sanitizeHtml(text);
+                if (sanitizedText.length > 1024) {
+                    await bot.sendMessage(chatId, t('admin.error_too_long', { length: sanitizedText.length }), { parse_mode: 'HTML' });
+                    return true;
+                }
                 session.data.full_text = sanitizedText;
                 session.data.title = sanitizedText.split('\n')[0].substring(0, 50);
                 session.step = 'MIN_BID';

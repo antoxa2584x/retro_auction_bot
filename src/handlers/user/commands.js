@@ -1,5 +1,5 @@
 import { q } from '../../services/db.js';
-import { getAuctionLink } from '../../utils/utils.js';
+import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
@@ -27,10 +27,12 @@ function formatMyAuctionCaption(a, userId) {
     const status = a.leader_id === userId ? t('bid.status_leading') : t('bid.status_outbid');
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
 
-    return `🔹 <a href="${link}">${a.title}</a>\n` +
+    const caption = `🔹 <a href="${link}">${a.title}</a>\n` +
            `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
            `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>\n` +
            `Статус: ${status}`;
+    
+    return truncateCaption(caption);
 }
 
 /**
@@ -43,12 +45,14 @@ function formatWonAuctionCaption(a) {
     const link = getAuctionLink(a.chat_id, a.message_id);
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
 
-    return t('bid.won_item', {
+    const caption = t('bid.won_item', {
         link: link,
         title: a.title,
         price: a.current_price,
         date: endDate
     });
+
+    return truncateCaption(caption);
 }
 
 /**
@@ -61,9 +65,11 @@ function formatWatchlistAuctionCaption(a) {
     const link = getAuctionLink(a.chat_id, a.message_id);
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
 
-    return `🔔 <a href="${link}">${a.title}</a>\n` +
+    const caption = `🔔 <a href="${link}">${a.title}</a>\n` +
            `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
            `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>`;
+
+    return truncateCaption(caption);
 }
 
 /**
@@ -116,7 +122,7 @@ export function registerUserCommands(bot) {
 
                 if (row.photo_id) {
                     await bot.sendPhoto(chatId, row.photo_id, {
-                        caption: messageText,
+                        caption: truncateCaption(messageText),
                         parse_mode: 'HTML',
                         reply_markup: replyMarkup
                     });

@@ -1,6 +1,7 @@
 import { q } from '../../services/db.js';
 import { makeAdminBroadcastConfirmKb } from '../../utils/keyboards.js';
 import { t } from '../../services/i18n.js';
+import { truncateCaption } from '../../utils/utils.js';
 
 export const broadcastSessions = new Map();
 
@@ -53,7 +54,7 @@ export function registerBroadcastHandlers(bot) {
                 try {
                     if (session.photo_id) {
                         await bot.sendPhoto(user.user_id, session.photo_id, {
-                            caption: session.text,
+                            caption: truncateCaption(session.text),
                             parse_mode: 'HTML'
                         });
                     } else {
@@ -137,7 +138,7 @@ async function showBroadcastPreview(bot, chatId, userId) {
 
     if (session.photo_id) {
         await bot.sendPhoto(chatId, session.photo_id, {
-            caption: confirmText,
+            caption: truncateCaption(confirmText),
             parse_mode: 'HTML',
             reply_markup: kb
         });
