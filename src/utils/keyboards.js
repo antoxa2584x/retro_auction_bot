@@ -1,5 +1,6 @@
 import {BOT_USERNAME} from '../config/env.js';
 import {t, getCurrency} from '../services/i18n.js';
+import { q } from '../services/db.js';
 
 /**
  * Creates the main auction keyboard for the channel post.
@@ -86,6 +87,8 @@ export function makeUserMenuKb() {
             [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
             [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
             [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}],
+            [{text: t('bid.kb.menu_created'), callback_data: 'menu_created'}],
+            [{text: t('admin.kb.support'), callback_data: 'support_contact'}],
             [{text: t('bid.kb.post_new'), callback_data: 'user_post', style: 'success'}]
         ]
     };
@@ -98,10 +101,14 @@ export function makeUserMenuKb() {
  * @returns {Object} Inline keyboard object.
  */
 export function makeAdminPendingKb(pending) {
-    const buttons = pending.map(p => ([{
-        text: `⏳ ${p.title} (${p.user_id})`,
-        callback_data: `adm_pen_view:${p.id}`
-    }]));
+    const buttons = pending.map(p => {
+        const user = q.getUserFromAnywhere.get(p.user_id, p.user_id, p.user_id, p.user_id);
+        const name = user?.name || p.user_id;
+        return [{
+            text: `⏳ ${p.title} (${name})`,
+            callback_data: `adm_pen_view:${p.id}`
+        }];
+    });
 
     buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
 
@@ -152,6 +159,7 @@ export function makeAdminPanelKb() {
             [{text: t('admin.kb.view_active'), callback_data: 'adm_active'}],
             [{text: t('admin.kb.view_finished'), callback_data: 'adm_finished'}],
             [{text: t('admin.kb.pending_auctions'), callback_data: 'adm_pending'}],
+            [{text: t('admin.kb.support_history'), callback_data: 'adm_support_history'}],
             [{text: t('admin.post_new'), callback_data: 'adm_post', style: 'success'}],
             [{text: t('admin.kb.broadcast'), callback_data: 'adm_broadcast', style: 'primary'}],
             [{text: t('admin.kb.settings'), callback_data: 'adm_settings', style: 'danger'}]
@@ -203,18 +211,67 @@ export function makeAdminActiveKb(auctions, page = 0, totalCount = 0) {
 }
 
 /**
+ * Creates a keyboard for support messages history.
+ * 
+ * @param {Array} messages - List of support messages.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminSupportHistoryKb(messages) {
+    console.log(`[DEBUG] Building history KB for ${messages?.length} messages`);
+    const buttons = (messages || []).map(m => {
+        const date = m.created_at ? new Date(m.created_at).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) : '??.??';
+        const status = m.status === 'open' ? '✉️' : '✅';
+        const truncatedMessage = m.message ? (m.message.length > 20 ? m.message.substring(0, 20) + '...' : m.message) : '...';
+        return [{
+            text: `${status} ${date} | ${m.user_name || 'User'}: ${truncatedMessage}`,
+            callback_data: `adm_support_view:${m.id}`
+        }];
+    });
+
+    buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
+    console.log(`[DEBUG] History KB built with ${buttons.length} rows`);
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates a keyboard for viewing a specific support message.
+ * 
+ * @param {Object} message - Support message object.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminSupportViewKb(message) {
+    const buttons = [];
+    const canReply = message.status === 'open' || !message.admin_reply || String(message.admin_reply).trim() === '';
+    
+    if (canReply) {
+        buttons.push([{ text: t('admin.kb.reply'), callback_data: `support_reply:${message.id}` }]);
+    }
+    buttons.push([{ text: t('admin.kb.prev'), callback_data: 'adm_support_history' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
  * Creates a carousel navigation keyboard for "/my" or "/won" auctions.
  *
  * @param {number} index - Current auction index.
  * @param {number} total - Total number of auctions.
  * @param {string} [prefix='my'] - Prefix for callback data ('my' or 'won').
+ * @param {Object} [auction] - Optional auction object to add more buttons.
  * @returns {Object} Inline keyboard object.
  */
-export function makeMyCarouselKb(index, total, prefix = 'my') {
+export function makeMyCarouselKb(index, total, prefix = 'my', auction = null) {
     const buttons = [];
-    const row = [];
+    
+    if (prefix === 'created' && auction && auction.status === 'finished') {
+        buttons.push([{
+            text: t('bid.kb.request_restart'),
+            callback_data: `request_restart:${auction.chat_id}:${auction.message_id}`,
+            style: 'primary'
+        }]);
+    }
 
     if (total > 1) {
+        const row = [];
         row.push({text: t('admin.kb.prev'), callback_data: `${prefix}_prev:${index}`});
         row.push({text: `${index + 1} / ${total}`, callback_data: 'undefined'});
         row.push({text: t('admin.kb.next'), callback_data: `${prefix}_next:${index}`});
@@ -222,6 +279,114 @@ export function makeMyCarouselKb(index, total, prefix = 'my') {
     }
 
     return {inline_keyboard: buttons};
+}
+
+/**
+ * Creates the duration selection keyboard for user auction post.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserPostDurationKb() {
+    const buttons = [];
+    for (let i = 1; i <= 7; i += 2) {
+        const row = [];
+        row.push({ text: t(`bid.kb.days_${i}`), callback_data: `user_post_dur:${i}` });
+        if (i + 1 <= 7) {
+            row.push({ text: t(`bid.kb.days_${i + 1}`), callback_data: `user_post_dur:${i + 1}` });
+        }
+        buttons.push(row);
+    }
+    buttons.push([{ text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the time selection keyboard for user auction post.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserPostTimeKb() {
+    const buttons = [];
+    for (let h = 9; h <= 21; h += 3) {
+        const row = [];
+        row.push({ text: t('bid.kb.time_h', { h }), callback_data: `user_post_time:${h}` });
+        if (h + 1 <= 21) row.push({ text: t('bid.kb.time_h', { h: h + 1 }), callback_data: `user_post_time:${h + 1}` });
+        if (h + 2 <= 21) row.push({ text: t('bid.kb.time_h', { h: h + 2 }), callback_data: `user_post_time:${h + 2}` });
+        buttons.push(row);
+    }
+    buttons.push([{ text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates a cancel keyboard for user restart.
+ * 
+ * @param {boolean} hasSkip - If it should have a skip button.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserRestartCancelKb(hasSkip = false) {
+    const row = [];
+    if (hasSkip) {
+        row.push({ text: t('admin.kb.skip'), callback_data: 'restart_skip' });
+    }
+    row.push({ text: t('common.cancel'), callback_data: 'restart_cancel', style: 'danger' });
+    return { inline_keyboard: [row] };
+}
+
+/**
+ * Creates the keyboard for selecting restart duration.
+ *
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserRestartDurationKb() {
+    const buttons = [];
+    const row1 = [1, 2, 3, 4].map(d => ({ text: d.toString(), callback_data: `restart_dur:${d}` }));
+    const row2 = [5, 6, 7].map(d => ({ text: d.toString(), callback_data: `restart_dur:${d}` }));
+    buttons.push(row1);
+    buttons.push(row2);
+    buttons.push([{ text: t('common.cancel'), callback_data: 'restart_cancel', style: 'danger' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the keyboard for selecting restart time.
+ *
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeUserRestartTimeKb() {
+    const buttons = [];
+    for (let h = 18; h <= 21; h += 2) {
+        const row = [];
+        row.push({ text: t('bid.kb.time_h', { h }), callback_data: `restart_time:${h}` });
+        if (h + 1 <= 21) row.push({ text: t('bid.kb.time_h', { h: h + 1 }), callback_data: `restart_time:${h + 1}` });
+        buttons.push(row);
+    }
+    buttons.push([{ text: t('common.cancel'), callback_data: 'restart_cancel', style: 'danger' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the admin restart approval keyboard.
+ * 
+ * @param {number} userId - User ID who requested restart.
+ * @param {number} chatId - Auction chat ID.
+ * @param {number} msgId - Auction message ID.
+ * @param {Object} params - New parameters for restart.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminRestartRequestKb(userId, chatId, msgId, params = null) {
+    let approveData = `adm_res_approve:${userId}:${chatId}:${msgId}`;
+    if (params) {
+        approveData += `:${params.min_bid}:${params.step}:${params.duration_days}:${params.hour}`;
+    }
+    return {
+        inline_keyboard: [
+            [
+                { text: t('admin.kb.approve'), callback_data: approveData, style: 'success' },
+                { text: t('admin.kb.reject'), callback_data: `adm_res_reject:${userId}:${chatId}:${msgId}`, style: 'danger' }
+            ]
+        ]
+    };
 }
 
 /**

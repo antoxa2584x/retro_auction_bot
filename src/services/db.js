@@ -91,6 +91,18 @@ db.exec(`
         status TEXT DEFAULT 'pending', -- pending, approved, rejected
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS support_messages
+    (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        user_name TEXT,
+        message TEXT,
+        admin_reply TEXT,
+        status TEXT DEFAULT 'open', -- open, closed
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        replied_at DATETIME
+    );
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -103,7 +115,8 @@ const migrations = [
     { name: 'participants_count', type: 'INTEGER DEFAULT 0' },
     { name: 'admin_contact', type: 'TEXT' },
     { name: 'is_continuous', type: 'INTEGER DEFAULT 0' },
-    { name: 'continuous_minutes', type: 'INTEGER DEFAULT 5' }
+    { name: 'continuous_minutes', type: 'INTEGER DEFAULT 5' },
+    { name: 'creator_id', type: 'INTEGER' }
 ];
 
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
@@ -185,8 +198,8 @@ export const q = {
    */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes)
+      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes, creator_id)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes, @creator_id)
   `),
 
   /**
@@ -319,6 +332,17 @@ export const q = {
       JOIN notifications n ON a.chat_id=n.chat_id AND a.message_id=n.message_id
      WHERE n.user_id=? AND a.status='active'
      ORDER BY a.message_id DESC
+  `),
+
+  /**
+   * Retrieves auctions created by a specific user.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getCreatedAuctions: db.prepare(`
+    SELECT *
+      FROM auctions
+     WHERE creator_id=?
+     ORDER BY CASE WHEN status='active' THEN 0 ELSE 1 END, message_id DESC
   `),
 
   // Admin related
@@ -540,6 +564,19 @@ export const q = {
     FROM notifications n
     JOIN auctions a ON n.chat_id = a.chat_id AND n.message_id = a.message_id
     WHERE a.status = 'active'
+  `),
+
+  // Support messages
+  insertSupportMessage: db.prepare(`
+    INSERT INTO support_messages (user_id, user_name, message)
+    VALUES (?, ?, ?)
+  `),
+  getSupportMessage: db.prepare(`SELECT * FROM support_messages WHERE id = ?`),
+  getAllSupportMessages: db.prepare(`SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 50`),
+  updateSupportReply: db.prepare(`
+    UPDATE support_messages 
+    SET admin_reply = ?, status = 'closed', replied_at = CURRENT_TIMESTAMP 
+    WHERE id = ?
   `)
 };
 

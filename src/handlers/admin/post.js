@@ -374,6 +374,10 @@ export async function handlePostInput(bot, msg) {
 
         case 'MIN_BID':
             if (text) {
+                if (text.includes('.') || text.includes(',')) {
+                    await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
                 const val = parseInt(text);
                 if (isNaN(val) || val < 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
@@ -395,6 +399,10 @@ export async function handlePostInput(bot, msg) {
 
         case 'STEP':
             if (text) {
+                if (text.includes('.') || text.includes(',')) {
+                    await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
                 const val = parseInt(text);
                 if (isNaN(val) || val <= 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });

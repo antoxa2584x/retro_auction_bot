@@ -30,15 +30,27 @@ export function getAuctionLink(chatId, messageId) {
  * @returns {string} HTML-formatted link.
  */
 export function formatUserLink(userId, name, username) {
-    const displayName = escapeHtml(name || (username ? `@${username}` : `ID ${userId}`));
-    if (username) {
-        return `<a href="https://t.me/${username}">${displayName}</a>`;
+    if (name) {
+        return `<a href="tg://user?id=${userId}">${escapeHtml(String(name))}</a>`;
     }
-    // tg://user?id= link can fail if the user has privacy restrictions.
-    // However, in HTML messages, Telegram usually just hides the link or 
-    // makes it unclickable rather than failing the whole message send.
-    // The BUTTON_USER_PRIVACY_RESTRICTED error is specific to inline buttons.
-    return `<a href="tg://user?id=${userId}">${displayName}</a>`;
+    if (username) {
+        const cleanNick = String(username).replace('@', '');
+        return `<a href="https://t.me/${cleanNick}">@${escapeHtml(cleanNick)}</a>`;
+    }
+    return `<a href="tg://user?id=${userId}">ID ${userId}</a>`;
+}
+
+/**
+ * Formats a user link by looking up the user in the database.
+ * 
+ * @param {number} userId - Telegram user ID.
+ * @returns {string} HTML-formatted link.
+ */
+export function formatUserLinkById(userId) {
+    if (!userId) return t('admin.not_set');
+    const user = q.getUserFromAnywhere.get(userId, userId, userId, userId);
+    const displayName = user?.name || `ID ${userId}`;
+    return `<a href="tg://user?id=${userId}">${escapeHtml(String(displayName))}</a>`;
 }
 
 /**
@@ -50,19 +62,16 @@ export function formatUserLink(userId, name, username) {
 export function formatContactLink(nickname) {
     if (!nickname) return t('admin.not_set');
 
-    if (nickname.startsWith('tg://')) {
-        const idMatch = nickname.match(/id=(\d+)/);
+    if (String(nickname).startsWith('tg://')) {
+        const idMatch = String(nickname).match(/id=(\d+)/);
         if (idMatch) {
-            const userId = Number(idMatch[1]);
-            const user = q.getUserFromAnywhere.get(userId, userId, userId, userId);
-            const name = user?.name || `ID ${userId}`;
-            return `<a href="${nickname}">${escapeHtml(name)}</a>`;
+            return formatUserLinkById(Number(idMatch[1]));
         }
-        return `<a href="${nickname}">${escapeHtml(nickname)}</a>`;
+        return `<a href="${nickname}">${escapeHtml(String(nickname))}</a>`;
     }
 
-    const cleanNick = nickname.replace('@', '');
-    return `<a href="https://t.me/${cleanNick}">${escapeHtml(nickname)}</a>`;
+    const cleanNick = String(nickname).replace('@', '');
+    return `<a href="https://t.me/${cleanNick}">@${escapeHtml(cleanNick)}</a>`;
 }
 
 /**

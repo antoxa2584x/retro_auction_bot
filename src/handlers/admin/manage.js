@@ -14,8 +14,18 @@ import {
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction } from '../../services/scheduler.js';
-import { getAuctionLink, formatUserLink, formatContactLink, buildAuctionText, sendAuctionGallery, safeEditMessage, truncateCaption } from '../../utils/utils.js';
+import { 
+    getAuctionLink, 
+    formatUserLink, 
+    formatUserLinkById,
+    formatContactLink, 
+    buildAuctionText, 
+    sendAuctionGallery, 
+    safeEditMessage, 
+    truncateCaption 
+} from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
+import { reconstructAuctionText } from '../../utils/parse.js';
 
 function isAdmin(userId) {
     const admin = q.getAdmin.get(userId);
@@ -52,6 +62,114 @@ export function registerManageHandlers(bot) {
         const { data, message, from } = query;
         const chatId = message.chat.id;
         const messageId = message.message_id;
+
+        if (data.startsWith('adm_res_approve:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            
+            const parts = data.split(':');
+            const targetUserId = Number(parts[1]);
+            const targetChatId = Number(parts[2]);
+            const targetMsgId = Number(parts[3]);
+
+            const a = q.getAuction.get(targetChatId, targetMsgId);
+            if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+
+            await bot.answerCallbackQuery(query.id).catch(() => {});
+
+            let minBid = a.min_bid;
+            let step = a.step;
+            let durationDays = 4;
+            let endHour = new Date(a.end_at).getHours();
+
+            if (parts.length >= 8) {
+                minBid = Number(parts[4]);
+                step = Number(parts[5]);
+                durationDays = Number(parts[6]);
+                endHour = Number(parts[7]);
+            }
+
+            const newEnd = new Date();
+            newEnd.setDate(newEnd.getDate() + durationDays);
+            newEnd.setHours(endHour, 0, 0, 0);
+
+            const updatedFullText = reconstructAuctionText(a.full_text, {
+                min_bid: minBid,
+                step: step,
+                end_at: newEnd.toISOString(),
+                is_continuous: a.is_continuous,
+                continuous_minutes: a.continuous_minutes
+            });
+
+            let newMsg;
+            const kb = makeKb(targetChatId, 0, minBid, 0);
+            if (a.photo_id) {
+                newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
+                    caption: truncateCaption(updatedFullText),
+                    parse_mode: 'HTML',
+                    reply_markup: kb
+                });
+            } else {
+                newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
+                    parse_mode: 'HTML',
+                    reply_markup: kb
+                });
+            }
+
+            const finalKb = makeKb(targetChatId, newMsg.message_id, minBid, 0);
+            await bot.editMessageReplyMarkup(finalKb, {
+                chat_id: targetChatId,
+                message_id: newMsg.message_id
+            }).catch(() => {});
+
+            q.insertAuction.run({
+                chat_id: targetChatId,
+                message_id: newMsg.message_id,
+                title: a.title,
+                full_text: updatedFullText,
+                photo_id: a.photo_id,
+                min_bid: minBid,
+                step: step,
+                current_price: minBid,
+                admin_contact: a.admin_contact,
+                end_at: newEnd.toISOString(),
+                is_continuous: a.is_continuous,
+                continuous_minutes: a.continuous_minutes,
+                creator_id: a.creator_id
+            });
+
+            scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
+
+            const successDate = formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm');
+            await bot.editMessageText(t('admin.post_restart_approved', { title: a.title, date: successDate }), {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'HTML'
+            }).catch(() => {});
+
+            await bot.sendMessage(targetUserId, t('admin.post_restart_approved', { title: a.title, date: successDate }), { parse_mode: 'HTML' }).catch(() => {});
+        }
+
+        if (data.startsWith('adm_res_reject:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            
+            const [, userIdParam, targetChatIdParam, targetMsgIdParam] = data.split(':');
+            const targetUserId = Number(userIdParam);
+            const targetChatId = Number(targetChatIdParam);
+            const targetMsgId = Number(targetMsgIdParam);
+
+            const a = q.getAuction.get(targetChatId, targetMsgId);
+            const title = a?.title || '';
+            
+            await bot.answerCallbackQuery(query.id).catch(() => {});
+
+            await bot.editMessageText(t('admin.post_restart_rejected', { title }), {
+                chat_id: chatId,
+                message_id: messageId,
+                parse_mode: 'HTML'
+            }).catch(() => {});
+
+            await bot.sendMessage(targetUserId, t('admin.post_restart_rejected', { title }), { parse_mode: 'HTML' }).catch(() => {});
+        }
 
         if (data === 'adm_list') {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
@@ -136,7 +254,7 @@ export function registerManageHandlers(bot) {
             const p = q.getPendingAuction.get(id);
             if (!p) return bot.sendMessage(chatId, "Not found.");
 
-            const userContact = formatContactLink(p.user_id ? `tg://user?id=${p.user_id}` : null);
+            const userContact = formatUserLinkById(p.user_id);
             const headerText = t('admin.pending_auction_view_header', { contact: userContact });
 
             const text = headerText + '\n\n' + buildAuctionText(p, true, false);
@@ -234,7 +352,8 @@ export function registerManageHandlers(bot) {
                     admin_contact: p.user_id ? `tg://user?id=${p.user_id}` : getContactNickname(),
                     end_at: new Date(p.end_at).toISOString(),
                     is_continuous: p.is_continuous,
-                    continuous_minutes: p.continuous_minutes
+                    continuous_minutes: p.continuous_minutes,
+                    creator_id: p.user_id
                 });
 
                 scheduleClose(bot, channelId, sentMsg.message_id, new Date(p.end_at));
@@ -533,7 +652,8 @@ export function registerManageHandlers(bot) {
                 admin_contact: a.admin_contact,
                 end_at: newEnd.toISOString(),
                 is_continuous: a.is_continuous,
-                continuous_minutes: a.continuous_minutes
+                continuous_minutes: a.continuous_minutes,
+                creator_id: a.creator_id
             });
 
             scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);

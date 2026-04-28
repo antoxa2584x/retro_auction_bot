@@ -4,13 +4,15 @@ import {
     makeAdminPostContinuousKb,
     makeUserPostStepKb,
     makeUserPostContinuousKb,
-    makeUserPostConfirmKb
+    makeUserPostConfirmKb,
+    makeUserPostDurationKb,
+    makeUserPostTimeKb
 } from '../../utils/keyboards.js';
 import { TZ } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, getDefaultEndDate, sanitizeHtml, truncateCaption } from '../../utils/utils.js';
+import { buildAuctionText, getDefaultEndDate, sanitizeHtml, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
 
 /** @type {Map<number, {step: string, data: any}>} */
 const userSessions = new Map();
@@ -38,6 +40,27 @@ export function registerUserPostHandlers(bot) {
             });
         }
 
+        if (data.startsWith('user_post_dur:')) {
+            await bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = userSessions.get(from.id);
+            if (!session || session.step !== 'DURATION') return;
+
+            session.data.duration_days = parseInt(data.split(':')[1]);
+            await goToTimeStep(bot, chatId, session);
+        }
+
+        if (data.startsWith('user_post_time:')) {
+            await bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = userSessions.get(from.id);
+            if (!session || session.step !== 'TIME') return;
+
+            const hour = parseInt(data.split(':')[1]);
+            const endAt = addDays(new Date(), session.data.duration_days);
+            session.data.end_at = set(endAt, { hours: hour, minutes: 0, seconds: 0, milliseconds: 0 });
+            
+            await goToContinuousStep(bot, chatId, session);
+        }
+
         if (data === 'user_post_skip' || data === 'user_post_continue') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
             const session = userSessions.get(from.id);
@@ -52,9 +75,6 @@ export function registerUserPostHandlers(bot) {
                     parse_mode: 'HTML',
                     reply_markup: makeAdminPostCancelKb(false, true)
                 });
-            } else if (session.step === 'DATE') {
-                session.data.end_at = session.data.default_date;
-                await goToContinuousStep(bot, chatId, session);
             }
         }
 
@@ -90,7 +110,7 @@ export function registerUserPostHandlers(bot) {
                 });
             } else {
                 session.data.step = parseInt(val);
-                await goToDateStep(bot, chatId, session);
+                await goToDurationStep(bot, chatId, session);
             }
         }
 
@@ -115,8 +135,9 @@ export function registerUserPostHandlers(bot) {
 
             // Notify admins
             const admins = q.getAdmins.all();
+            const userLink = formatUserLinkById(from.id);
             const notificationText = t('admin.kb.admin_new_pending')
-                .replace('%user%', from.username ? `@${from.username}` : from.id)
+                .replace('%user%', userLink)
                 .replace('%title%', sessionData.title);
 
             for (const admin of admins) {
@@ -200,6 +221,10 @@ export async function handleUserPostInput(bot, msg) {
 
         case 'MIN_BID':
             if (text) {
+                if (text.includes('.') || text.includes(',')) {
+                    await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
                 const val = parseInt(text);
                 if (isNaN(val) || val < 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
@@ -221,6 +246,10 @@ export async function handleUserPostInput(bot, msg) {
 
         case 'STEP':
             if (text) {
+                if (text.includes('.') || text.includes(',')) {
+                    await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
+                    return true;
+                }
                 const val = parseInt(text);
                 if (isNaN(val) || val <= 0) {
                     await bot.sendMessage(chatId, t('admin.invalid_number'), { parse_mode: 'HTML' });
@@ -231,38 +260,27 @@ export async function handleUserPostInput(bot, msg) {
                     return true;
                 }
                 session.data.step = val;
-                await goToDateStep(bot, chatId, session);
+                await goToDurationStep(bot, chatId, session);
                 return true;
-            }
-            break;
-
-        case 'DATE':
-            if (text) {
-                const parsedDate = parse(text, 'dd.MM.yyyy HH:mm', new Date());
-                if (!isNaN(parsedDate.getTime())) {
-                    session.data.end_at = parsedDate;
-                    await goToContinuousStep(bot, chatId, session);
-                    return true;
-                } else {
-                    await bot.sendMessage(chatId, t('admin.invalid_date'), { parse_mode: 'HTML' });
-                    return true;
-                }
             }
             break;
     }
     return false;
 }
 
-async function goToDateStep(bot, chatId, session) {
-    session.step = 'DATE';
-    
-    const defaultDate = getDefaultEndDate();
-    session.data.default_date = defaultDate;
-
-    const formattedDefault = formatInTimeZone(defaultDate, TZ, 'dd.MM.yyyy HH:mm');
-    await bot.sendMessage(chatId, t('admin.post_step_end', { default: formattedDefault }), {
+async function goToDurationStep(bot, chatId, session) {
+    session.step = 'DURATION';
+    await bot.sendMessage(chatId, t('admin.post_step_end'), {
         parse_mode: 'HTML',
-        reply_markup: makeAdminPostCancelKb(true, true)
+        reply_markup: makeUserPostDurationKb()
+    });
+}
+
+async function goToTimeStep(bot, chatId, session) {
+    session.step = 'TIME';
+    await bot.sendMessage(chatId, t('admin.post_step_time'), {
+        parse_mode: 'HTML',
+        reply_markup: makeUserPostTimeKb()
     });
 }
 

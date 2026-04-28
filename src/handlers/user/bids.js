@@ -40,9 +40,14 @@ export function registerBidHandlers(bot) {
             });
 
             bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
-                const amountText = replyMsg.text.replace(/[^0-9.]/g, '');
+                const text = replyMsg.text.trim();
+                const amountText = text.replace(/[^0-9]/g, '');
                 const amount = Number(amountText);
                 const cur = getCurrency();
+
+                if (text.includes('.') || text.includes(',')) {
+                    return bot.sendMessage(chatId, t('bid.error_invalid_amount'));
+                }
 
                 if (isNaN(amount) || amount <= 0 || amountText === '') {
                     return bot.sendMessage(chatId, t('bid.error_invalid_amount'));

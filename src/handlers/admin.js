@@ -4,6 +4,7 @@ import { registerSettingsHandlers, handleSettingsInput, userSessions } from './a
 import { registerManageHandlers, sendAdminPanel } from './admin/manage.js';
 import { registerPostHandlers, handlePostInput } from './admin/post.js';
 import { registerBroadcastHandlers, handleBroadcastInput } from './admin/broadcast.js';
+import { registerAdminSupportHandlers, handleAdminSupportInput } from './admin/support.js';
 import { t } from '../services/i18n.js';
 
 export function registerAdminHandlers(bot) {
@@ -12,6 +13,7 @@ export function registerAdminHandlers(bot) {
     registerManageHandlers(bot);
     registerPostHandlers(bot);
     registerBroadcastHandlers(bot);
+    registerAdminSupportHandlers(bot);
 
     // Handle messages (text and photo)
     bot.on('message', async (msg) => {
@@ -42,6 +44,12 @@ export function registerAdminHandlers(bot) {
         // Broadcast input handling
         const broadcastHandled = await handleBroadcastInput(bot, msg);
         if (broadcastHandled) {
+            return;
+        }
+
+        // Support input handling
+        const supportHandled = await handleAdminSupportInput(bot, msg);
+        if (supportHandled) {
             return;
         }
 
