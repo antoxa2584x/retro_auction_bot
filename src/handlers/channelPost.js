@@ -45,6 +45,9 @@ export function registerChannelPostHandler(bot) {
             }
         }
 
+        const isContinuous = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5') > 0 ? 1 : 0;
+        const continuousMinutes = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
+
         q.insertAuction.run({
             chat_id: post.chat.id,
             message_id: post.message_id,
@@ -55,7 +58,10 @@ export function registerChannelPostHandler(bot) {
             step,
             current_price: minBid,
             admin_contact: getContactNickname(),
-            end_at: end.toISOString()
+            end_at: end.toISOString(),
+            is_continuous: isContinuous,
+            continuous_minutes: continuousMinutes,
+            creator_id: null
         });
 
         const finalKb = makeKb(post.chat.id, post.message_id, minBid, 0);

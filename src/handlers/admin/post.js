@@ -6,7 +6,8 @@ import {
     makeAdminPostContactKb, 
     makeAdminPostAIGenKb, 
     makeAdminPostAIConfirmKb,
-    makeAdminPostContinuousKb
+    makeAdminPostContinuousKb,
+    makeAdminPostDurationKb
 } from '../../utils/keyboards.js';
 import { TZ, getChannelId, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -203,6 +204,22 @@ export function registerPostHandlers(bot) {
             }
         }
 
+        if (data.startsWith('post_dur:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = postSessions.get(from.id);
+            if (!session || session.step !== 'DATE') return;
+
+            const days = parseInt(data.split(':')[1]);
+            const defTime = q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00';
+            let date = addDays(new Date(), days);
+            const [hours, minutes] = defTime.split(':').map(Number);
+            date = set(date, { hours, minutes, seconds: 0, milliseconds: 0 });
+
+            session.data.end_at = date;
+            await goToContinuousStep(bot, chatId, session);
+        }
+
         if (data.startsWith('post_cont:')) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
@@ -280,7 +297,8 @@ export function registerPostHandlers(bot) {
                     admin_contact: sessionData.admin_contact || getContactNickname(),
                     end_at: sessionData.end_at.toISOString(),
                     is_continuous: sessionData.is_continuous || 0,
-                    continuous_minutes: sessionData.continuous_minutes || 5
+                    continuous_minutes: sessionData.continuous_minutes || 5,
+                    creator_id: from.id
                 });
 
                 scheduleClose(bot, channelId, sentMsg.message_id, sessionData.end_at);
@@ -421,12 +439,21 @@ export async function handlePostInput(bot, msg) {
         case 'DATE':
             if (text) {
                 let date;
-                try {
-                    date = parse(text, 'dd.MM.yyyy HH:mm', new Date());
-                    if (isNaN(date.getTime())) throw new Error();
-                } catch (e) {
-                    await bot.sendMessage(chatId, t('admin.invalid_date'), { parse_mode: 'HTML' });
-                    return true;
+                // Check if it's a number (days)
+                if (/^\d+$/.test(text)) {
+                    const days = parseInt(text);
+                    const defTime = q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00';
+                    date = addDays(new Date(), days);
+                    const [hours, minutes] = defTime.split(':').map(Number);
+                    date = set(date, { hours, minutes, seconds: 0, milliseconds: 0 });
+                } else {
+                    try {
+                        date = parse(text, 'dd.MM.yyyy HH:mm', new Date());
+                        if (isNaN(date.getTime())) throw new Error();
+                    } catch (e) {
+                        await bot.sendMessage(chatId, t('admin.invalid_date'), { parse_mode: 'HTML' });
+                        return true;
+                    }
                 }
                 session.data.end_at = date;
                 await goToContinuousStep(bot, chatId, session);
@@ -482,7 +509,7 @@ async function goToDateStep(bot, chatId, session) {
 
     await bot.sendMessage(chatId, t('admin.post_step_end', { default: formattedDef }), {
         parse_mode: 'HTML',
-        reply_markup: makeAdminPostCancelKb(true) // Reuse skip for default
+        reply_markup: makeAdminPostDurationKb()
     });
 }
 

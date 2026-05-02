@@ -557,6 +557,22 @@ export function makeUserPostConfirmKb() {
 }
 
 /**
+ * Creates the duration selection keyboard for admin auction post.
+ * 
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminPostDurationKb() {
+    const buttons = [];
+    const row1 = [1, 2, 3, 4].map(d => ({ text: d.toString(), callback_data: `post_dur:${d}` }));
+    const row2 = [5, 6, 7, 10, 14].map(d => ({ text: d.toString(), callback_data: `post_dur:${d}` }));
+    buttons.push(row1);
+    buttons.push(row2);
+    buttons.push([{ text: t('admin.kb.skip'), callback_data: 'post_skip', style: 'primary' }]);
+    buttons.push([{ text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger' }]);
+    return { inline_keyboard: buttons };
+}
+
+/**
  * Creates a simple cancel keyboard for auction posting.
  *
  * @param {boolean} [includeSkip=false] - Whether to include a skip button.
