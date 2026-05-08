@@ -1,4 +1,4 @@
-import {BOT_USERNAME} from '../config/env.js';
+import {BOT_USERNAME, isUserPostEnabled} from '../config/env.js';
 import {t, getCurrency} from '../services/i18n.js';
 import { q } from '../services/db.js';
 
@@ -82,15 +82,20 @@ export function makeNotifyKb(chatId, messageId, alreadySet = false) {
  * @returns {Object} Inline keyboard object.
  */
 export function makeUserMenuKb() {
+    const buttons = [
+        [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
+        [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
+        [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}],
+        [{text: t('bid.kb.menu_created'), callback_data: 'menu_created'}],
+        [{text: t('admin.kb.support'), callback_data: 'support_contact'}]
+    ];
+
+    if (isUserPostEnabled()) {
+        buttons.push([{text: t('bid.kb.post_new'), callback_data: 'user_post', style: 'success'}]);
+    }
+
     return {
-        inline_keyboard: [
-            [{text: t('bid.kb.menu_won'), callback_data: 'menu_won'}],
-            [{text: t('bid.kb.menu_my'), callback_data: 'menu_my'}],
-            [{text: t('bid.kb.menu_watchlist'), callback_data: 'menu_watchlist'}],
-            [{text: t('bid.kb.menu_created'), callback_data: 'menu_created'}],
-            [{text: t('admin.kb.support'), callback_data: 'support_contact'}],
-            [{text: t('bid.kb.post_new'), callback_data: 'user_post', style: 'success'}]
-        ]
+        inline_keyboard: buttons
     };
 }
 
@@ -456,6 +461,8 @@ export function makeAdminSettingsDefaultsKb() {
             [{text: `📅 ${t('admin.def_days')}`, callback_data: 'set_conf:DEFAULT_END_DAYS'}],
             [{text: `🕒 ${t('admin.def_time')}`, callback_data: 'set_conf:DEFAULT_END_TIME'}],
             [{text: `⏳ ${t('admin.def_continuous')}`, callback_data: 'set_conf:CONTINUOUS_MINUTES'}],
+            [{text: `👤 ${t('admin.def_max_user_auctions')}`, callback_data: 'set_conf:MAX_USER_AUCTIONS'}],
+            [{text: `📝 ${t('admin.def_user_post_enabled')}`, callback_data: 'set_conf:USER_POST_ENABLED'}],
             [{text: t('common.back'), callback_data: 'adm_settings', style: 'primary'}]
         ]
     };

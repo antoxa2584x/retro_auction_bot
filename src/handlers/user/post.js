@@ -8,7 +8,7 @@ import {
     makeUserPostDurationKb,
     makeUserPostTimeKb
 } from '../../utils/keyboards.js';
-import { TZ } from "../../config/env.js";
+import { TZ, getMaxUserAuctions, isUserPostEnabled } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { parse, addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
@@ -26,9 +26,19 @@ export function registerUserPostHandlers(bot) {
         if (data === 'user_post') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
             
+            if (!isUserPostEnabled()) {
+                return bot.sendMessage(chatId, t('admin.user_post_disabled'), {
+                    parse_mode: 'HTML'
+                });
+            }
+
             const pendingCount = q.countPendingAuctionsByUser.get(from.id).count;
-            if (pendingCount >= 3) {
-                return bot.sendMessage(chatId, t('admin.user_post_too_many'), {
+            const activeCount = q.countActiveAuctionsByUser.get(from.id).count;
+            const totalCount = pendingCount + activeCount;
+
+            const maxAuctions = getMaxUserAuctions();
+            if (totalCount >= maxAuctions) {
+                return bot.sendMessage(chatId, t('admin.user_post_too_many', { count: maxAuctions }), {
                     parse_mode: 'HTML'
                 });
             }

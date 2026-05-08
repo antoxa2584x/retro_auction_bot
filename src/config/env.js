@@ -30,6 +30,16 @@ export const CHANNEL_ID = getChannelId();
 export const CONTACT_NICKNAME = getContactNickname();
 export const OPENAI_API_KEY = getSetting('OPENAI_API_KEY', null);
 
+export const getMaxUserAuctions = () => {
+    const val = getSetting('MAX_USER_AUCTIONS', '3');
+    return parseInt(val);
+};
+
+export const isUserPostEnabled = () => {
+    const val = getSetting('USER_POST_ENABLED', 'true');
+    return val === 'true';
+};
+
 if (!BOT_TOKEN) {
     console.error('Please set BOT_TOKEN in .env');
     process.exit(1);

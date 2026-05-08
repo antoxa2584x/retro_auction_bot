@@ -168,6 +168,15 @@ export function registerSettingsHandlers(bot) {
             }
 
             const key = setConfMatch[1];
+
+            if (key === 'USER_POST_ENABLED') {
+                const currentVal = q.getSetting.get('USER_POST_ENABLED')?.value || 'true';
+                const newVal = currentVal === 'true' ? 'false' : 'true';
+                q.setSetting.run('USER_POST_ENABLED', newVal);
+                await sendSettingsDefaultsPanel(bot, chatId, from.id, true, messageId);
+                return;
+            }
+
             userSessions.set(from.id, key);
 
             await bot.sendMessage(chatId, t('admin.enter_new_value', { key }), { 
@@ -219,6 +228,14 @@ export async function handleSettingsInput(bot, msg, text) {
         let finalValue = text;
         if (['AUCTION_HEADER', 'AUCTION_FOOTER', 'AUCTION_MIN_BID_TEXT', 'AUCTION_BID_STEP_TEXT', 'AUCTION_END_DATE_TEXT'].includes(settingKey)) {
             finalValue = sanitizeHtml(text);
+        }
+
+        if (settingKey === 'MAX_USER_AUCTIONS') {
+            const val = parseInt(text);
+            if (isNaN(val) || val < 0) {
+                throw new Error(t('admin.invalid_number'));
+            }
+            finalValue = val.toString();
         }
 
         if (settingKey === 'CURRENCY') {
@@ -328,7 +345,9 @@ export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = fa
     const text = t('admin.panel_settings_defaults') + '\n\n' +
         t('admin.panel_settings_defaults_days', { value: q.getSetting.get('DEFAULT_END_DAYS')?.value || '5' }) + '\n' +
         t('admin.panel_settings_defaults_time', { value: q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00' }) + '\n' +
-        t('admin.panel_settings_defaults_continuous', { value: q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5' }) + '\n\n' +
+        t('admin.panel_settings_defaults_continuous', { value: q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5' }) + '\n' +
+        t('admin.panel_settings_defaults_max_user_auctions', { value: q.getSetting.get('MAX_USER_AUCTIONS')?.value || '3' }) + '\n' +
+        t('admin.panel_settings_defaults_user_post_enabled', { value: q.getSetting.get('USER_POST_ENABLED')?.value || 'true' }) + '\n\n' +
         t('admin.click_below_to_change');
 
     const kb = makeAdminSettingsDefaultsKb();

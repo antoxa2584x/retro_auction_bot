@@ -430,6 +430,7 @@ export const q = {
    * Counts all active auctions.
    */
   countActiveAuctions: db.prepare(`SELECT COUNT(*) as count FROM auctions WHERE status='active'`),
+  countActiveAuctionsByUser: db.prepare(`SELECT COUNT(*) as count FROM auctions WHERE creator_id = ? AND status = 'active'`),
 
   /**
    * Retrieves recently finished auctions for the admin panel.

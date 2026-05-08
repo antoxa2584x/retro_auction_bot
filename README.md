@@ -15,7 +15,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
 * **Auction Subscriptions & Custom Notifications** — users can subscribe to any auction and set personalized reminders (1h, 2h, 3h, 6h, or 12h before closing) to never miss a deadline.
 * **Automatic End-of-Auction Reminders** — the bot automatically sends a 30-minute warning to all active participants before an auction closes.
-* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel.
+* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel. Features configurable **per-user active auction limits** and a **global toggle** to enable/disable user submissions.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
 * **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
 * **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated or subscribed.
@@ -83,7 +83,7 @@ To access the admin panel:
 * **⚙️ Structured Settings**:
     * **Main Settings**: Manage `Channel ID`, `Contact Nickname`, `OpenAI API Key`, `Language`, `Currency`, `Timezone`, and **Continuous Minutes** (the default duration for extensions, e.g., 5 minutes).
     * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
-    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions.
+    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions. Also configure **Max Active Auctions per User** (limit combined active and pending submissions) and the **User Auctions Posting** toggle (globally enable or disable user submissions).
 * **👥 Admin Management**: Add or remove other administrators by their Telegram User ID.
 * **📢 Broadcast**: Send a message to all users who have ever interacted with the bot.
 
