@@ -5,6 +5,7 @@ import {
     makeUserPostStepKb,
     makeUserPostContinuousKb,
     makeUserPostConfirmKb,
+    makeUserRulesKb,
     makeUserPostDurationKb,
     makeUserPostTimeKb
 } from '../../utils/keyboards.js';
@@ -43,6 +44,24 @@ export function registerUserPostHandlers(bot) {
                 });
             }
 
+            const rulesLink = q.getSetting.get('RULES_LINK')?.value;
+            if (rulesLink) {
+                await bot.sendMessage(chatId, t('user.rules_title') + '\n\n' + t('user.rules_text'), {
+                    parse_mode: 'HTML',
+                    reply_markup: makeUserRulesKb(rulesLink)
+                });
+                return;
+            }
+
+            userSessions.set(from.id, { step: 'IMAGE', data: { user_id: from.id } });
+            await bot.sendMessage(chatId, t('admin.post_step_img'), {
+                parse_mode: 'HTML',
+                reply_markup: makeAdminPostCancelKb(false, true)
+            });
+        }
+
+        if (data === 'user_rules_confirm') {
+            await bot.answerCallbackQuery(query.id).catch(() => {});
             userSessions.set(from.id, { step: 'IMAGE', data: { user_id: from.id } });
             await bot.sendMessage(chatId, t('admin.post_step_img'), {
                 parse_mode: 'HTML',

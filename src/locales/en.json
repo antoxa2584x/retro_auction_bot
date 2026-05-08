@@ -65,6 +65,7 @@
     "panel_settings_defaults_time": "🕒 <b>Default End Time:</b> <code>{{value}}</code>",
     "panel_settings_defaults_continuous": "⏳ <b>Continuous Extension (min):</b> <code>{{value}}</code>",
     "panel_settings_defaults_max_user_auctions": "👤 <b>Max Active Auctions per User:</b> <code>{{value}}</code>",
+    "panel_settings_defaults_rules_link": "📜 <b>Rules Link:</b> <code>{{value}}</code>",
     "panel_settings_defaults_user_post_enabled": "📝 <b>User Auctions Posting:</b> <code>{{value}}</code>",
     "panel_admins": "<b>👥 Admin Management</b>",
     "settings_main": "⚙️ Main",
@@ -81,6 +82,7 @@
     "def_time": "Default End Time",
     "def_continuous": "Continuous extension (min)",
     "def_max_user_auctions": "Max Active Auctions per User",
+    "def_rules_link": "Rules Link",
     "def_user_post_enabled": "User Auctions Enabled",
     "continuous_auction": "Continue auction?",
     "continuous_yes": "✅ Yes (+{{min}}m)",
@@ -193,6 +195,12 @@
     "message_view": "👤 <b>User:</b> <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (<code>{{user_id}}</code>)\n📅 <b>Date:</b> {{date}}\n💬 <b>Message:</b>\n{{message}}\n\n✅ <b>Reply:</b>\n{{reply}}",
     "no_reply": "<i>no reply yet</i>",
     "empty": "No support messages yet."
+  },
+  "user": {
+    "rules_title": "📜 <b>Rules Confirmation</b>",
+    "rules_text": "Before you create an auction, please make sure you are familiar with the rules.",
+    "rules_link_button": "View Rules",
+    "rules_confirm_button": "I Agree with Rules"
   },
   "bid": {
     "not_found": "Auction not found",

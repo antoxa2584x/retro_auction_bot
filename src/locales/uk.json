@@ -65,6 +65,7 @@
     "panel_settings_defaults_time": "🕒 <b>Час завершення:</b> <code>{{value}}</code>",
     "panel_settings_defaults_continuous": "⏳ <b>Продовження (хв):</b> <code>{{value}}</code>",
     "panel_settings_defaults_max_user_auctions": "👤 <b>Макс. активних аукціонів у користувача:</b> <code>{{value}}</code>",
+    "panel_settings_defaults_rules_link": "📜 <b>Посилання на правила:</b> <code>{{value}}</code>",
     "panel_settings_defaults_user_post_enabled": "📝 <b>Публікація аукціонів користувачами:</b> <code>{{value}}</code>",
     "panel_admins": "<b>👥 Керування адміністраторами</b>",
     "settings_main": "⚙️ Основні",
@@ -81,6 +82,7 @@
     "def_time": "Час завершення (за замовч.)",
     "def_continuous": "Продовження аукціону (хв)",
     "def_max_user_auctions": "Макс. аукціонів у користувача",
+    "def_rules_link": "Посилання на правила",
     "def_user_post_enabled": "Аукціони від користувачів",
     "continuous_auction": "Продовжувати аукціон?",
     "continuous_yes": "✅ Так (+{{min}}хв)",
@@ -201,6 +203,12 @@
     "message_view": "👤 <b>Користувач:</b> <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (<code>{{user_id}}</code>)\n📅 <b>Дата:</b> {{date}}\n💬 <b>Повідомлення:</b>\n{{message}}\n\n✅ <b>Відповідь:</b>\n{{reply}}",
     "no_reply": "<i>немає відповіді</i>",
     "empty": "Звернень ще не було."
+  },
+  "user": {
+    "rules_title": "📜 <b>Підтвердження правил</b>",
+    "rules_text": "Перед тим як створити аукціон, будь ласка, переконайтеся, що ви ознайомлені з правилами.",
+    "rules_link_button": "Переглянути правила",
+    "rules_confirm_button": "Я погоджуюся з правилами"
   },
   "bid": {
     "not_found": "Аукціон не знайдено",

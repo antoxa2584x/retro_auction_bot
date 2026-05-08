@@ -462,6 +462,7 @@ export function makeAdminSettingsDefaultsKb() {
             [{text: `🕒 ${t('admin.def_time')}`, callback_data: 'set_conf:DEFAULT_END_TIME'}],
             [{text: `⏳ ${t('admin.def_continuous')}`, callback_data: 'set_conf:CONTINUOUS_MINUTES'}],
             [{text: `👤 ${t('admin.def_max_user_auctions')}`, callback_data: 'set_conf:MAX_USER_AUCTIONS'}],
+            [{text: `📜 ${t('admin.def_rules_link')}`, callback_data: 'set_conf:RULES_LINK'}],
             [{text: `📝 ${t('admin.def_user_post_enabled')}`, callback_data: 'set_conf:USER_POST_ENABLED'}],
             [{text: t('common.back'), callback_data: 'adm_settings', style: 'primary'}]
         ]
@@ -558,6 +559,16 @@ export function makeUserPostConfirmKb() {
     return {
         inline_keyboard: [
             [{text: t('admin.kb.ai_confirm'), callback_data: 'user_post_confirm', style: 'success'}],
+            [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
+        ]
+    };
+}
+
+export function makeUserRulesKb(rulesLink) {
+    return {
+        inline_keyboard: [
+            [{text: `📜 ${t('user.rules_link_button')}`, url: rulesLink}],
+            [{text: `✅ ${t('user.rules_confirm_button')}`, callback_data: 'user_rules_confirm', style: 'success'}],
             [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
         ]
     };

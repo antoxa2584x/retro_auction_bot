@@ -15,7 +15,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 * **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
 * **Auction Subscriptions & Custom Notifications** — users can subscribe to any auction and set personalized reminders (1h, 2h, 3h, 6h, or 12h before closing) to never miss a deadline.
 * **Automatic End-of-Auction Reminders** — the bot automatically sends a 30-minute warning to all active participants before an auction closes.
-* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel. Features configurable **per-user active auction limits** and a **global toggle** to enable/disable user submissions.
+* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel. Features configurable **per-user active auction limits**, a **rules confirmation step** (with a link to external rules), and a **global toggle** to enable/disable user submissions.
 * **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
 * **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
 * **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated or subscribed.
@@ -32,7 +32,7 @@ Recently updated with **bid confirmation via bot** and **rich media support**.
 
 ## 🧠 How it works (high level)
 
-1. **An auction is posted to the channel**: Either by an Admin using the wizard/manual post, or by a User whose submission was approved by an Admin. The bot listens to `channel_post`, parses details, saves the auction, and attaches the "Bid" and "Info" buttons.
+1. **An auction is posted to the channel**: Either by an Admin using the wizard/manual post, or by a User whose submission was approved by an Admin. For user submissions, the bot first presents a **Rules Confirmation** step (if configured by an admin) before starting the wizard. The bot listens to `channel_post`, parses details, saves the auction, and attaches the "Bid" and "Info" buttons.
 2. **User taps “Bid” in the channel**: They are redirected to the bot with a deep link (`/start bid_CHATID_MSGID`).
 3. **Confirmation in Bot**: The bot shows the item's photo/text and the required bid amount. The user clicks "Confirm".
 4. **Processing**: The bot validates the price, updates the database, refreshes the channel keyboard, and notifies the previous leader.
@@ -83,7 +83,7 @@ To access the admin panel:
 * **⚙️ Structured Settings**:
     * **Main Settings**: Manage `Channel ID`, `Contact Nickname`, `OpenAI API Key`, `Language`, `Currency`, `Timezone`, and **Continuous Minutes** (the default duration for extensions, e.g., 5 minutes).
     * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
-    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions. Also configure **Max Active Auctions per User** (limit combined active and pending submissions) and the **User Auctions Posting** toggle (globally enable or disable user submissions).
+    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions. Also configure **Max Active Auctions per User**, the **Rules Link** (optional URL users must confirm before posting), and the **User Auctions Posting** toggle.
 * **👥 Admin Management**: Add or remove other administrators by their Telegram User ID.
 * **📢 Broadcast**: Send a message to all users who have ever interacted with the bot.
 

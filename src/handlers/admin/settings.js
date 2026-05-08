@@ -347,6 +347,7 @@ export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = fa
         t('admin.panel_settings_defaults_time', { value: q.getSetting.get('DEFAULT_END_TIME')?.value || '21:00' }) + '\n' +
         t('admin.panel_settings_defaults_continuous', { value: q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5' }) + '\n' +
         t('admin.panel_settings_defaults_max_user_auctions', { value: q.getSetting.get('MAX_USER_AUCTIONS')?.value || '3' }) + '\n' +
+        t('admin.panel_settings_defaults_rules_link', { value: q.getSetting.get('RULES_LINK')?.value || t('admin.not_set') }) + '\n' +
         t('admin.panel_settings_defaults_user_post_enabled', { value: q.getSetting.get('USER_POST_ENABLED')?.value || 'true' }) + '\n\n' +
         t('admin.click_below_to_change');
 
