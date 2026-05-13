@@ -270,7 +270,7 @@ export const q = {
    * Selects all currently active auctions.
    * @type {import('better-sqlite3').Statement}
    */
-  selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active' ORDER BY message_id ASC`),
+  selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active' ORDER BY message_id DESC`),
 
   /**
    * Inserts a new training example for AI.
@@ -419,12 +419,12 @@ export const q = {
    * Retrieves all active auctions for the admin panel.
    * @type {import('better-sqlite3').Statement}
    */
-  getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id ASC`),
+  getAllActiveAuctions: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id DESC`),
 
   /**
    * Retrieves active auctions with pagination.
    */
-  getActiveAuctionsPaginated: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id ASC LIMIT ? OFFSET ?`),
+  getActiveAuctionsPaginated: db.prepare(`SELECT * FROM auctions WHERE status='active' ORDER BY message_id DESC LIMIT ? OFFSET ?`),
 
   /**
    * Counts all active auctions.

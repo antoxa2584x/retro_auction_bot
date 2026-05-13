@@ -1,9 +1,9 @@
 import { q } from '../../services/db.js';
-import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
+import { getAuctionLink, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
-import { t } from '../../services/i18n.js';
+import { t, getCurrency } from '../../services/i18n.js';
 import { 
     confirmBidKb, 
     makeMyCarouselKb, 
@@ -32,10 +32,36 @@ function formatMyAuctionCaption(a, userId) {
     const link = getAuctionLink(a.chat_id, a.message_id);
     const status = a.leader_id === userId ? t('bid.status_leading') : t('bid.status_outbid');
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
-    const caption = `🔹 <a href="${link}">${a.title}</a>\n` +
-           `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
+    
+    const isFinished = a.status === 'finished';
+    const cur = getCurrency();
+    let priceText;
+    
+    if (isFinished) {
+        if (a.leader_id) {
+            priceText = `${t('bid.winner_bid_label')}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    } else {
+        const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
+        if (a.leader_id) {
+            priceText = `${currentBidText}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    }
+
+    let caption = `🔹 <a href="${link}">${a.title}</a>\n` +
+           `${priceText}\n` +
            `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>\n` +
            `Статус: ${status}`;
+
+    if (isFinished && a.leader_id) {
+        const winnerLink = formatUserLinkById(a.leader_id, { name: a.leader_name });
+        caption += `\n${t('bid.winner_label')}: ${winnerLink}`;
+    }
+
     return truncateCaption(caption);
 }
 
@@ -54,9 +80,35 @@ function formatWonAuctionCaption(a) {
 function formatWatchlistAuctionCaption(a) {
     const link = getAuctionLink(a.chat_id, a.message_id);
     const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM HH:mm');
-    const caption = `🔔 <a href="${link}">${a.title}</a>\n` +
-           `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
+    
+    const isFinished = a.status === 'finished';
+    const cur = getCurrency();
+    let priceText;
+    
+    if (isFinished) {
+        if (a.leader_id) {
+            priceText = `${t('bid.winner_bid_label')}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    } else {
+        const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
+        if (a.leader_id) {
+            priceText = `${currentBidText}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    }
+
+    let caption = `🔔 <a href="${link}">${a.title}</a>\n` +
+           `${priceText}\n` +
            `${t('admin.auction_end_date_text').replace(/^(🕘|📅)\s*/, '')}: <b>${endDate}</b>`;
+
+    if (isFinished && a.leader_id) {
+        const winnerLink = formatUserLinkById(a.leader_id, { name: a.leader_name });
+        caption += `\n${t('bid.winner_label')}: ${winnerLink}`;
+    }
+
     return truncateCaption(caption);
 }
 
@@ -66,9 +118,35 @@ function formatCreatedAuctionCaption(a) {
     let statusText = a.status === 'active' 
         ? t('bid.created_status_active', { date: endDate })
         : t('bid.created_status_finished', { date: endDate });
-    const caption = `📂 <a href="${link}">${a.title}</a>\n` +
-           `${t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '')}: <b>${a.current_price} грн</b>\n` +
+
+    const isFinished = a.status === 'finished';
+    const cur = getCurrency();
+    let priceText;
+    
+    if (isFinished) {
+        if (a.leader_id) {
+            priceText = `${t('bid.winner_bid_label')}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    } else {
+        const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
+        if (a.leader_id) {
+            priceText = `${currentBidText}: <b>${a.current_price} ${cur}</b>`;
+        } else {
+            priceText = `${t('bid.no_bids')}`;
+        }
+    }
+
+    let caption = `👨‍⚖ <a href="${link}">${a.title}</a>\n` +
+           `${priceText}\n` +
            `Статус: ${statusText}`;
+
+    if (isFinished && a.leader_id) {
+        const winnerLink = formatUserLinkById(a.leader_id, { name: a.leader_name });
+        caption += `\n${t('bid.winner_label')}: ${winnerLink}`;
+    }
+
     return truncateCaption(caption);
 }
 

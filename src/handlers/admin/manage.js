@@ -526,12 +526,15 @@ export function registerManageHandlers(bot) {
 
             const contactLink = formatContactLink(a.admin_contact);
 
+            const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
+            const priceLabel = a.leader_id ? currentBidText : t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '');
+
             const text = t('admin.panel_header') + '\n\n' +
                 t('admin.auction_details', {
                     title: a.title,
                     chat_id: targetChatId,
                     message_id: targetMsgId,
-                    price: a.current_price,
+                    price: `${a.current_price} (${priceLabel})`,
                     status: statusText,
                     end_at: endDate,
                     winner: winner,

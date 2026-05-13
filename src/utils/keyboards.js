@@ -442,6 +442,7 @@ export function makeAdminSettingsTemplateKb() {
         inline_keyboard: [
             [{text: `📢 ${t('admin.auction_header')}`, callback_data: 'set_conf:AUCTION_HEADER'}],
             [{text: `💰 ${t('admin.auction_min_bid_text')}`, callback_data: 'set_conf:AUCTION_MIN_BID_TEXT'}],
+            [{text: `💰 ${t('admin.auction_current_bid_text')}`, callback_data: 'set_conf:AUCTION_CURRENT_BID_TEXT'}],
             [{text: `📈 ${t('admin.auction_bid_step_text')}`, callback_data: 'set_conf:AUCTION_BID_STEP_TEXT'}],
             [{text: `🕘 ${t('admin.auction_end_date_text')}`, callback_data: 'set_conf:AUCTION_END_DATE_TEXT'}],
             [{text: `📝 ${t('admin.auction_footer')}`, callback_data: 'set_conf:AUCTION_FOOTER'}],

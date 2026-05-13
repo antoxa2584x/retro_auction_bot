@@ -322,6 +322,7 @@ export async function sendSettingsTemplatePanel(bot, chatId, userId, isEdit = fa
     const text = t('admin.panel_settings_template') + '\n\n' +
         t('admin.panel_settings_template_header', { value: q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header') }) + '\n' +
         t('admin.panel_settings_template_min_bid', { value: q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid') }) + '\n' +
+        t('admin.panel_settings_template_current_bid', { value: q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label') }) + '\n' +
         t('admin.panel_settings_template_bid_step', { value: q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step') }) + '\n' +
         t('admin.panel_settings_template_end_date', { value: q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date') }) + '\n' +
         t('admin.panel_settings_template_footer', { value: q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer') }) + '\n\n' +
