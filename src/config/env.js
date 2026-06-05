@@ -25,11 +25,6 @@ export const getChannelId = () => {
 };
 export const getContactNickname = () => getSetting('CONTACT_NICKNAME', null);
 
-// For backward compatibility or one-time checks
-export const CHANNEL_ID = getChannelId();
-export const CONTACT_NICKNAME = getContactNickname();
-export const OPENAI_API_KEY = getSetting('OPENAI_API_KEY', null);
-
 export const getMaxUserAuctions = () => {
     const val = getSetting('MAX_USER_AUCTIONS', '3');
     return parseInt(val);

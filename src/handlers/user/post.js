@@ -109,6 +109,8 @@ export function registerUserPostHandlers(bot) {
 
         if (data === 'user_post_cancel') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
+            const cancelledSession = userSessions.get(from.id);
+            if (cancelledSession?.media_timer) clearTimeout(cancelledSession.media_timer);
             userSessions.delete(from.id);
             await bot.sendMessage(chatId, t('admin.post_cancelled'), {
                 parse_mode: 'HTML'
@@ -163,19 +165,16 @@ export function registerUserPostHandlers(bot) {
             });
 
             // Notify admins
-            const admins = q.getAdmins.all();
+            const admins = q.getAllAdmins.all();
             const userLink = formatUserLinkById(from.id);
             const notificationText = t('admin.kb.admin_new_pending')
                 .replace('%user%', userLink)
                 .replace('%title%', sessionData.title);
 
-            for (const admin of admins) {
-                try {
-                    await bot.sendMessage(admin.user_id, notificationText, { parse_mode: 'HTML' });
-                } catch (e) {
-                    console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
-                }
-            }
+            await Promise.allSettled(admins.map(admin =>
+                bot.sendMessage(admin.user_id, notificationText, { parse_mode: 'HTML' })
+                    .catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
+            ));
 
             userSessions.delete(from.id);
             await bot.sendMessage(chatId, t('admin.post_pending_success'), {
@@ -216,10 +215,12 @@ export async function handleUserPostInput(bot, msg) {
                 if (mediaGroupId) {
                     if (session.media_timer) clearTimeout(session.media_timer);
                     session.media_timer = setTimeout(async () => {
+                        delete session.media_timer;
+                        // Session may have been cancelled while the album timer was pending
+                        if (userSessions.get(msg.from.id) !== session) return;
                         await bot.sendMessage(chatId, t('admin.post_photo_added', { count: session.data.photo_ids.length }), {
                             reply_markup: makeAdminPostCancelKb(false, true, true)
                         });
-                        delete session.media_timer;
                     }, 500);
                 } else {
                     await bot.sendMessage(chatId, t('admin.post_photo_added', { count: session.data.photo_ids.length }), {

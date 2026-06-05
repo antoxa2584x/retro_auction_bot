@@ -1,4 +1,4 @@
-import { db, q, placeBidTransaction } from '../../services/db.js';
+import { q, placeBidTransaction } from '../../services/db.js';
 import { makeKb, confirmBidKb, confirmManualBidKb, makeOutbidKb } from '../../utils/keyboards.js';
 import { scheduleClose, closeAuction } from "../../services/scheduler.js";
 import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
@@ -39,7 +39,12 @@ export function registerBidHandlers(bot) {
                 reply_markup: { force_reply: true }
             });
 
-            bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
+            // Reply listeners are kept by the library forever unless removed —
+            // consume it on first reply and clean up abandoned prompts after 10 min.
+            let cleanupTimer;
+            const replyListenerId = bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
+                bot.removeReplyListener(replyListenerId);
+                clearTimeout(cleanupTimer);
                 const text = replyMsg.text.trim();
                 const amountText = text.replace(/[^0-9]/g, '');
                 const amount = Number(amountText);
@@ -86,6 +91,7 @@ export function registerBidHandlers(bot) {
                     });
                 }
             });
+            cleanupTimer = setTimeout(() => bot.removeReplyListener(replyListenerId), 10 * 60 * 1000);
             return;
         }
 
@@ -156,6 +162,13 @@ export function registerBidHandlers(bot) {
             }
 
             // Success
+            // Reschedule the close job FIRST — before any Telegram API round-trips —
+            // so the old job can't fire at the previous end time while we are still
+            // updating messages (post would show the new time but close at the old one).
+            if (res.timeExtended) {
+                scheduleClose(bot, target_chat_id, target_message_id, new Date(res.newEndAt));
+            }
+
             await bot.answerCallbackQuery(query.id, { text: t('bid.accepted_alert', { price }), show_alert: true }).catch(() => {});
 
             // Notify previous leader if outbid
@@ -246,16 +259,8 @@ export function registerBidHandlers(bot) {
                         }
                         
                         // Save the updated text back to the DB so subsequent updates don't use the old text
-                        db.prepare(`UPDATE auctions SET full_text=? WHERE chat_id=? AND message_id=?`).run(newText, target_chat_id, target_message_id);
-                        
-                        // Notify in the channel that the auction was extended (optional, but requested by "time in post shpoud be updated")
-                        // Wait, "time in post shpoud be updated" probably means the original post. 
-                        // Let's also send a short notification message or just update the post.
-                        // I'll just update the post as it's cleaner.
-                        
-                        // Reschedule
-                        scheduleClose(bot, target_chat_id, target_message_id, newEndDate);
-                        
+                        q.updateAuctionFullText.run(newText, target_chat_id, target_message_id);
+
                     } catch (e) {
                         console.error('Error updating extended auction post:', e.message);
                     }

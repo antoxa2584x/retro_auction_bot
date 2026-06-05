@@ -483,7 +483,7 @@ export function registerUserCommands(bot) {
             // Send request to admins
             const { data: d } = session;
             const admins = q.getAllAdmins.all();
-            const link = getAuctionLink(d.chat_id, d.msgId);
+            const link = getAuctionLink(d.chatId, d.msgId);
             const restartText = t('admin.post_restart_request', {
                 user_id: userId,
                 name: from.first_name + (from.last_name ? ' ' + from.last_name : ''),
@@ -496,12 +496,12 @@ export function registerUserCommands(bot) {
                 cur: q.getSetting.get('CURRENCY')?.value || '₴'
             });
             const restartKb = makeAdminRestartRequestKb(userId, d.chatId, d.msgId, d);
-            for (const admin of admins) {
-                await bot.sendMessage(admin.user_id, restartText, {
+            await Promise.allSettled(admins.map(admin =>
+                bot.sendMessage(admin.user_id, restartText, {
                     parse_mode: 'HTML',
                     reply_markup: restartKb
-                }).catch(() => {});
-            }
+                }).catch(() => {})
+            ));
 
             restartSessions.delete(userId);
             await bot.sendMessage(chatId, t('admin.post_restart_sent'), { parse_mode: 'HTML' });

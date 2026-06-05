@@ -28,6 +28,24 @@ export function scheduleClose(bot, chat_id, message_id, when) {
 }
 
 /**
+ * Cancels every scheduled job belonging to an auction (close, reminder and
+ * per-user custom notifications). Must be called when an auction is deleted,
+ * otherwise the jobs stay in node-schedule's registry and fire against a
+ * missing row.
+ *
+ * @param {number} chat_id - The chat ID.
+ * @param {number} message_id - The message ID.
+ */
+export function cancelAuctionJobs(chat_id, message_id) {
+    schedule.cancelJob(`${chat_id}:${message_id}`);
+    schedule.cancelJob(`reminder:${chat_id}:${message_id}`);
+    const notifyPrefix = `notify:${chat_id}:${message_id}:`;
+    for (const name of Object.keys(schedule.scheduledJobs)) {
+        if (name.startsWith(notifyPrefix)) schedule.cancelJob(name);
+    }
+}
+
+/**
  * Schedules custom notifications set by users for an auction.
  * 
  * @param {TelegramBot} bot - Telegram bot instance.
@@ -124,11 +142,16 @@ export async function sendReminder(bot, chat_id, message_id) {
         price: row.current_price
     });
 
-    for (const bidder of bidders) {
-        try {
-            await bot.sendMessage(bidder.user_id, reminderText, { parse_mode: 'HTML' });
-        } catch (err) {
-            console.error(`Failed to send reminder to ${bidder.user_id}:`, err.message);
+    // Send in bounded-concurrency chunks instead of one-by-one: parallel within
+    // a chunk for speed, chunked to stay under Telegram's ~30 msg/s limit.
+    const CHUNK = 25;
+    for (let i = 0; i < bidders.length; i += CHUNK) {
+        await Promise.allSettled(bidders.slice(i, i + CHUNK).map(bidder =>
+            bot.sendMessage(bidder.user_id, reminderText, { parse_mode: 'HTML' })
+                .catch(err => console.error(`Failed to send reminder to ${bidder.user_id}:`, err.message))
+        ));
+        if (i + CHUNK < bidders.length) {
+            await new Promise(r => setTimeout(r, 1000));
         }
     }
 }
@@ -139,10 +162,22 @@ export async function sendReminder(bot, chat_id, message_id) {
  * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
+ * @param {boolean} [force=false] - Close even if end_at is still in the future (manual admin close).
  */
-export async function closeAuction(bot, chat_id, message_id) {
+export async function closeAuction(bot, chat_id, message_id, force = false) {
     const row = q.getAuction.get(chat_id, message_id);
     if (!row) return;
+
+    // Guard against stale close jobs: if the auction was extended (continuous mode)
+    // after this job was scheduled, don't close early — reschedule to the real end time.
+    if (!force && row.status === 'active') {
+        const endAt = new Date(row.end_at);
+        if (endAt > new Date()) {
+            console.warn(`Stale close job for auction ${chat_id}:${message_id} — end_at is ${row.end_at}, rescheduling.`);
+            scheduleClose(bot, chat_id, message_id, endAt);
+            return;
+        }
+    }
 
     const alreadyFinished = row.status === 'finished';
     if (!alreadyFinished) {
@@ -220,13 +255,10 @@ export async function closeAuction(bot, chat_id, message_id) {
                     name: escapedWinnerName,
                     mention: formatUserLink(freshRow.leader_id, freshRow.leader_name)
                 });
-                for (const admin of admins) {
-                    try {
-                        await bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
-                    } catch (e) {
-                        console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
-                    }
-                }
+                await Promise.allSettled(admins.map(admin =>
+                    bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' })
+                        .catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
+                ));
             }
         } catch (e) {
             console.error('Error closing auction with winner:', e.message);
@@ -249,13 +281,10 @@ export async function closeAuction(bot, chat_id, message_id) {
                     link: auctionLink,
                     title: freshRow.title
                 });
-                for (const admin of admins) {
-                    try {
-                        await bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' });
-                    } catch (e) {
-                        console.error(`Failed to notify admin ${admin.user_id}:`, e.message);
-                    }
-                }
+                await Promise.allSettled(admins.map(admin =>
+                    bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' })
+                        .catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
+                ));
             }
         } catch (e) {
             console.error('Error closing auction without winner:', e.message);

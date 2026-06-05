@@ -13,7 +13,7 @@ import {
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
-import { scheduleClose, closeAuction } from '../../services/scheduler.js';
+import { scheduleClose, closeAuction, cancelAuctionJobs } from '../../services/scheduler.js';
 import { 
     getAuctionLink, 
     formatUserLink, 
@@ -694,7 +694,7 @@ export function registerManageHandlers(bot) {
                 }
             }
 
-            await closeAuction(bot, targetChatId, targetMsgId);
+            await closeAuction(bot, targetChatId, targetMsgId, true);
 
             await bot.sendMessage(chatId, t('admin.finish_success', { title: a.title }), { parse_mode: 'HTML' });
             await sendAdminPanel(bot, chatId, true, messageId);
@@ -807,7 +807,8 @@ export function registerManageHandlers(bot) {
             const targetMsgId = Number(deleteMatch[2]);
             
             q.deleteAuction.run(targetChatId, targetMsgId);
-            
+            cancelAuctionJobs(targetChatId, targetMsgId);
+
             await bot.sendMessage(chatId, "Аукціон видалено з бази даних.");
             await sendAdminPanel(bot, chatId, true, messageId);
         }

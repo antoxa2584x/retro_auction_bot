@@ -45,8 +45,8 @@ export function registerChannelPostHandler(bot) {
             }
         }
 
-        const isContinuous = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5') > 0 ? 1 : 0;
         const continuousMinutes = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
+        const isContinuous = continuousMinutes > 0 ? 1 : 0;
 
         q.insertAuction.run({
             chat_id: post.chat.id,

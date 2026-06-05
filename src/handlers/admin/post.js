@@ -75,6 +75,8 @@ export function registerPostHandlers(bot) {
         if (data === 'post_cancel') {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
+            const cancelledSession = postSessions.get(from.id);
+            if (cancelledSession?.media_timer) clearTimeout(cancelledSession.media_timer);
             postSessions.delete(from.id);
             await bot.editMessageText(t('admin.post_cancelled'), {
                 chat_id: chatId,
@@ -246,15 +248,6 @@ export function registerPostHandlers(bot) {
             }
 
             try {
-                const cur = getCurrency();
-                const header = q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header');
-                const minBidText = q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid');
-                const bidStepText = q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step');
-                const endDateText = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
-                const footer = q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer');
-
-                const formattedEnd = formatInTimeZone(sessionData.end_at, TZ, 'dd.MM о HH:mm');
-
                 const auctionPost = buildAuctionText(sessionData);
 
                 const kb = makeKb(channelId, 0, sessionData.min_bid, 0);
@@ -356,8 +349,10 @@ export async function handlePostInput(bot, msg) {
                 if (mediaGroupId) {
                     if (session.media_timer) clearTimeout(session.media_timer);
                     session.media_timer = setTimeout(async () => {
-                        await showPhotoReceivedOptions(bot, chatId, session);
                         delete session.media_timer;
+                        // Session may have been cancelled while the album timer was pending
+                        if (postSessions.get(msg.from.id) !== session) return;
+                        await showPhotoReceivedOptions(bot, chatId, session);
                     }, 500);
                 } else {
                     await showPhotoReceivedOptions(bot, chatId, session);

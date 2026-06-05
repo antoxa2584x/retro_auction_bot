@@ -222,7 +222,6 @@ export function makeAdminActiveKb(auctions, page = 0, totalCount = 0) {
  * @returns {Object} Inline keyboard object.
  */
 export function makeAdminSupportHistoryKb(messages) {
-    console.log(`[DEBUG] Building history KB for ${messages?.length} messages`);
     const buttons = (messages || []).map(m => {
         const date = m.created_at ? new Date(m.created_at).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) : '??.??';
         const status = m.status === 'open' ? '✉️' : '✅';
@@ -234,7 +233,6 @@ export function makeAdminSupportHistoryKb(messages) {
     });
 
     buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
-    console.log(`[DEBUG] History KB built with ${buttons.length} rows`);
     return { inline_keyboard: buttons };
 }
 

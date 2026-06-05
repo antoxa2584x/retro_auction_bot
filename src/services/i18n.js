@@ -104,14 +104,10 @@ export function t(key, params = {}) {
         return key;
     }
 
-    let result = value;
-    
-    // Replace global currency placeholder
-    result = result.replace(/{{cur}}/g, currentCurrency);
-
-    for (const [param, val] of Object.entries(params)) {
-        result = result.replace(new RegExp(`{{${param}}}`, 'g'), val);
-    }
-
-    return result;
+    // Single-pass replacement of all {{param}} placeholders (incl. the global
+    // currency) — avoids compiling a RegExp per param on every call.
+    return value.replace(/\{\{(\w+)\}\}/g, (match, name) => {
+        if (name === 'cur') return currentCurrency;
+        return name in params ? params[name] : match;
+    });
 }

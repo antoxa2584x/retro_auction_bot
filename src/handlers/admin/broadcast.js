@@ -50,7 +50,8 @@ export function registerBroadcastHandlers(bot) {
 
             const statusMsg = await bot.sendMessage(chatId, `⏳ Sending to ${users.length} users...`);
 
-            for (const user of users) {
+            for (let i = 0; i < users.length; i++) {
+                const user = users[i];
                 try {
                     if (session.photo_id) {
                         await bot.sendPhoto(user.user_id, session.photo_id, {
@@ -67,7 +68,7 @@ export function registerBroadcastHandlers(bot) {
                     console.error(`Failed to send broadcast to ${user.user_id}:`, e.message);
                 }
                 // Sleep a bit to avoid hitting rate limits too hard if there are many users
-                if (success % 20 === 0) {
+                if ((i + 1) % 20 === 0) {
                     await new Promise(r => setTimeout(r, 1000));
                 }
             }
@@ -131,7 +132,7 @@ export async function handleBroadcastInput(bot, msg) {
 async function showBroadcastPreview(bot, chatId, userId) {
     const session = broadcastSessions.get(userId);
     session.step = 'confirm';
-    const usersCount = q.getAllUsers.all().length;
+    const usersCount = q.countUsers.get().cnt;
 
     const confirmText = t('admin.broadcast_confirm', { text: session.text, count: usersCount });
     const kb = makeAdminBroadcastConfirmKb();

@@ -103,6 +103,21 @@ db.exec(`
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         replied_at DATETIME
     );
+
+    CREATE TABLE IF NOT EXISTS notifications
+    (
+        chat_id INTEGER,
+        message_id INTEGER,
+        user_id INTEGER,
+        hours INTEGER,
+        PRIMARY KEY (chat_id, message_id, user_id)
+    );
+
+    -- Covering index for the hot bid-path queries (getLastBid, getNewLeader,
+    -- checkBidExists, selectBidsForInfo, getBidders) which all filter by
+    -- (chat_id, message_id) and often order by ts.
+    CREATE INDEX IF NOT EXISTS idx_bids_auction ON bids (chat_id, message_id, ts);
+    CREATE INDEX IF NOT EXISTS idx_notifications_auction ON notifications (chat_id, message_id);
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -352,8 +367,6 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAdmin: db.prepare(`SELECT * FROM admins WHERE user_id=?`),
-  getAdmins: db.prepare(`SELECT * FROM admins WHERE otp_code IS NULL`),
-  getAllAdmins: db.prepare(`SELECT * FROM admins`),
 
   /**
    * Stores or updates an OTP code for an admin.
@@ -388,7 +401,7 @@ export const q = {
   `),
 
   /**
-   * Retrieves all registered admins.
+   * Retrieves all verified admins (pending-OTP admins are excluded).
    * @type {import('better-sqlite3').Statement}
    */
   getAllAdmins: db.prepare(`SELECT * FROM admins WHERE otp_code IS NULL`),
@@ -532,6 +545,18 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAllUsers: db.prepare(`SELECT DISTINCT user_id FROM participants`),
+
+  /**
+   * Counts unique users who have interacted with auctions.
+   * @type {import('better-sqlite3').Statement}
+   */
+  countUsers: db.prepare(`SELECT COUNT(DISTINCT user_id) AS cnt FROM participants`),
+
+  /**
+   * Updates the stored post text of an auction (used after a continuous-mode extension).
+   * @type {import('better-sqlite3').Statement}
+   */
+  updateAuctionFullText: db.prepare(`UPDATE auctions SET full_text=? WHERE chat_id=? AND message_id=?`),
 
   // Users
   getUserFromAnywhere: db.prepare(`
