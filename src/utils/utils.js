@@ -216,14 +216,14 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
 }
 
 /**
- * Truncates a caption to fit within Telegram's character limit (1024 for photos),
+ * Truncates a caption to fit within the character limit (default 450),
  * while attempting to preserve HTML tags.
  * 
  * @param {string} caption - The caption to truncate.
- * @param {number} [limit=1024] - Character limit.
+ * @param {number} [limit=450] - Character limit.
  * @returns {string} Truncated caption.
  */
-export function truncateCaption(caption, limit = 1024) {
+export function truncateCaption(caption, limit = 450) {
     if (!caption || caption.length <= limit) return caption;
 
     // A very simple approach: truncate the string and then close any unclosed tags.

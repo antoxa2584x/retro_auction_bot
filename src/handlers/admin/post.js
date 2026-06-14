@@ -1,25 +1,30 @@
-import { q } from '../../services/db.js';
-import { 
-    makeAdminPostStepKb, 
-    makeAdminPostCancelKb, 
-    makeAdminPostConfirmKb, 
-    makeAdminPostContactKb, 
-    makeAdminPostAIGenKb, 
+import {q} from '../../services/db.js';
+import {
     makeAdminPostAIConfirmKb,
+    makeAdminPostAIGenKb,
+    makeAdminPostCancelKb,
+    makeAdminPostConfirmKb,
+    makeAdminPostContactKb,
     makeAdminPostContinuousKb,
-    makeAdminPostDurationKb
+    makeAdminPostDurationKb,
+    makeAdminPostStepKb,
+    makeKb
 } from '../../utils/keyboards.js';
-import { TZ, getChannelId, getContactNickname } from "../../config/env.js";
-import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { parse, addDays, set } from 'date-fns';
-import { scheduleClose } from '../../services/scheduler.js';
-import { makeKb } from '../../utils/keyboards.js';
-import { t, getCurrency, getLocale } from '../../services/i18n.js';
-import { sendAdminPanel } from './manage.js';
-import { generateAuctionDetails, calculateImageHash } from '../../services/openai.js';
-import { buildAuctionText, sendAuctionGallery, getDefaultEndDate, sanitizeHtml, truncateCaption } from '../../utils/utils.js';
+import {getChannelId, getContactNickname, TZ} from "../../config/env.js";
+import {formatInTimeZone} from 'date-fns-tz';
+import {addDays, parse, set} from 'date-fns';
+import {scheduleClose} from '../../services/scheduler.js';
+import {getCurrency, getLocale, t} from '../../services/i18n.js';
+import {sendAdminPanel} from './manage.js';
+import {calculateImageHash, generateAuctionDetails} from '../../services/openai.js';
+import {
+    buildAuctionText,
+    getDefaultEndDate,
+    sanitizeHtml,
+    sendAuctionGallery,
+    truncateCaption
+} from '../../utils/utils.js';
 import fs from 'fs';
-import path from 'path';
 import os from 'os';
 
 /** @type {Map<number, {step: string, data: any}>} */
@@ -100,8 +105,7 @@ export function registerPostHandlers(bot) {
                 // Download file to temp
                 const tempPath = await bot.downloadFile(session.data.photo_id, os.tmpdir());
 
-                const imageHash = calculateImageHash(tempPath);
-                session.data.image_hash = imageHash;
+                session.data.image_hash = calculateImageHash(tempPath);
 
                 const aiText = sanitizeHtml(await generateAuctionDetails(tempPath, getLocale()));
                 
@@ -365,7 +369,7 @@ export async function handlePostInput(bot, msg) {
         case 'AI_EDIT':
             if (text) {
                 const sanitizedText = sanitizeHtml(text);
-                if (sanitizedText.length > 1024) {
+                if (sanitizedText.length > 450) {
                     await bot.sendMessage(chatId, t('admin.error_too_long', { length: sanitizedText.length }), { parse_mode: 'HTML' });
                     return true;
                 }

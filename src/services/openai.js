@@ -39,7 +39,7 @@ Line 2–3: Short condition description (cosmetic condition, visible wear, scree
 Line 4: What is included in the sale.
 
 Rules:
-- Maximum 300 characters total.
+- Maximum 350 characters total.
 - Use simple clear ${locale === 'uk' ? 'Ukrainian' : 'English'} language.
 - Do NOT invent accessories.
 - Assume region by language or age rating sticker

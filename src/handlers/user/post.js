@@ -1,7 +1,6 @@
 import { q } from '../../services/db.js';
 import { 
     makeAdminPostCancelKb, 
-    makeAdminPostContinuousKb,
     makeUserPostStepKb,
     makeUserPostContinuousKb,
     makeUserPostConfirmKb,
@@ -11,9 +10,9 @@ import {
 } from '../../utils/keyboards.js';
 import { TZ, getMaxUserAuctions, isUserPostEnabled } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
-import { parse, addDays, set } from 'date-fns';
+import { addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, getDefaultEndDate, sanitizeHtml, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
+import { buildAuctionText, sanitizeHtml, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
 
 /** @type {Map<number, {step: string, data: any}>} */
 const userSessions = new Map();
@@ -22,8 +21,6 @@ export function registerUserPostHandlers(bot) {
     bot.on('callback_query', async (query) => {
         const { data, message, from } = query;
         const chatId = message.chat.id;
-        const messageId = message.message_id;
-
         if (data === 'user_post') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
             
@@ -234,7 +231,7 @@ export async function handleUserPostInput(bot, msg) {
         case 'TITLE':
             if (text) {
                 const sanitizedText = sanitizeHtml(text);
-                if (sanitizedText.length > 1024) {
+                if (sanitizedText.length > 450) {
                     await bot.sendMessage(chatId, t('admin.error_too_long', { length: sanitizedText.length }), { parse_mode: 'HTML' });
                     return true;
                 }
