@@ -231,7 +231,7 @@ export async function handleUserPostInput(bot, msg) {
         case 'TITLE':
             if (text) {
                 const sanitizedText = sanitizeHtml(text);
-                if (sanitizedText.length > 450) {
+                if (sanitizedText.length > 500) {
                     await bot.sendMessage(chatId, t('admin.error_too_long', { length: sanitizedText.length }), { parse_mode: 'HTML' });
                     return true;
                 }
