@@ -216,14 +216,19 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
 }
 
 /**
- * Truncates a caption to fit within the character limit (default 500),
- * while attempting to preserve HTML tags.
- * 
+ * Truncates a caption to fit within the character limit (default 1024,
+ * Telegram's photo caption limit), while attempting to preserve HTML tags.
+ *
+ * Note: the user-facing description is already capped at 500 chars on input
+ * (see TITLE step in handlers/user/post.js). This limit only acts as a safety
+ * net for the fully assembled post (header + description + bid info + footer)
+ * so that footer/header text is never cut.
+ *
  * @param {string} caption - The caption to truncate.
- * @param {number} [limit=500] - Character limit.
+ * @param {number} [limit=1024] - Character limit.
  * @returns {string} Truncated caption.
  */
-export function truncateCaption(caption, limit = 500) {
+export function truncateCaption(caption, limit = 1024) {
     if (!caption || caption.length <= limit) return caption;
 
     // A very simple approach: truncate the string and then close any unclosed tags.
