@@ -244,13 +244,22 @@ export function registerPostHandlers(bot) {
             const session = postSessions.get(from.id);
             if (!session || session.step !== 'CONFIRM') return;
 
+            // Guard against double-clicks / duplicate callback delivery: a second
+            // press would otherwise post the same auction to the channel twice.
+            // Claim the session synchronously before any await so a re-entrant
+            // call bails out here.
+            if (session.posting) return;
+            session.posting = true;
+
             const { data: sessionData } = session;
             const channelId = getChannelId();
-            
+
             if (!channelId) {
+                session.posting = false;
                 return bot.sendMessage(chatId, "Channel ID is not set in settings!").catch(() => {});
             }
 
+            let posted = false;
             try {
                 const auctionPost = buildAuctionText(sessionData);
 
@@ -262,8 +271,6 @@ export function registerPostHandlers(bot) {
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });
-
-                    await sendAuctionGallery(bot, channelId, sessionData.photo_ids, sentMsg.message_id);
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
                         parse_mode: 'HTML',
@@ -271,17 +278,11 @@ export function registerPostHandlers(bot) {
                     });
                 }
 
-                // Update keyboard with actual message_id
-                const finalKb = makeKb(channelId, sentMsg.message_id, sessionData.min_bid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
-                    chat_id: channelId,
-                    message_id: sentMsg.message_id
-                }).catch(err => {
-                    if (!err.message.includes('message is not modified')) {
-                        console.error(`Failed to update keyboard for admin post ${channelId}:${sentMsg.message_id}:`, err.message);
-                    }
-                });
-
+                // Insert the auction row synchronously, immediately after the send
+                // and before any further await. This guarantees the record (with
+                // the real message_id) exists before Telegram's channel_post
+                // update for this same message can be processed, so channelPost.js
+                // dedupes instead of racing/double-inserting.
                 q.insertAuction.run({
                     chat_id: channelId,
                     message_id: sentMsg.message_id,
@@ -297,6 +298,24 @@ export function registerPostHandlers(bot) {
                     continuous_minutes: sessionData.continuous_minutes || 5,
                     creator_id: from.id
                 });
+                posted = true;
+
+                // Patch the keyboard with the real message_id. The deep-link bid
+                // button encodes it; without this it points at message_id 0 and
+                // every bid fails with "auction not found".
+                const finalKb = makeKb(channelId, sentMsg.message_id, sessionData.min_bid, 0);
+                await bot.editMessageReplyMarkup(finalKb, {
+                    chat_id: channelId,
+                    message_id: sentMsg.message_id
+                }).catch(err => {
+                    if (!err.message.includes('message is not modified')) {
+                        console.error(`Failed to update keyboard for admin post ${channelId}:${sentMsg.message_id}:`, err.message);
+                    }
+                });
+
+                if (sessionData.photo_id) {
+                    await sendAuctionGallery(bot, channelId, sessionData.photo_ids, sentMsg.message_id);
+                }
 
                 scheduleClose(bot, channelId, sentMsg.message_id, sessionData.end_at);
 
@@ -309,6 +328,13 @@ export function registerPostHandlers(bot) {
                 await sendAdminPanel(bot, chatId, false);
             } catch (e) {
                 console.error('Failed to post auction:', e);
+                if (posted) {
+                    // Auction is already live in the channel; the failure was in a
+                    // follow-up step (gallery / panel). Don't allow a re-post.
+                    postSessions.delete(from.id);
+                } else {
+                    session.posting = false; // nothing posted yet — allow retry
+                }
                 await bot.sendMessage(chatId, t('common.error_try_again') + ': ' + e.message, { parse_mode: 'HTML' });
             }
         }

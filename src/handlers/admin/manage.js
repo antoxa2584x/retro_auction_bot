@@ -35,6 +35,11 @@ function isAdmin(userId) {
 /** @type {Map<number, {pending_id: string, gallery_msg_ids: number[]}>} */
 const adminSessions = new Map();
 
+// Restart-approvals currently being posted to the channel, keyed by
+// `${chatId}:${msgId}` of the finished auction. Used to drop rapid duplicate
+// callbacks so a restart isn't posted to the channel twice.
+const restartsInFlight = new Set();
+
 /**
  * Cleanup gallery if exists for the user.
  * 
@@ -74,6 +79,13 @@ export function registerManageHandlers(bot) {
             const a = q.getAuction.get(targetChatId, targetMsgId);
             if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
 
+            // Drop rapid duplicate callbacks so the restart isn't posted twice.
+            const restartKey = `${targetChatId}:${targetMsgId}`;
+            if (restartsInFlight.has(restartKey)) {
+                return bot.answerCallbackQuery(query.id).catch(() => {});
+            }
+            restartsInFlight.add(restartKey);
+
             await bot.answerCallbackQuery(query.id).catch(() => {});
 
             let minBid = a.min_bid;
@@ -100,53 +112,62 @@ export function registerManageHandlers(bot) {
                 continuous_minutes: a.continuous_minutes
             });
 
-            let newMsg;
-            const kb = makeKb(targetChatId, 0, minBid, 0);
-            if (a.photo_id) {
-                newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
-                    caption: truncateCaption(updatedFullText),
-                    parse_mode: 'HTML',
-                    reply_markup: kb
+            try {
+                let newMsg;
+                const kb = makeKb(targetChatId, 0, minBid, 0);
+                if (a.photo_id) {
+                    newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
+                        caption: truncateCaption(updatedFullText),
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
+                } else {
+                    newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
+                }
+
+                // Insert synchronously right after the send (before any further
+                // await) so the row with the real message_id exists before the
+                // channel_post update for this message can race in.
+                q.insertAuction.run({
+                    chat_id: targetChatId,
+                    message_id: newMsg.message_id,
+                    title: a.title,
+                    full_text: updatedFullText,
+                    photo_id: a.photo_id,
+                    min_bid: minBid,
+                    step: step,
+                    current_price: minBid,
+                    admin_contact: a.admin_contact,
+                    end_at: newEnd.toISOString(),
+                    is_continuous: a.is_continuous,
+                    continuous_minutes: a.continuous_minutes,
+                    creator_id: a.creator_id
                 });
-            } else {
-                newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
-                    parse_mode: 'HTML',
-                    reply_markup: kb
-                });
+
+                // Patch the keyboard with the real message_id so the deep-link bid
+                // button resolves instead of pointing at message_id 0.
+                const finalKb = makeKb(targetChatId, newMsg.message_id, minBid, 0);
+                await bot.editMessageReplyMarkup(finalKb, {
+                    chat_id: targetChatId,
+                    message_id: newMsg.message_id
+                }).catch(() => {});
+
+                scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
+
+                const successDate = formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm');
+                await bot.editMessageText(t('admin.post_restart_approved', { title: a.title, date: successDate }), {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML'
+                }).catch(() => {});
+
+                await bot.sendMessage(targetUserId, t('admin.post_restart_approved', { title: a.title, date: successDate }), { parse_mode: 'HTML' }).catch(() => {});
+            } finally {
+                restartsInFlight.delete(restartKey);
             }
-
-            const finalKb = makeKb(targetChatId, newMsg.message_id, minBid, 0);
-            await bot.editMessageReplyMarkup(finalKb, {
-                chat_id: targetChatId,
-                message_id: newMsg.message_id
-            }).catch(() => {});
-
-            q.insertAuction.run({
-                chat_id: targetChatId,
-                message_id: newMsg.message_id,
-                title: a.title,
-                full_text: updatedFullText,
-                photo_id: a.photo_id,
-                min_bid: minBid,
-                step: step,
-                current_price: minBid,
-                admin_contact: a.admin_contact,
-                end_at: newEnd.toISOString(),
-                is_continuous: a.is_continuous,
-                continuous_minutes: a.continuous_minutes,
-                creator_id: a.creator_id
-            });
-
-            scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
-
-            const successDate = formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm');
-            await bot.editMessageText(t('admin.post_restart_approved', { title: a.title, date: successDate }), {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'HTML'
-            }).catch(() => {});
-
-            await bot.sendMessage(targetUserId, t('admin.post_restart_approved', { title: a.title, date: successDate }), { parse_mode: 'HTML' }).catch(() => {});
         }
 
         if (data.startsWith('adm_res_reject:')) {
@@ -299,14 +320,25 @@ export function registerManageHandlers(bot) {
         }
 
         if (data.startsWith('adm_pen_approve:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             const id = data.split(':')[1];
             const p = q.getPendingAuction.get(id);
-            if (!p) return;
+            if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
+
+            // Idempotency guard: claim the pending auction synchronously, before
+            // any await. A rapid second click (or duplicate callback delivery)
+            // would otherwise re-read it as still 'pending' and post the auction
+            // to the channel twice.
+            if (p.status !== 'pending') {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_approved') }).catch(() => {});
+            }
+            q.updatePendingAuctionStatus.run('approved', id);
 
             // Cleanup gallery if exists
             await cleanupGallery(bot, chatId, from.id);
             adminSessions.delete(from.id);
 
+            let posted = false;
             try {
                 const channelId = getChannelId();
                 const auctionPost = buildAuctionText(p);
@@ -321,8 +353,6 @@ export function registerManageHandlers(bot) {
                         parse_mode: 'HTML',
                         reply_markup: kb
                     });
-
-                    await sendAuctionGallery(bot, channelId, photoIds, sentMsg.message_id);
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
                         parse_mode: 'HTML',
@@ -330,16 +360,9 @@ export function registerManageHandlers(bot) {
                     });
                 }
 
-                const finalKb = makeKb(channelId, sentMsg.message_id, p.min_bid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
-                    chat_id: channelId,
-                    message_id: sentMsg.message_id
-                }).catch(err => {
-                    if (!err.message.includes('message is not modified')) {
-                        console.error(`Failed to update keyboard after approval:`, err.message);
-                    }
-                });
-
+                // Insert synchronously right after the send (before any further
+                // await) so the row with the real message_id exists before
+                // Telegram's channel_post update for this message can race in.
                 q.insertAuction.run({
                     chat_id: channelId,
                     message_id: sentMsg.message_id,
@@ -355,16 +378,37 @@ export function registerManageHandlers(bot) {
                     continuous_minutes: p.continuous_minutes,
                     creator_id: p.user_id
                 });
+                posted = true;
+
+                // Patch the keyboard with the real message_id so the deep-link bid
+                // button resolves (otherwise it points at message_id 0 → bids fail
+                // with "auction not found").
+                const finalKb = makeKb(channelId, sentMsg.message_id, p.min_bid, 0);
+                await bot.editMessageReplyMarkup(finalKb, {
+                    chat_id: channelId,
+                    message_id: sentMsg.message_id
+                }).catch(err => {
+                    if (!err.message.includes('message is not modified')) {
+                        console.error(`Failed to update keyboard after approval:`, err.message);
+                    }
+                });
+
+                if (photoIds.length > 0) {
+                    await sendAuctionGallery(bot, channelId, photoIds, sentMsg.message_id);
+                }
 
                 scheduleClose(bot, channelId, sentMsg.message_id, new Date(p.end_at));
-                q.updatePendingAuctionStatus.run('approved', id);
 
                 await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_approved') }).catch(() => {});
                 await bot.sendMessage(p.user_id, t('admin.pending_auction_approved')).catch(() => {});
                 await sendAdminPanel(bot, chatId, false);
             } catch (e) {
                 console.error(e);
-                await bot.answerCallbackQuery(query.id, { text: "Error: " + e.message });
+                // Roll the claim back only if nothing was actually posted, so the
+                // admin can retry. If the post already landed, leave it 'approved'
+                // to avoid a duplicate on retry.
+                if (!posted) q.updatePendingAuctionStatus.run('pending', id);
+                await bot.answerCallbackQuery(query.id, { text: "Error: " + e.message }).catch(() => {});
             }
         }
 
@@ -583,6 +627,11 @@ export function registerManageHandlers(bot) {
                 }
             }
 
+            // Drop rapid duplicate callbacks so the restart isn't posted twice.
+            const restartKey = `${targetChatId}:${targetMsgId}`;
+            if (restartsInFlight.has(restartKey)) return;
+            restartsInFlight.add(restartKey);
+
             const originalEnd = new Date(a.end_at);
             const newEnd = new Date();
             newEnd.setDate(newEnd.getDate() + 4);
@@ -608,64 +657,73 @@ export function registerManageHandlers(bot) {
                 }
             }
 
-            let newMsg;
             try {
-                const kb = makeKb(targetChatId, 0, a.min_bid, 0);
-                if (a.photo_id) {
-                    newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
-                        caption: truncateCaption(updatedFullText),
-                        parse_mode: 'HTML',
-                        reply_markup: kb
-                    });
-                } else {
-                    newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
-                        parse_mode: 'HTML',
-                        reply_markup: kb
-                    });
-                }
-            } catch (e) {
-                console.error('Failed to create new post for restart:', e.message);
+                let newMsg;
                 try {
-                    return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
-                } catch (err) {
-                    console.error('Error answering adm_restart error callback:', err.message);
-                    return;
+                    const kb = makeKb(targetChatId, 0, a.min_bid, 0);
+                    if (a.photo_id) {
+                        newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
+                            caption: truncateCaption(updatedFullText),
+                            parse_mode: 'HTML',
+                            reply_markup: kb
+                        });
+                    } else {
+                        newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
+                            parse_mode: 'HTML',
+                            reply_markup: kb
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to create new post for restart:', e.message);
+                    try {
+                        return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
+                    } catch (err) {
+                        console.error('Error answering adm_restart error callback:', err.message);
+                        return;
+                    }
                 }
-            }
 
-            try {
-                const finalKb = makeKb(targetChatId, newMsg.message_id, a.min_bid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
+                // Insert synchronously right after the send (before any further
+                // await) so the row with the real message_id exists before the
+                // channel_post update for this message can race in.
+                q.insertAuction.run({
                     chat_id: targetChatId,
-                    message_id: newMsg.message_id
+                    message_id: newMsg.message_id,
+                    title: a.title,
+                    full_text: updatedFullText,
+                    photo_id: a.photo_id,
+                    min_bid: a.min_bid,
+                    step: a.step,
+                    current_price: a.min_bid,
+                    admin_contact: a.admin_contact,
+                    end_at: newEnd.toISOString(),
+                    is_continuous: a.is_continuous,
+                    continuous_minutes: a.continuous_minutes,
+                    creator_id: a.creator_id
                 });
-            } catch (e) {
-                console.error('Failed to update new post keyboard:', e.message);
+
+                // Patch the keyboard with the real message_id so the deep-link bid
+                // button resolves instead of pointing at message_id 0.
+                try {
+                    const finalKb = makeKb(targetChatId, newMsg.message_id, a.min_bid, 0);
+                    await bot.editMessageReplyMarkup(finalKb, {
+                        chat_id: targetChatId,
+                        message_id: newMsg.message_id
+                    });
+                } catch (e) {
+                    console.error('Failed to update new post keyboard:', e.message);
+                }
+
+                scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
+
+                await bot.sendMessage(chatId, t('admin.restart_success', {
+                    title: a.title,
+                    date: formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm')
+                }), { parse_mode: 'HTML' });
+                await sendAdminPanel(bot, chatId, true, messageId);
+            } finally {
+                restartsInFlight.delete(restartKey);
             }
-
-            q.insertAuction.run({
-                chat_id: targetChatId,
-                message_id: newMsg.message_id,
-                title: a.title,
-                full_text: updatedFullText,
-                photo_id: a.photo_id,
-                min_bid: a.min_bid,
-                step: a.step,
-                current_price: a.min_bid,
-                admin_contact: a.admin_contact,
-                end_at: newEnd.toISOString(),
-                is_continuous: a.is_continuous,
-                continuous_minutes: a.continuous_minutes,
-                creator_id: a.creator_id
-            });
-
-            scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
-
-            await bot.sendMessage(chatId, t('admin.restart_success', { 
-                title: a.title, 
-                date: formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm') 
-            }), { parse_mode: 'HTML' });
-            await sendAdminPanel(bot, chatId, true, messageId);
         }
 
         const finishNowMatch = data.match(/^adm_finish_now:(.+):(.+)$/);

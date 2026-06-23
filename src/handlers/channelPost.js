@@ -16,6 +16,15 @@ export function registerChannelPostHandler(bot) {
         const currentChannelId = getChannelId();
         if (!post || post.chat.id !== currentChannelId) return;
 
+        // Auctions posted by the bot itself (admin wizard / approval flow) are
+        // inserted synchronously the moment they're sent, with the correct
+        // keyboard already attached. Telegram still delivers a channel_post
+        // update for them — ignore it so we don't double-insert (INSERT OR
+        // REPLACE would wipe an existing leader/price) or fight over the
+        // keyboard. Only genuinely manually-typed posts (not yet in the DB)
+        // are processed below.
+        if (q.getAuction.get(post.chat.id, post.message_id)) return;
+
         const text = post.text || post.caption || '';
 
         let parsed;
