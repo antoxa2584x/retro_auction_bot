@@ -1,6 +1,6 @@
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
-import { scheduleOneCustomNotification } from '../../services/scheduler.js';
+import { scheduleOneCustomNotification, cancelCustomNotification } from '../../services/scheduler.js';
 
 /**
  * Registers callback handlers for the Notify feature.
@@ -10,7 +10,7 @@ import { scheduleOneCustomNotification } from '../../services/scheduler.js';
 export function registerNotificationHandlers(bot) {
     bot.on('callback_query', async (query) => {
         const { data, message, from } = query;
-        if (!data) return;
+        if (!data || !message) return;
 
         const chatId = message.chat.id;
         const messageId = message.message_id;
@@ -55,8 +55,9 @@ export function registerNotificationHandlers(bot) {
         const remMatch = data.match(/^rem_notify:(.+)$/);
         if (remMatch) {
             const [targetChatId, targetMessageId] = remMatch[1].split(':').map(Number);
-            
+
             q.deleteNotification.run(targetChatId, targetMessageId, from.id);
+            cancelCustomNotification(targetChatId, targetMessageId, from.id);
             
             await bot.answerCallbackQuery(query.id, { 
                 text: t('admin.notify_removed'), 

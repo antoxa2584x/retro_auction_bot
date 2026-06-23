@@ -148,7 +148,10 @@ export function registerUserPostHandlers(bot) {
             if (!session || session.step !== 'CONFIRM') return;
 
             const { data: sessionData } = session;
-            
+            // Consume the session synchronously BEFORE the await chain below, so a
+            // rapid double-tap can't insert a second pending auction / re-notify admins.
+            userSessions.delete(from.id);
+
             q.insertPendingAuction.run({
                 user_id: sessionData.user_id,
                 title: sessionData.title,
@@ -173,7 +176,6 @@ export function registerUserPostHandlers(bot) {
                     .catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
             ));
 
-            userSessions.delete(from.id);
             await bot.sendMessage(chatId, t('admin.post_pending_success'), {
                 parse_mode: 'HTML'
             });

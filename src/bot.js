@@ -44,6 +44,13 @@ bot.on('polling_error', (error) => {
     console.error('Polling error:', error.code, error.message);
 });
 
+// Safety net: node-telegram-bot-api does not catch rejections thrown inside
+// async event listeners. Without this an unhandled rejection (e.g. a user who
+// blocked the bot mid-handler) would crash the whole process.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled promise rejection:', reason?.message || reason);
+});
+
 // Restore scheduled jobs
 restoreJobs(bot);
 

@@ -173,13 +173,16 @@ export function registerUserCommands(bot) {
             if (parts.length === 3) {
                 const targetChatId = -Math.abs(Number(parts[1]));
                 const targetMessageId = Number(parts[2]);
+                if (!Number.isFinite(targetChatId) || !Number.isFinite(targetMessageId)) {
+                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                }
                 const row = q.getAuction.get(targetChatId, targetMessageId);
-                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' });
+                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
                 const now = new Date();
                 const end = new Date(row.end_at);
                 if (now >= end || row.status !== 'active') {
-                    await closeAuction(bot, targetChatId, targetMessageId);
-                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' });
+                    await closeAuction(bot, targetChatId, targetMessageId).catch(e => console.error('closeAuction (bid deep-link) failed:', e.message));
+                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
                 let messageText = t('bid.confirm_text', {
@@ -208,13 +211,16 @@ export function registerUserCommands(bot) {
             if (parts.length === 3) {
                 const targetChatId = -Math.abs(Number(parts[1]));
                 const targetMessageId = Number(parts[2]);
+                if (!Number.isFinite(targetChatId) || !Number.isFinite(targetMessageId)) {
+                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                }
                 const row = q.getAuction.get(targetChatId, targetMessageId);
-                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' });
+                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
                 const now = new Date();
                 const end = new Date(row.end_at);
                 if (now >= end || row.status !== 'active') {
-                    await closeAuction(bot, targetChatId, targetMessageId);
-                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' });
+                    await closeAuction(bot, targetChatId, targetMessageId).catch(e => console.error('closeAuction (notify deep-link) failed:', e.message));
+                    return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const existing = q.getNotification.get(targetChatId, targetMessageId, msg.from.id);
                 const text = existing 
@@ -479,9 +485,13 @@ export function registerUserCommands(bot) {
             if (!session || session.step !== 'TIME') return;
 
             session.data.hour = parseInt(data.split(':')[1]);
-            
-            // Send request to admins
+
+            // Consume the session synchronously BEFORE the slow admin-broadcast
+            // await below, so a rapid double-tap can't send the request twice.
             const { data: d } = session;
+            restartSessions.delete(userId);
+
+            // Send request to admins
             const admins = q.getAllAdmins.all();
             const link = getAuctionLink(d.chatId, d.msgId);
             const restartText = t('admin.post_restart_request', {
@@ -503,7 +513,6 @@ export function registerUserCommands(bot) {
                 }).catch(() => {})
             ));
 
-            restartSessions.delete(userId);
             await bot.sendMessage(chatId, t('admin.post_restart_sent'), { parse_mode: 'HTML' });
             return;
         }

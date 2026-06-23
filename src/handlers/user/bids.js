@@ -45,6 +45,10 @@ export function registerBidHandlers(bot) {
             const replyListenerId = bot.onReplyToMessage(chatId, prompt.message_id, async (replyMsg) => {
                 bot.removeReplyListener(replyListenerId);
                 clearTimeout(cleanupTimer);
+                // Reply may be a photo/sticker/etc. with no text — guard before .trim()
+                if (!replyMsg.text) {
+                    return bot.sendMessage(chatId, t('bid.error_invalid_amount')).catch(() => {});
+                }
                 const text = replyMsg.text.trim();
                 const amountText = text.replace(/[^0-9]/g, '');
                 const amount = Number(amountText);
@@ -207,17 +211,22 @@ export function registerBidHandlers(bot) {
             }
 
             const kb = makeKb(target_chat_id, target_message_id, price, res.participantsCount);
-            await bot.editMessageReplyMarkup(kb, {
-                chat_id: target_chat_id,
-                message_id: target_message_id
-            }).catch(async (err) => {
-                if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
-                    // This can happen if makeKb is modified to include user links in buttons
-                    console.error(`Privacy restriction when updating keyboard for ${target_chat_id}:${target_message_id}`);
-                } else if (!err.message.includes('message is not modified')) {
-                    console.error(`Failed to update keyboard for auction ${target_chat_id}:${target_message_id}:`, err.message);
-                }
-            });
+            // When the timer was extended we rewrite the whole post (text + markup)
+            // below in a single edit — so skip the standalone keyboard edit here to
+            // avoid a redundant second API round-trip on the same message.
+            if (!res.timeExtended) {
+                await bot.editMessageReplyMarkup(kb, {
+                    chat_id: target_chat_id,
+                    message_id: target_message_id
+                }).catch(async (err) => {
+                    if (err.message.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
+                        // This can happen if makeKb is modified to include user links in buttons
+                        console.error(`Privacy restriction when updating keyboard for ${target_chat_id}:${target_message_id}`);
+                    } else if (!err.message.includes('message is not modified')) {
+                        console.error(`Failed to update keyboard for auction ${target_chat_id}:${target_message_id}:`, err.message);
+                    }
+                });
+            }
 
             if (res.timeExtended) {
                 const auction = q.getAuction.get(target_chat_id, target_message_id);

@@ -83,16 +83,19 @@ export function registerSettingsHandlers(bot) {
                 console.error('Error answering adm_del perm check callback:', e.message);
             }
             const delUserId = parseInt(data.split(':')[1]);
-            
-            // Prevent self-deletion if needed, though typically we want to allow it
-            // but at least one admin must remain?
-            
-            q.deleteAdmin.run(delUserId);
-            try {
-                await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true }).catch(() => {});
-            } catch (e) {
-                console.error('Error answering admin_deleted callback:', e.message);
+            if (!Number.isFinite(delUserId)) {
+                return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
             }
+
+            // At least one admin must remain — block deleting the last one,
+            // otherwise the bot becomes permanently unmanageable.
+            const verifiedAdmins = q.getAllAdmins.all();
+            if (verifiedAdmins.length <= 1) {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.cannot_delete_last_admin'), show_alert: true }).catch(() => {});
+            }
+
+            q.deleteAdmin.run(delUserId);
+            await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true }).catch(() => {});
             await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
 

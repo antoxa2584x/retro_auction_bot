@@ -8,6 +8,8 @@
     "already_admin": "You are already an administrator. Use /admin_panel for management.",
     "enter_otp": "Enter OTP code to gain administrator rights.",
     "otp_cancelled": "OTP entry cancelled.",
+    "otp_too_many_attempts": "Too many incorrect attempts. The code has been invalidated — use /admin to request a new one.",
+    "cannot_delete_last_admin": "Cannot delete the last administrator — at least one must remain.",
     "cancelled": "Cancelled",
     "setting_updated": "Setting <b>{{key}}</b> updated to: <code>{{value}}</code>",
     "setting_error": "Error updating setting: {{error}}",

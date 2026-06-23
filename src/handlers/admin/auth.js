@@ -1,6 +1,13 @@
+import crypto from 'crypto';
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
 import { escapeHtml } from '../../utils/utils.js';
+
+// In-memory failed-verification counter (user_id -> count). Caps brute-force
+// guessing of the 6-digit OTP within its 10-minute window. Reset on success,
+// lockout, or process restart.
+const otpAttempts = new Map();
+const MAX_OTP_ATTEMPTS = 5;
 
 /**
  * Registers handlers for admin authentication (OTP process).
@@ -23,7 +30,8 @@ export function registerAuthHandlers(bot) {
             return bot.sendMessage(msg.chat.id, t('admin.feature_unavailable'), { parse_mode: 'HTML' });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
+        otpAttempts.delete(msg.from.id); // fresh code → reset any prior failed attempts
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
         q.upsertAdminOtp.run(
@@ -77,8 +85,29 @@ export function registerAuthHandlers(bot) {
  */
 export function handleOtpInput(bot, msg, text) {
     if (/^\d{6}$/.test(text)) {
-        const result = q.verifyOtp.run(msg.from.id, text, new Date().toISOString());
-        if (result.changes > 0) {
+        const userId = msg.from.id;
+
+        // Only entertain guesses when there is actually a pending OTP for this
+        // user — avoids counting random 6-digit messages from non-admins.
+        const pending = q.getAdmin.get(userId);
+        if (!pending || pending.otp_code === null) return false;
+
+        const result = q.verifyOtp.run(userId, text, new Date().toISOString());
+        if (result.changes === 0) {
+            // Wrong/expired code — throttle brute force.
+            const attempts = (otpAttempts.get(userId) || 0) + 1;
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                otpAttempts.delete(userId);
+                q.deleteAdmin.run(userId); // invalidate the pending OTP record
+                bot.sendMessage(msg.chat.id, t('admin.otp_too_many_attempts'), { parse_mode: 'HTML' }).catch(() => {});
+                return true;
+            }
+            otpAttempts.set(userId, attempts);
+            return false;
+        }
+
+        otpAttempts.delete(userId);
+        {
             // Notify other admins
             const otherAdmins = q.getAllAdmins.all();
             const newAdminName = msg.from.first_name ? (msg.from.last_name ? `${msg.from.first_name} ${msg.from.last_name}` : msg.from.first_name)

@@ -118,6 +118,13 @@ db.exec(`
     -- (chat_id, message_id) and often order by ts.
     CREATE INDEX IF NOT EXISTS idx_bids_auction ON bids (chat_id, message_id, ts);
     CREATE INDEX IF NOT EXISTS idx_notifications_auction ON notifications (chat_id, message_id);
+
+    -- Auction-list queries filter on these columns and would otherwise full-scan
+    -- the auctions table (selectActive/getAllActiveAuctions, getCreatedAuctions,
+    -- getWonAuctions).
+    CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions (status);
+    CREATE INDEX IF NOT EXISTS idx_auctions_creator ON auctions (creator_id);
+    CREATE INDEX IF NOT EXISTS idx_auctions_leader ON auctions (status, leader_id);
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -164,7 +171,7 @@ const getLastBid = db.prepare(`
   SELECT rowid AS rid, chat_id, message_id, user_id, amount, ts
     FROM bids
    WHERE chat_id=? AND message_id=?
-   ORDER BY ts DESC
+   ORDER BY ts DESC, rowid DESC
    LIMIT 1
 `); // NEW
 
@@ -182,7 +189,7 @@ const getNewLeader = db.prepare(`
     LEFT JOIN participants p
       ON p.chat_id=b.chat_id AND p.message_id=b.message_id AND p.user_id=b.user_id
    WHERE b.chat_id=? AND b.message_id=?
-   ORDER BY b.ts DESC
+   ORDER BY b.ts DESC, b.rowid DESC
    LIMIT 1
 `); // NEW
 

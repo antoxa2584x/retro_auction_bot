@@ -48,36 +48,67 @@ export function registerBroadcastHandlers(bot) {
             const users = q.getAllUsers.all();
             let success = 0;
 
-            const statusMsg = await bot.sendMessage(chatId, `⏳ Sending to ${users.length} users...`);
+            const statusMsg = await bot.sendMessage(chatId, `⏳ Sending to ${users.length} users...`).catch(() => null);
 
-            for (let i = 0; i < users.length; i++) {
-                const user = users[i];
-                try {
-                    if (session.photo_id) {
-                        await bot.sendPhoto(user.user_id, session.photo_id, {
-                            caption: truncateCaption(session.text),
-                            parse_mode: 'HTML'
-                        });
-                    } else {
-                        await bot.sendMessage(user.user_id, session.text, {
-                            parse_mode: 'HTML'
-                        });
-                    }
-                    success++;
-                } catch (e) {
-                    console.error(`Failed to send broadcast to ${user.user_id}:`, e.message);
+            const sendOne = async (userId) => {
+                if (session.photo_id) {
+                    await bot.sendPhoto(userId, session.photo_id, {
+                        caption: truncateCaption(session.text),
+                        parse_mode: 'HTML'
+                    });
+                } else {
+                    await bot.sendMessage(userId, session.text, { parse_mode: 'HTML' });
                 }
-                // Sleep a bit to avoid hitting rate limits too hard if there are many users
-                if ((i + 1) % 20 === 0) {
+            };
+
+            // Send in bounded-concurrency chunks to stay under Telegram's ~30 msg/s
+            // global limit. On a 429 we honour retry_after and retry the user once;
+            // 403 (user blocked the bot) is logged and skipped, not retried.
+            const CHUNK = 25;
+            for (let i = 0; i < users.length; i += CHUNK) {
+                const slice = users.slice(i, i + CHUNK);
+                const results = await Promise.allSettled(slice.map(u => sendOne(u.user_id)));
+
+                let maxRetryAfter = 0;
+                for (let j = 0; j < results.length; j++) {
+                    if (results[j].status === 'fulfilled') { success++; continue; }
+                    const err = results[j].reason;
+                    const code = err?.response?.statusCode;
+                    if (code === 429) {
+                        maxRetryAfter = Math.max(maxRetryAfter, err?.response?.body?.parameters?.retry_after || 1);
+                    } else {
+                        // 403 = blocked by user, or any other terminal error
+                        console.error(`Failed to send broadcast to ${slice[j].user_id}:`, err?.message);
+                    }
+                }
+
+                if (maxRetryAfter > 0) {
+                    // Hit the rate limit — back off, then retry just the throttled users.
+                    await new Promise(r => setTimeout(r, (maxRetryAfter + 1) * 1000));
+                    const retryResults = await Promise.allSettled(
+                        results
+                            .map((res, idx) => ({ res, idx }))
+                            .filter(({ res }) => res.status === 'rejected' && res.reason?.response?.statusCode === 429)
+                            .map(({ idx }) => sendOne(slice[idx].user_id))
+                    );
+                    for (const r of retryResults) {
+                        if (r.status === 'fulfilled') success++;
+                        else console.error('Broadcast retry failed:', r.reason?.message);
+                    }
+                }
+
+                if (i + CHUNK < users.length) {
                     await new Promise(r => setTimeout(r, 1000));
                 }
             }
 
-            await bot.editMessageText(t('admin.broadcast_success', { success, total: users.length }), {
-                chat_id: chatId,
-                message_id: statusMsg.message_id,
-                parse_mode: 'HTML'
-            });
+            if (statusMsg) {
+                await bot.editMessageText(t('admin.broadcast_success', { success, total: users.length }), {
+                    chat_id: chatId,
+                    message_id: statusMsg.message_id,
+                    parse_mode: 'HTML'
+                }).catch(() => {});
+            }
         }
 
         if (data === 'broadcast_cancel') {

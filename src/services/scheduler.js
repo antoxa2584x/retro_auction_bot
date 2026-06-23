@@ -74,6 +74,24 @@ export function scheduleOneCustomNotification(bot, chat_id, message_id, userId, 
     const id = `notify:${chat_id}:${message_id}:${userId}`;
     schedule.cancelJob(id);
 
+    return _scheduleOneCustomNotification(bot, chat_id, message_id, userId, hours, endAt, id);
+}
+
+/**
+ * Cancels a single user's custom notification job (e.g. when the user removes
+ * their reminder). Without this the node-schedule job lingers in the registry
+ * until its fire time even though the DB row is gone.
+ *
+ * @param {number} chat_id - Chat ID.
+ * @param {number} message_id - Message ID.
+ * @param {number} userId - User ID.
+ */
+export function cancelCustomNotification(chat_id, message_id, userId) {
+    schedule.cancelJob(`notify:${chat_id}:${message_id}:${userId}`);
+}
+
+function _scheduleOneCustomNotification(bot, chat_id, message_id, userId, hours, endAt, id) {
+
     const notifyTime = new Date(endAt.getTime() - hours * 60 * 60 * 1000);
     if (notifyTime > new Date()) {
         schedule.scheduleJob(id, notifyTime, async () => {
@@ -299,12 +317,17 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
  */
 export function restoreJobs(bot) {
     const rows = q.selectActive.all();
+    // Stagger overdue closes: each one edits the channel message and notifies
+    // winner + all admins, so firing them all at once on restart would burst
+    // straight into Telegram's rate limit. Space them ~3s apart.
+    let overdueIndex = 0;
     for (const r of rows) {
         const when = new Date(r.end_at);
         if (when > new Date()) {
             scheduleClose(bot, r.chat_id, r.message_id, when);
         } else {
-            setTimeout(() => closeAuction(bot, r.chat_id, r.message_id), 2_000);
+            setTimeout(() => closeAuction(bot, r.chat_id, r.message_id), 2_000 + overdueIndex * 3_000);
+            overdueIndex++;
         }
     }
 

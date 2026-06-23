@@ -11,16 +11,16 @@ import { t, getCurrency } from '../../services/i18n.js';
 export function registerInfoHandlers(bot) {
     bot.on('callback_query', async (query) => {
         const { data, message } = query;
+        // Inline/edited callbacks may arrive without a message — bail early.
+        if (!message) return;
         const chatId = message.chat.id;
         const messageId = message.message_id;
 
         if (data === 'none') {
-            try {
-                return bot.answerCallbackQuery(query.id, { text: t('bid.no_bids'), show_alert: true });
-            } catch (e) {
-                console.error('Error answering none callback:', e.message);
-                return;
-            }
+            // Generic inert/spacer button: silently dismiss the spinner. Do NOT
+            // show a "no bids" alert here — 'none' is used by buttons across the
+            // bot, not just the bids list.
+            return bot.answerCallbackQuery(query.id).catch(() => {});
         }
 
         if (data.startsWith('winner_info:')) {
@@ -40,6 +40,9 @@ export function registerInfoHandlers(bot) {
             const [chatIdStr, msgIdStr] = params.split(':');
             const target_chat_id = Number(chatIdStr);
             const target_message_id = Number(msgIdStr);
+            if (!Number.isFinite(target_chat_id) || !Number.isFinite(target_message_id)) {
+                return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
+            }
 
             const row = q.getAuction.get(target_chat_id, target_message_id);
             if (!row) {
@@ -54,7 +57,7 @@ export function registerInfoHandlers(bot) {
             const now = new Date();
             const end = new Date(row.end_at);
             if (now >= end && row.status === 'active') {
-                await closeAuction(bot, target_chat_id, target_message_id);
+                await closeAuction(bot, target_chat_id, target_message_id).catch(e => console.error('closeAuction (info) failed:', e.message));
                 try {
                     return bot.answerCallbackQuery(query.id, { text: t('bid.finished'), show_alert: true });
                 } catch (e) {
