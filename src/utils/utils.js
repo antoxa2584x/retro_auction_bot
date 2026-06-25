@@ -98,6 +98,22 @@ export async function safeEditMessage(bot, chatId, messageId, text, options = {}
         if (e.message.includes('message is not modified')) {
             return true;
         }
+        // Last-resort safety net: malformed HTML (e.g. an unclosed <b> from a
+        // truncated title) would otherwise crash the handler. Retry once with
+        // all tags stripped so the user still gets a (plain) readable message.
+        if (e.message.includes("can't parse entities")) {
+            const plain = stripHtml(text);
+            try {
+                return await bot.editMessageText(plain, { chat_id: chatId, message_id: messageId, ...options });
+            } catch (e2) {
+                if (e2.message.includes('there is no text in the message to edit')) {
+                    const { reply_markup } = options;
+                    return await bot.editMessageCaption(plain, { caption: plain, chat_id: chatId, message_id: messageId, parse_mode: options.parse_mode, reply_markup });
+                }
+                if (e2.message.includes('message is not modified')) return true;
+                throw e2;
+            }
+        }
         throw e;
     }
 }

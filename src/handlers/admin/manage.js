@@ -19,10 +19,11 @@ import {
     formatUserLink, 
     formatUserLinkById,
     formatContactLink, 
-    buildAuctionText, 
-    sendAuctionGallery, 
-    safeEditMessage, 
-    truncateCaption 
+    buildAuctionText,
+    sendAuctionGallery,
+    safeEditMessage,
+    stripHtml,
+    truncateCaption
 } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { reconstructAuctionText } from '../../utils/parse.js';
@@ -424,7 +425,9 @@ export function registerManageHandlers(bot) {
             await cleanupGallery(bot, chatId, from.id);
             adminSessions.set(from.id, { pending_id: id });
 
-            const text = t('admin.pending_auction_reject_prompt', { title: p.title });
+            // Older rows may have a title built from truncated raw HTML (e.g. a
+            // dangling "<b>"); strip tags so the prompt's own <b> wrapper stays valid.
+            const text = t('admin.pending_auction_reject_prompt', { title: stripHtml(p.title) });
             await safeEditMessage(bot, chatId, messageId, text, {
                 parse_mode: 'HTML',
                 reply_markup: makeAdminPendingRejectKb(id)
