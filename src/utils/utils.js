@@ -172,6 +172,25 @@ export function sanitizeHtml(html) {
 }
 
 /**
+ * Strips all HTML tags from a string, leaving only the text content.
+ *
+ * Used to derive a short plain-text title from the (HTML) auction body. The
+ * title is later truncated and embedded raw into other HTML messages, so it
+ * must not contain partial/unclosed tags — truncating raw HTML would otherwise
+ * cut a tag in half (e.g. a dangling "<b>") and break Telegram's HTML parser.
+ *
+ * @param {string} html - String possibly containing HTML tags.
+ * @returns {string} Plain text with tags removed and whitespace collapsed.
+ */
+export function stripHtml(html) {
+    if (!html) return '';
+    return html
+        .replace(/<\/?[a-z1-6]+[^>]*>/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
  * Constructs the auction post text based on the provided data and settings.
  * 
  * @param {Object} data - Auction data (full_text, min_bid, step, end_at, user_id, is_continuous, continuous_minutes).

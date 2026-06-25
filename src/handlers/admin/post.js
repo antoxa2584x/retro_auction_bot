@@ -22,6 +22,7 @@ import {
     getDefaultEndDate,
     sanitizeHtml,
     sendAuctionGallery,
+    stripHtml,
     truncateCaption
 } from '../../utils/utils.js';
 import fs from 'fs';
@@ -112,7 +113,7 @@ export function registerPostHandlers(bot) {
                 fs.unlinkSync(tempPath);
 
                 session.data.full_text = aiText;
-                session.data.title = aiText.split('\n')[0].substring(0, 50);
+                session.data.title = stripHtml(aiText.split('\n')[0]).substring(0, 50);
                 session.step = 'AI_CONFIRM';
 
                 await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
@@ -405,7 +406,7 @@ export async function handlePostInput(bot, msg) {
                 }
 
                 session.data.full_text = sanitizedText;
-                session.data.title = sanitizedText.split('\n')[0].substring(0, 50);
+                session.data.title = stripHtml(sanitizedText.split('\n')[0]).substring(0, 50);
                 session.step = 'MIN_BID';
                 await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
                     parse_mode: 'HTML',

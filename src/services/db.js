@@ -162,6 +162,25 @@ for (const m of migrations) {
     }
 }
 
+// Migration: titles were historically derived by truncating raw HTML to 50
+// chars, which could split an HTML tag in half (e.g. a dangling "<b>"). When
+// such a title is later embedded into another HTML message it breaks Telegram's
+// parser ("Can't find end tag"). Strip leftover tags from existing titles once.
+// (kept inline rather than importing utils.js to avoid a circular import)
+const stripTitleTags = (title) =>
+    title.replace(/<\/?[a-z1-6]+[^>]*>/gi, '').replace(/\s+/g, ' ').trim();
+
+for (const table of ['auctions', 'pending_auctions']) {
+    const broken = db.prepare(`SELECT rowid, title FROM ${table} WHERE title LIKE '%<%'`).all();
+    if (broken.length === 0) continue;
+    const updateTitle = db.prepare(`UPDATE ${table} SET title=? WHERE rowid=?`);
+    const fixAll = db.transaction((rows) => {
+        for (const row of rows) updateTitle.run(stripTitleTags(row.title), row.rowid);
+    });
+    fixAll(broken);
+    console.log(`Migrating: stripped HTML tags from ${broken.length} ${table} title(s)`);
+}
+
 //
 // Helpers for undo-last-bid
 //

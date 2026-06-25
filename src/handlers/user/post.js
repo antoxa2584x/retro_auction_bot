@@ -12,7 +12,7 @@ import { TZ, getMaxUserAuctions, isUserPostEnabled } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, sanitizeHtml, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
+import { buildAuctionText, sanitizeHtml, stripHtml, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
 
 /** @type {Map<number, {step: string, data: any}>} */
 const userSessions = new Map();
@@ -238,7 +238,7 @@ export async function handleUserPostInput(bot, msg) {
                     return true;
                 }
                 session.data.full_text = sanitizedText;
-                session.data.title = sanitizedText.split('\n')[0].substring(0, 50);
+                session.data.title = stripHtml(sanitizedText.split('\n')[0]).substring(0, 50);
                 session.step = 'MIN_BID';
                 await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
                     parse_mode: 'HTML',
