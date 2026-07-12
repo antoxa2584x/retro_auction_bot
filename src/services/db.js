@@ -724,7 +724,12 @@ export const placeBidTransaction = db.transaction((chat_id, message_id, user, pr
         const extensionMs = auction.continuous_minutes * 60 * 1000;
         
         if (remainingMs <= extensionMs) {
-            const extendedDate = new Date(end.getTime() + extensionMs);
+            // Extend from the bid time (now), not the current end. This guarantees a
+            // fresh full window after every last-minute bid, matching the documented
+            // behavior ("every bid within the last N minutes extends it by N minutes").
+            // Since remainingMs <= extensionMs, (now + extensionMs) is always >= end,
+            // so the end time can never be shortened.
+            const extendedDate = new Date(now.getTime() + extensionMs);
             newEndAt = extendedDate.toISOString();
             timeExtended = true;
         }
