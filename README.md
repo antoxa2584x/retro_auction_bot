@@ -1,164 +1,243 @@
-# Telegram Auction Bot — README
+<div align="center">
 
-A lightweight Telegram channel auction bot built with Node.js. It turns a normal channel post (with a specific text format) into a live auction with inline “Bid” and “Info” buttons, keeps track of participants and current price, and automatically closes the auction at the scheduled time with a winner banner.
+# 🎮 Telegram Auction Bot
 
-Recently updated with **bid confirmation via bot** and **rich media support**.
+**Add the bot to your Telegram channel and run live, interactive auctions straight from the bot.**
+
+A lightweight Node.js bot that posts and manages auctions in your channel — each with inline **Bid** & **Info** buttons — tracking participants and the current price, and automatically closing with a winner banner at the scheduled time.
+
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white)](https://github.com/WiseLibs/better-sqlite3)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots/api)
+![Version](https://img.shields.io/badge/version-2.0.5-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**🌐 Language:** **English** · [Українська](README.uk.md)
+
+</div>
+
+---
+
+## 📖 Table of Contents
+
+- [Highlights](#-highlights)
+- [Features](#-features)
+- [How It Works](#-how-it-works)
+- [Bot Commands](#-bot-commands)
+- [Admin Panel](#-admin-panel)
+- [Configuration](#-configuration)
+- [Auction Post Format](#-auction-post-format)
+- [Tech Stack](#-tech-stack)
+- [Project Layout](#-project-layout)
+- [Getting Started](#-getting-started)
+- [License](#-license)
+
+---
+
+## ⭐ Highlights
+
+|  | |
+|---|---|
+| 🕒 **Continuous auctions** | Auto-extends the deadline on last-minute bids to stop sniping. |
+| 🌍 **Bilingual** | Full Ukrainian & English UI, switchable from the admin panel. |
+| 🤖 **AI generation** | Generate titles & descriptions from a photo with OpenAI. |
+| 🔔 **Smart notifications** | Outbid alerts, custom reminders, and auto 30-min warnings. |
+| 📝 **User submissions** | Users propose lots; admins review, edit, and approve. |
+| 🛡️ **OTP-secured panel** | Full auction & settings management behind one-time-password auth. |
 
 ---
 
 ## ✨ Features
 
-* **Continuous Auctions** — extensions are automatically added to the auction end time (e.g., +5 minutes) if a bid is placed near the deadline, preventing last-second "sniping".
-* **Multi-language Support** — supports both **Ukrainian** and **English**, with easy switching via the admin panel.
-* **Custom Currency** — admins can set any custom currency symbol or name (e.g., ₴, $, €, BTC) to be used across all auctions.
-* **One-tap bidding with confirmation** — users are redirected from the channel to the bot's private chat to confirm their bid, preventing accidental clicks.
-* **Quick Outbid Response** — users receive a "Quick Bid" button in their private outbid notification, allowing them to raise their bid with a single tap.
-* **Auction Subscriptions & Custom Notifications** — users can subscribe to any auction and set personalized reminders (1h, 2h, 3h, 6h, or 12h before closing) to never miss a deadline.
-* **Automatic End-of-Auction Reminders** — the bot automatically sends a 30-minute warning to all active participants before an auction closes.
-* **User-Submitted Auctions** — users can submit their own items for auction directly via the bot. Admins can then review, edit, and approve these submissions before they go live on the channel. Features configurable **per-user active auction limits**, a **rules confirmation step** (with a link to external rules), and a **global toggle** to enable/disable user submissions.
-* **Rich Media Support** — the bot shows the auction's **photo** and **full original text** during the confirmation step.
-* **Real-time notifications** — users receive private messages when they are outbid or when they win an auction.
-* **User Portfolio & Watchlist** — `/menu` command to see active bids, auction history, and a watchlist of auctions where you've participated or subscribed.
-* **Automatic Winner Contact** — winners are provided with the admin's contact info and a direct link back to the auction post.
-* **Interactive Info Button** — reveals recent bidders in a safe, short alert, collapsing consecutive bids from the same user.
-* **Robust scheduled closing** — uses `node-schedule` to close at the exact end time; restores jobs on restart; posts winner banner or “no bids” banner.
-* **Customizable Auction Templates** — admins can edit the auction post header, footer, and all field labels (e.g., "Min bid", "Bid step") directly from the bot.
-* **Auction Posting Wizard** — create and post new auctions to the channel directly via a step-by-step bot interface (upload photo, set title, price, step, and end date).
-* **AI Auction Generation** — integrate OpenAI's GPT-4o-mini to automatically generate professional auction titles and descriptions from uploaded photos. Just set your `OPENAI_API_KEY` in the admin settings.
-* **Smart Parsing** — extracts lot name, min bid, step, and end time from channel posts, with dynamic regex that adapts to your custom template labels.
-* **Advanced Admin Panel** — OTP-authenticated private panel to manage auctions (including pending user submissions), post new ones, and configure all bot settings (IDs, Language, Currency, Default End Times, and Post Templates).
+<details open>
+<summary><b>Bidding & auctions</b></summary>
+
+- **One-tap bidding with confirmation** — users are deep-linked from the channel to the bot's private chat to confirm, preventing accidental bids.
+- **Continuous auctions** — a bid placed near the deadline extends the end time (e.g. +5 min), preventing last-second sniping.
+- **Quick outbid response** — outbid notifications include a "Quick Bid" button to re-raise in a single tap.
+- **Interactive Info button** — reveals recent bidders in a short alert, collapsing consecutive bids from the same user.
+- **Robust scheduled closing** — powered by `node-schedule`; restores jobs on restart and posts a winner (or "no bids") banner.
+
+</details>
+
+<details>
+<summary><b>Users & engagement</b></summary>
+
+- **Subscriptions & custom reminders** — subscribe to any auction and set reminders (1h / 2h / 3h / 6h / 12h before closing).
+- **Automatic end-of-auction warning** — a 30-minute heads-up is sent to all active participants.
+- **Real-time notifications** — private messages on being outbid or winning.
+- **Portfolio & watchlist** — `/menu` shows active bids, history, and watched auctions.
+- **Automatic winner contact** — winners get the admin's contact and a link back to the post.
+- **User-submitted auctions** — submit lots via the bot with per-user limits, an optional rules-confirmation step, and a global on/off toggle.
+
+</details>
+
+<details>
+<summary><b>Admin & customization</b></summary>
+
+- **Advanced admin panel** — OTP-authenticated private panel to manage auctions, submissions, and all settings.
+- **Auction posting wizard** — step-by-step creation (photo → title → price → step → end date → continuous → contact).
+- **AI auction generation** — OpenAI (`gpt-4o-mini`) turns an uploaded photo into a professional title and description.
+- **Customizable templates** — edit the post header, footer, and every field label from the bot.
+- **Custom currency** — any symbol or name (₴, $, €, BTC, …) used across all auctions.
+- **Rich media support** — shows the auction's photo and full original text at the confirmation step.
+- **Smart parsing** — extracts lot name, min bid, step, and end time from posts with dynamic regex that adapts to custom labels.
+
+</details>
 
 ---
 
-## 🧠 How it works (high level)
+## 🧠 How It Works
 
-1. **An auction is posted to the channel**: Either by an Admin using the wizard/manual post, or by a User whose submission was approved by an Admin. For user submissions, the bot first presents a **Rules Confirmation** step (if configured by an admin) before starting the wizard. The bot listens to `channel_post`, parses details, saves the auction, and attaches the "Bid" and "Info" buttons.
-2. **User taps “Bid” in the channel**: They are redirected to the bot with a deep link (`/start bid_CHATID_MSGID`).
-3. **Confirmation in Bot**: The bot shows the item's photo/text and the required bid amount. The user clicks "Confirm".
-4. **Processing**: The bot validates the price, updates the database, refreshes the channel keyboard, and notifies the previous leader.
-5. **Subscriptions**: Users can click "Subscribe" in the channel to set custom reminders.
-6. **Auction End**: The scheduler (or an interaction after expiration) triggers the closing sequence, updating the channel post with the winner's name and notifying the winner privately.
+```mermaid
+flowchart LR
+    A["Auction posted<br/>(admin or approved user)"] --> B["Bot parses post<br/>+ adds Bid / Info buttons"]
+    B --> C["User taps Bid<br/>→ deep-link to bot"]
+    C --> D["Confirm in private chat"]
+    D --> E["Price updated,<br/>keyboard refreshed,<br/>previous leader notified"]
+    E --> F["Scheduler closes auction<br/>→ winner banner + DM"]
+```
 
----
-
-## 🤖 Bot Commands
-
-### 👤 User Commands
-* `/start` — Start the bot and see the welcome message.
-* `/menu` — Main user menu. Access your active bids, won auctions, watchlist, and submit new auctions.
-* `/my` — View your active bids where you are either leading or outbid.
-* `/won` — View the list of auctions you have won.
-* `/about` — Information about the bot and its current version.
-
-### 🔐 Admin Commands
-* `/admin` — Request an OTP code for admin authentication.
-* `/admin_panel` — Open the main admin management interface (requires authentication).
+1. **Auction is posted** to the channel — by an admin (wizard/manual) or a user whose submission was approved. For user submissions, a **rules confirmation** step can be required first. The bot listens to `channel_post`, parses the details, saves the auction, and attaches the **Bid** and **Info** buttons.
+2. **User taps "Bid"** and is redirected to the bot via a deep link (`/start bid_CHATID_MSGID`).
+3. **Confirmation in the bot** — the item's photo/text and required bid amount are shown; the user confirms.
+4. **Processing** — the bot validates the price, updates the database, refreshes the channel keyboard, and notifies the previous leader.
+5. **Auction end** — the scheduler triggers the closing sequence, updating the post with the winner and notifying them privately.
 
 ---
 
-## 🛠️ Admin Functions
+## 💬 Bot Commands
 
-The bot provides powerful administrative tools accessible via private messages.
+### 👤 User
 
-### 🔐 Admin Panel
-To access the admin panel:
+| Command | Description |
+|---------|-------------|
+| `/start` | Start the bot and see the welcome message. |
+| `/menu` | Main menu — active bids, won auctions, watchlist, and submit new auctions. |
+| `/my` | Active bids where you are leading or outbid. |
+| `/won` | Auctions you have won. |
+| `/about` | Bot information and current version. |
+
+### 🔐 Admin
+
+| Command | Description |
+|---------|-------------|
+| `/admin` | Request an OTP code for admin authentication. |
+| `/admin_panel` | Open the admin management interface (requires authentication). |
+
+---
+
+## 🛠️ Admin Panel
+
+Access the panel in three steps:
+
 1. Send `/admin` to the bot in a private chat.
-2. Retrieve the **OTP code** and send it back to the bot.
-3. Use `/admin_panel` to open the management interface.
+2. Retrieve the **OTP code** and send it back.
+3. Open the management interface with `/admin_panel`.
 
-**Features:**
-* **⏳ Pending Submissions**: Review, edit, and approve auctions submitted by users.
-* **➕ Post New Auction**: Wizard-style step-by-step creation:
-    1. **Image**: Upload a photo or skip for text-only.
-    2. **Title & Description**: Enter manually or use **AI Generate** to create them from the photo.
-    3. **Minimum Bid**: Starting price.
-    4. **Bid Step**: Fixed increments (e.g., 50, 100) or custom value.
-    5. **End Date & Time**: Set manually or use the default calculated from settings.
-    6. **Continuous Auction**: Toggle whether to extend the auction if a bid is placed near the deadline.
-    7. **Contact Nickname**: Choose the nickname winners should contact.
-* **Active/Finished Lists**: View and manage all auctions via categorical buttons.
-* **Detailed View**: Check current price, leader (with profile link), and end date.
-* **🏁 Finish Immediately**: Instantly close any active auction.
-* **🔄 Restart**: Re-post a finished auction with a new end date.
-* **⚙️ Structured Settings**:
-    * **Main Settings**: Manage `Channel ID`, `Contact Nickname`, `OpenAI API Key`, `Language`, `Currency`, `Timezone`, and **Continuous Minutes** (the default duration for extensions, e.g., 5 minutes).
-    * **Auction Template**: Customize the header, footer, and labels (Min Bid, Bid Step, End Date) used in channel posts.
-    * **Default Values**: Set the default number of days and time (e.g., 5 days at 21:00) for new auctions. Also configure **Max Active Auctions per User**, the **Rules Link** (optional URL users must confirm before posting), and the **User Auctions Posting** toggle.
-* **👥 Admin Management**: Add or remove other administrators by their Telegram User ID.
-* **📢 Broadcast**: Send a message to all users who have ever interacted with the bot.
+<details>
+<summary><b>Panel capabilities</b></summary>
+
+- **⏳ Pending submissions** — review, edit, and approve user-submitted auctions.
+- **➕ Post new auction** — wizard: image → title & description (or **AI Generate**) → minimum bid → bid step → end date & time → continuous toggle → contact nickname.
+- **📋 Active / finished lists** — browse and manage all auctions by category.
+- **🔍 Detailed view** — current price, leader (with profile link), and end date.
+- **🏁 Finish immediately** — instantly close any active auction.
+- **🔄 Restart** — re-post a finished auction with a new end date.
+- **⚙️ Settings**
+  - *Main* — Channel ID, Contact Nickname, OpenAI API Key, Language, Currency, Timezone, and Continuous Minutes.
+  - *Auction template* — header, footer, and labels (Min Bid, Bid Step, End Date).
+  - *Defaults* — default days & time for new auctions, Max Active Auctions per User, the Rules Link, and the User Auctions Posting toggle.
+- **👥 Admin management** — add or remove admins by Telegram User ID.
+- **📢 Broadcast** — message every user who has interacted with the bot.
+
+</details>
 
 ---
 
 ## ⚙️ Configuration
 
-Create a `.env` file with the following:
+Create a `.env` file with a single required variable:
 
 ```env
 BOT_TOKEN=your_bot_token   # Required
 ```
 
-All other settings (Channel ID, Timezone, Contact Nickname, OpenAI Key, etc.) are configured directly via the **Admin Panel** in the bot and stored in the database.
+Everything else — Channel ID, Timezone, Contact Nickname, OpenAI Key, Language, Currency, and post templates — is configured through the **Admin Panel** and stored in the database.
 
 ---
 
-## 📝 Auction post format (Ukrainian)
+## 📝 Auction Post Format
 
-Put this in the **channel post caption/text**:
+Put this in the **channel post caption/text** (default English labels shown):
 
 ```
-🎮 Аукціон!
-Назва лота (будь-який заголовок)
+🎮 Auction!
+Lot title (any heading)
 
-Мінімальна ставка: 1 000 грн
-Крок ставки: 50 грн
-Завершення аукціону: 21.10 о 22:00
+🔸 Minimum bid: 1 000 $
+🔸 Bid step: 50 $
+🕘 Auction ends: 21.10 at 22:00
 ```
 
-The bot extracts the **Title** as the first non-empty line between the configured **Auction Header** and **Min Bid Label**. Labels are dynamic and can be changed in the admin panel.
+The bot extracts the **title** as the first non-empty line between the configured **Auction Header** and **Min Bid Label**. Labels are dynamic and editable in the admin panel.
 
 ---
 
-## 🔧 Requirements
+## 🧰 Tech Stack
 
-* **Node.js 18+**
-* **better-sqlite3** (SQLite database)
-* **node-telegram-bot-api** (Bot API framework)
-* **node-schedule**
-* **date-fns & date-fns-tz** (Date manipulation)
-* **openai** (Optional, for AI generation)
+| Dependency | Purpose |
+|------------|---------|
+| **node-telegram-bot-api** | Telegram Bot API framework |
+| **better-sqlite3** | Embedded SQLite database |
+| **node-schedule** | Scheduled auction closing |
+| **date-fns** / **date-fns-tz** | Date & timezone handling |
+| **openai** | Optional AI title/description generation |
+| **dotenv** | Environment configuration |
 
----
-
-## 📁 Project layout
-
-* `src/bot.js` — Main entry point, wires handlers and restores jobs.
-* `src/config/env.js` — Environment variables and dynamic settings.
-* `src/services/db.js` — Database schema and operations (SQLite).
-* `src/services/i18n.js` — Internationalization service for UK/EN support.
-* `src/services/scheduler.js` — Auction closing logic and notifications.
-* `src/handlers/channelPost.js` — Processes new auctions from the channel.
-* `src/handlers/user/` — Commands (`/start`, `/menu`, `/my`, `/won`), bidding logic, and info.
-* `src/handlers/admin/` — Admin panel navigation, authentication, settings, and posting wizard.
-* `src/locales/` — Translation files (`uk.json`, `en.json`).
-* `src/utils/` — Shared utility functions and keyboards.
+> Requires **Node.js 18+**.
 
 ---
 
-## 🗄️ Database & Migrations
+## 📁 Project Layout
 
-The bot uses SQLite (`auction.sqlite3`). On startup, it automatically checks for and adds missing columns/tables if you are upgrading.
+```
+src/
+├─ bot.js               # Entry point — wires handlers, restores jobs
+├─ config/env.js        # Environment variables & dynamic settings
+├─ services/
+│  ├─ db.js             # SQLite schema & operations
+│  ├─ i18n.js           # UK/EN internationalization
+│  └─ scheduler.js      # Auction closing & notifications
+├─ handlers/
+│  ├─ channelPost.js    # Processes new auctions from the channel
+│  ├─ user/             # /start, /menu, /my, /won, bidding, info
+│  └─ admin/            # Panel, auth, settings, posting wizard
+├─ locales/             # Translations (uk.json, en.json)
+└─ utils/               # Shared helpers & keyboards
+```
+
+**Database & migrations:** the bot uses SQLite (`auction.sqlite3`) and, on startup, automatically adds any missing columns/tables when upgrading.
 
 ---
 
-## ▶️ Running
+## 🚀 Getting Started
 
 ```bash
+# 1. Install dependencies
 npm install
-node src/bot.js
+
+# 2. Add your bot token
+echo "BOT_TOKEN=your_bot_token" > .env
+
+# 3. Run
+npm start
 ```
+
+Then send `/admin` to your bot to authenticate and finish configuration from the panel.
 
 ---
 
 ## 📜 License
 
-MIT
+Released under the **MIT** License.
