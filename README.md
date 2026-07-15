@@ -26,7 +26,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 - [Bot Commands](#-bot-commands)
 - [Admin Panel](#-admin-panel)
 - [Configuration](#-configuration)
-- [Auction Post Format](#-auction-post-format)
+- [Creating an Auction](#-creating-an-auction)
 - [Tech Stack](#-tech-stack)
 - [Project Layout](#-project-layout)
 - [Getting Started](#-getting-started)
@@ -77,7 +77,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 
 - **Advanced admin panel** — OTP-authenticated private panel to manage auctions, submissions, and all settings.
 - **Auction posting wizard** — step-by-step creation (photo → title → price → step → end date → continuous → contact).
-- **AI auction generation** — OpenAI (`gpt-4o-mini`) turns an uploaded photo into a professional title and description.
+- **AI auction generation** — OpenAI (`gpt-4.1-mini`) turns an uploaded photo into a professional title and description.
 - **Customizable templates** — edit the post header, footer, and every field label from the bot.
 - **Custom currency** — any symbol or name (₴, $, €, BTC, …) used across all auctions.
 - **Rich media support** — shows the auction's photo and full original text at the confirmation step.
@@ -167,20 +167,14 @@ Everything else — Channel ID, Timezone, Contact Nickname, OpenAI Key, Language
 
 ---
 
-## 📝 Auction Post Format
+## 📝 Creating an Auction
 
-Put this in the **channel post caption/text** (default English labels shown):
+Auctions are created **through the bot** — there's no need to format channel posts by hand:
 
-```
-🎮 Auction!
-Lot title (any heading)
+- **Admin wizard** — open the admin panel and choose **➕ Post New Auction**, then follow the steps (image → title & description → minimum bid → bid step → end date → continuous → contact). The bot publishes the auction to the channel with the **Bid** and **Info** buttons already attached.
+- **User submissions** — users submit lots via the bot; an admin reviews and approves them, and the bot publishes them the same way.
 
-🔸 Minimum bid: 1 000 $
-🔸 Bid step: 50 $
-🕘 Auction ends: 21.10 at 22:00
-```
-
-The bot extracts the **title** as the first non-empty line between the configured **Auction Header** and **Min Bid Label**. Labels are dynamic and editable in the admin panel.
+> **Advanced / legacy:** the bot will also pick up a manually-typed channel post if it matches the configured label format (Auction Header, Min Bid, Bid Step, and End Date labels, all editable in the admin panel). This is only a fallback — the wizard is the recommended way to create auctions.
 
 ---
 
