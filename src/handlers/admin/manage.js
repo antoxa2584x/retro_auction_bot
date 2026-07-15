@@ -36,11 +36,6 @@ function isAdmin(userId) {
 /** @type {Map<number, {pending_id: string, gallery_msg_ids: number[]}>} */
 const adminSessions = new Map();
 
-// Restart-approvals currently being posted to the channel, keyed by
-// `${chatId}:${msgId}` of the finished auction. Used to drop rapid duplicate
-// callbacks so a restart isn't posted to the channel twice.
-const restartsInFlight = new Set();
-
 /**
  * Cleanup gallery if exists for the user.
  * 
@@ -80,12 +75,18 @@ export function registerManageHandlers(bot) {
             const a = q.getAuction.get(targetChatId, targetMsgId);
             if (!a) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
 
-            // Drop rapid duplicate callbacks so the restart isn't posted twice.
-            const restartKey = `${targetChatId}:${targetMsgId}`;
-            if (restartsInFlight.has(restartKey)) {
-                return bot.answerCallbackQuery(query.id).catch(() => {});
+            // Atomically claim this restart request. If another admin already
+            // approved or rejected it, the claim fails and we bail out so the
+            // auction isn't posted to the channel twice.
+            if (q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
+                await bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
+                await bot.editMessageText(t('admin.restart_already_handled'), {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML'
+                }).catch(() => {});
+                return;
             }
-            restartsInFlight.add(restartKey);
 
             await bot.answerCallbackQuery(query.id).catch(() => {});
 
@@ -166,8 +167,11 @@ export function registerManageHandlers(bot) {
                 }).catch(() => {});
 
                 await bot.sendMessage(targetUserId, t('admin.post_restart_approved', { title: a.title, date: successDate }), { parse_mode: 'HTML' }).catch(() => {});
-            } finally {
-                restartsInFlight.delete(restartKey);
+            } catch (e) {
+                // Posting the restart failed — release the claim so it can be retried.
+                console.error('Error approving auction restart:', e.message);
+                q.releaseRestart.run(targetChatId, targetMsgId);
+                await bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
             }
         }
 
@@ -181,7 +185,18 @@ export function registerManageHandlers(bot) {
 
             const a = q.getAuction.get(targetChatId, targetMsgId);
             const title = a?.title || '';
-            
+
+            // Claim the request so it can't also be approved/rejected by another admin.
+            if (a && q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
+                await bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
+                await bot.editMessageText(t('admin.restart_already_handled'), {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'HTML'
+                }).catch(() => {});
+                return;
+            }
+
             await bot.answerCallbackQuery(query.id).catch(() => {});
 
             await bot.editMessageText(t('admin.post_restart_rejected', { title }), {
@@ -630,10 +645,10 @@ export function registerManageHandlers(bot) {
                 }
             }
 
-            // Drop rapid duplicate callbacks so the restart isn't posted twice.
-            const restartKey = `${targetChatId}:${targetMsgId}`;
-            if (restartsInFlight.has(restartKey)) return;
-            restartsInFlight.add(restartKey);
+            // Atomically claim this auction so two admins can't restart it twice.
+            if (q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
+            }
 
             const originalEnd = new Date(a.end_at);
             const newEnd = new Date();
@@ -660,6 +675,7 @@ export function registerManageHandlers(bot) {
                 }
             }
 
+            let restartOk = false;
             try {
                 let newMsg;
                 try {
@@ -724,8 +740,10 @@ export function registerManageHandlers(bot) {
                     date: formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm')
                 }), { parse_mode: 'HTML' });
                 await sendAdminPanel(bot, chatId, true, messageId);
+                restartOk = true;
             } finally {
-                restartsInFlight.delete(restartKey);
+                // Release the claim if the restart didn't complete, so it can be retried.
+                if (!restartOk) q.releaseRestart.run(targetChatId, targetMsgId);
             }
         }
 

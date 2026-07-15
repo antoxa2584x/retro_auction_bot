@@ -32,8 +32,18 @@ export function registerAdminSupportHandlers(bot) {
                 return bot.answerCallbackQuery(query.id, { text: t('admin.not_found') || 'Not found', show_alert: true });
             }
 
+            // Don't open a reply session if another admin already answered it.
+            if (supportMsg.status !== 'open') {
+                await bot.answerCallbackQuery(query.id, { text: t('support.already_answered'), show_alert: true }).catch(() => {});
+                await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+                    chat_id: query.from.id,
+                    message_id: message.message_id
+                }).catch(() => {});
+                return;
+            }
+
             await bot.answerCallbackQuery(query.id).catch(() => {});
-            
+
             adminSupportSessions.set(query.from.id, supportId);
 
             await bot.sendMessage(query.from.id, t('support.reply_prompt', { name: escapeHtml(String(supportMsg.user_name)), user_id: supportMsg.user_id }), {
@@ -144,8 +154,13 @@ export async function handleAdminSupportInput(bot, msg) {
     const supportMsg = q.getSupportMessage.get(supportId);
     if (!supportMsg) return false;
 
-    // Update DB
-    q.updateSupportReply.run(text, supportId);
+    // Atomically close the message. If another admin already replied while this
+    // one was typing, `changes` is 0 and we don't send a duplicate reply.
+    const updated = q.updateSupportReply.run(text, supportId);
+    if (updated.changes === 0) {
+        await bot.sendMessage(adminId, t('support.already_answered'), { parse_mode: 'HTML' }).catch(() => {});
+        return true;
+    }
 
     // Send reply to user
     const userText = t('support.admin_reply_header', {

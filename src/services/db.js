@@ -138,7 +138,10 @@ const migrations = [
     { name: 'admin_contact', type: 'TEXT' },
     { name: 'is_continuous', type: 'INTEGER DEFAULT 0' },
     { name: 'continuous_minutes', type: 'INTEGER DEFAULT 5' },
-    { name: 'creator_id', type: 'INTEGER' }
+    { name: 'creator_id', type: 'INTEGER' },
+    // Guards against two admins restarting the same finished auction: acts as a
+    // one-time claim flag so only the first approval/restart is processed.
+    { name: 'restart_handled', type: 'INTEGER DEFAULT 0' }
 ];
 
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
@@ -264,6 +267,20 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   finish: db.prepare(`UPDATE auctions SET status='finished' WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Atomically claims a finished auction for restart so that only the first
+   * admin who approves/restarts it succeeds. Returns `changes === 1` for the
+   * winning claim and `changes === 0` when another admin already handled it.
+   * @type {import('better-sqlite3').Statement}
+   */
+  claimRestart: db.prepare(`UPDATE auctions SET restart_handled=1 WHERE chat_id=? AND message_id=? AND restart_handled=0`),
+
+  /**
+   * Releases a previously-claimed restart so it can be retried after a failure.
+   * @type {import('better-sqlite3').Statement}
+   */
+  releaseRestart: db.prepare(`UPDATE auctions SET restart_handled=0 WHERE chat_id=? AND message_id=?`),
 
   /**
    * Deletes an auction record.
@@ -625,10 +642,13 @@ export const q = {
   `),
   getSupportMessage: db.prepare(`SELECT * FROM support_messages WHERE id = ?`),
   getAllSupportMessages: db.prepare(`SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 50`),
+  // Only closes a message that is still open, so two admins replying at the
+  // same time can't both deliver a reply. `changes === 0` means another admin
+  // already answered it.
   updateSupportReply: db.prepare(`
-    UPDATE support_messages 
-    SET admin_reply = ?, status = 'closed', replied_at = CURRENT_TIMESTAMP 
-    WHERE id = ?
+    UPDATE support_messages
+    SET admin_reply = ?, status = 'closed', replied_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND status = 'open'
   `)
 };
 
