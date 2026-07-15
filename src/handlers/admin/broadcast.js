@@ -48,7 +48,7 @@ export function registerBroadcastHandlers(bot) {
             const users = q.getAllUsers.all();
             let success = 0;
 
-            const statusMsg = await bot.sendMessage(chatId, `⏳ Sending to ${users.length} users...`).catch(() => null);
+            const statusMsg = await bot.sendMessage(chatId, t('admin.broadcast_sending', { count: users.length }), { parse_mode: 'HTML' }).catch(() => null);
 
             const sendOne = async (userId) => {
                 if (session.photo_id) {
