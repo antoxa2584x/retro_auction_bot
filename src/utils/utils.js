@@ -212,11 +212,15 @@ export function stripHtml(html) {
  * @param {Object} data - Auction data (full_text, min_bid, step, end_at, user_id, is_continuous, continuous_minutes).
  * @param {boolean} includeUserLabel - Whether to include the subscriber label.
  * @param {boolean} includeSettings - Whether to wrap with header/footer from settings.
+ * @param {'active'|'finished'} status - Status hashtag appended to the header (bot language).
  * @returns {string} Formatted auction text.
  */
-export function buildAuctionText(data, includeUserLabel = true, includeSettings = true) {
+export function buildAuctionText(data, includeUserLabel = true, includeSettings = true, status = 'active') {
     const cur = getCurrency();
-    const header = includeSettings ? sanitizeHtml(q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header')) : '';
+    let header = includeSettings ? sanitizeHtml(q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header')) : '';
+    // Tag the header with the auction status (#активний / #завершений), flipped to
+    // #завершений when the auction closes. See closeAuction in scheduler.js.
+    if (header) header += ` ${t(`parse.status.${status}`)}`;
     const minBidText = sanitizeHtml(q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid'));
     const bidStepText = sanitizeHtml(q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step'));
     const endDateText = sanitizeHtml(q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date'));

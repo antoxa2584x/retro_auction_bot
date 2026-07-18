@@ -675,6 +675,10 @@ export function registerManageHandlers(bot) {
                 }
             }
 
+            // Restart makes the auction active again — flip the header status
+            // hashtag back (#завершений → #активний) to match the new state.
+            updatedFullText = updatedFullText.replace(t('parse.status.finished'), t('parse.status.active'));
+
             let restartOk = false;
             try {
                 let newMsg;

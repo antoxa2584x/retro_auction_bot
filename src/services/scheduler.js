@@ -218,6 +218,34 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     const auctionLink = getAuctionLink(chat_id, message_id);
     const admins = q.getAllAdmins.all();
 
+    // Flip the status hashtag in the post header (#активний → #завершений, in the
+    // bot's language). full_text mirrors the live post text, so a plain replace is
+    // enough — the winner/empty keyboard is re-applied by the branches below.
+    if (!alreadyFinished && freshRow.full_text) {
+        const activeTag = t('parse.status.active');
+        const finishedTag = t('parse.status.finished');
+        if (freshRow.full_text.includes(activeTag)) {
+            const updatedText = freshRow.full_text.replace(activeTag, finishedTag);
+            try {
+                if (freshRow.photo_id) {
+                    await bot.editMessageCaption(truncateCaption(updatedText), {
+                        chat_id, message_id, parse_mode: 'HTML'
+                    });
+                } else {
+                    await bot.editMessageText(updatedText, {
+                        chat_id, message_id, parse_mode: 'HTML'
+                    });
+                }
+                q.updateAuctionFullText.run(updatedText, chat_id, message_id);
+                freshRow.full_text = updatedText;
+            } catch (err) {
+                if (!(await rescheduleIfLimit(err)) && !err.message.includes('message is not modified')) {
+                    console.error(`Failed to update status tag for auction ${chat_id}:${message_id}:`, err.message);
+                }
+            }
+        }
+    }
+
     if (freshRow.leader_id) {
         try {
             await bot.editMessageReplyMarkup(

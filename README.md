@@ -39,6 +39,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 |  | |
 |---|---|
 | 🕒 **Continuous auctions** | Auto-extends the deadline on last-minute bids to stop sniping. |
+| 🏷️ **Live status hashtag** | Header is tagged `#active` while open and flips to `#finished` on close. |
 | 🌍 **Bilingual** | Full Ukrainian & English UI, switchable from the admin panel. |
 | 🤖 **AI generation** | Generate titles & descriptions from a photo with OpenAI. |
 | 🔔 **Smart notifications** | Outbid alerts, custom reminders, and auto 30-min warnings. |
@@ -57,6 +58,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 - **Quick outbid response** — outbid notifications include a "Quick Bid" button to re-raise in a single tap.
 - **Interactive Info button** — reveals recent bidders in a short alert, collapsing consecutive bids from the same user.
 - **Robust scheduled closing** — powered by `node-schedule`; restores jobs on restart and posts a winner (or "no bids") banner.
+- **Live status hashtag** — the post header is tagged `#active` (`#активний`) while bidding is open and automatically flipped to `#finished` (`#завершений`) when the auction closes, in the bot's language. Restarting a finished auction flips it back.
 
 </details>
 
@@ -102,7 +104,7 @@ flowchart LR
 2. **User taps "Bid"** and is redirected to the bot via a deep link (`/start bid_CHATID_MSGID`).
 3. **Confirmation in the bot** — the item's photo/text and required bid amount are shown; the user confirms.
 4. **Processing** — the bot validates the price, updates the database, refreshes the channel keyboard, and notifies the previous leader.
-5. **Auction end** — the scheduler triggers the closing sequence, updating the post with the winner and notifying them privately.
+5. **Auction end** — the scheduler triggers the closing sequence, flipping the header hashtag to `#finished`, updating the post with the winner, and notifying them privately.
 
 ---
 

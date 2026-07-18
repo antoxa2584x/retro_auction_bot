@@ -296,6 +296,10 @@
       "bid_step": "🔸 Bid step",
       "end_date": "🕘 Auction ends",
       "footer": "To place a bid, just click the button under this post"
+    },
+    "status": {
+      "active": "#active",
+      "finished": "#finished"
     }
   }
 }
