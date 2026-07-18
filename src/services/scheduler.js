@@ -206,7 +206,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     if (!freshRow) return;
 
     const rescheduleIfLimit = async (err) => {
-        if (err.message.includes('Too Many Requests') || (err.response && err.response.statusCode === 429)) {
+        if (err.message.includes('Too Many Requests') || (err.response && err.response.status === 429)) {
             const delay = Math.floor(Math.random() * (60 - 30 + 1) + 30) * 1000;
             console.warn(`Too Many Requests while updating keyboard for auction ${chat_id}:${message_id}. Rescheduling in ${delay / 1000}s`);
             setTimeout(() => closeAuction(bot, chat_id, message_id), delay);

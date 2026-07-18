@@ -328,7 +328,7 @@ export async function sendAuctionGallery(bot, chatId, photoIds, replyToId) {
     }));
 
     await bot.sendMediaGroup(chatId, media, {
-        reply_to_message_id: replyToId
+        reply_parameters: { message_id: replyToId }
     });
 }
 

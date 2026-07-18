@@ -265,7 +265,7 @@ export function registerUserCommands(bot) {
             await bot.sendMessage(chatId, caption, {
                 parse_mode: 'HTML',
                 reply_markup: replyMarkup,
-                disable_web_page_preview: true
+                link_preview_options: { is_disabled: true }
             });
         }
     });
@@ -353,7 +353,7 @@ export function registerUserCommands(bot) {
                         await bot.sendMessage(chatId, caption, {
                             parse_mode: 'HTML',
                             reply_markup: replyMarkup,
-                            disable_web_page_preview: true
+                            link_preview_options: { is_disabled: true }
                         });
                     } else {
                         await bot.editMessageText(caption, {
@@ -361,7 +361,7 @@ export function registerUserCommands(bot) {
                             message_id: messageId,
                             parse_mode: 'HTML',
                             reply_markup: replyMarkup,
-                            disable_web_page_preview: true
+                            link_preview_options: { is_disabled: true }
                         });
                     }
                 }
@@ -410,7 +410,7 @@ export function registerUserCommands(bot) {
                 await bot.sendMessage(chatId, caption, {
                     parse_mode: 'HTML',
                     reply_markup: replyMarkup,
-                    disable_web_page_preview: true
+                    link_preview_options: { is_disabled: true }
                 });
             }
             return;
@@ -538,7 +538,7 @@ export function registerUserCommands(bot) {
             await bot.sendMessage(chatId, caption, {
                 parse_mode: 'HTML',
                 reply_markup: replyMarkup,
-                disable_web_page_preview: true
+                link_preview_options: { is_disabled: true }
             });
         }
     });

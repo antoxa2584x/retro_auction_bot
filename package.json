@@ -2,19 +2,19 @@
   "name": "tg-auction-bot",
   "version": "2.0.5",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node src/bot.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2",
-    "date-fns": "^4.1.0",
+    "better-sqlite3": "^12.11.1",
+    "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.2",
     "node-schedule": "^2.1.1",
-    "node-telegram-bot-api": "^0.67.0",
-    "openai": "^6.29.0"
-  },
-  "devDependencies": {
-    "@types/node-telegram-bot-api": "^0.64.14"
+    "node-telegram-bot-api": "^1.2.0",
+    "openai": "^6.48.0"
   }
 }

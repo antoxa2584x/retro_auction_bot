@@ -73,7 +73,7 @@ export function registerBroadcastHandlers(bot) {
                 for (let j = 0; j < results.length; j++) {
                     if (results[j].status === 'fulfilled') { success++; continue; }
                     const err = results[j].reason;
-                    const code = err?.response?.statusCode;
+                    const code = err?.response?.status;
                     if (code === 429) {
                         maxRetryAfter = Math.max(maxRetryAfter, err?.response?.body?.parameters?.retry_after || 1);
                     } else {
@@ -88,7 +88,7 @@ export function registerBroadcastHandlers(bot) {
                     const retryResults = await Promise.allSettled(
                         results
                             .map((res, idx) => ({ res, idx }))
-                            .filter(({ res }) => res.status === 'rejected' && res.reason?.response?.statusCode === 429)
+                            .filter(({ res }) => res.status === 'rejected' && res.reason?.response?.status === 429)
                             .map(({ idx }) => sendOne(slice[idx].user_id))
                     );
                     for (const r of retryResults) {
