@@ -107,7 +107,7 @@
     "not_set": "Not set",
     "post_new": "➕ Post New Auction",
     "post_step_img": "🖼 <b>Step 1/6: Image</b>\n\nSend an image for the auction, or click skip if you only want text.",
-    "post_step_title": "📝 <b>Step 2/6: Title & Description</b>\n\nEnter the title and description for the auction (HTML supported).\n\nDelivery and payment terms are agreed with the buyer individually. It is forbidden to specify such terms in the auction description.",
+    "post_step_title": "📝 <b>Step 2/6: Title & Description</b>\n\nEnter the title and description for the auction (HTML supported).\n\n<b>The first line</b> is the lot title: briefly state what the item is (e.g. <i>Sony PSP-3000, Japanese version</i>). The following lines are the detailed description.\n\n💡 Add hashtags to the description so the lot is easier to find, e.g.: #game #psp #console #japan #retro #cartridge\n\nDelivery and payment terms are agreed with the buyer individually. It is forbidden to specify such terms in the auction description.",
     "post_step_min_bid": "💰 <b>Step 3/6: Minimum Bid</b>\n\nEnter the starting price (number only).",
     "post_step_step": "📈 <b>Step 4/6: Bid Step</b>\n\nSelect a bid step or enter a custom value.",
     "post_step_end": "📅 <b>Step 5/7: Auction Duration</b>\n\nChoose the number of days for the auction duration.",
