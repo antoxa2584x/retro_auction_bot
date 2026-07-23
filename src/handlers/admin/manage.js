@@ -9,7 +9,8 @@ import {
     makeEmptyFinishKb,
     makeAdminPendingKb,
     makeAdminPendingViewKb,
-    makeAdminPendingRejectKb
+    makeAdminPendingRejectKb,
+    REJECT_REASON_KEYS
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
@@ -494,6 +495,25 @@ export function registerManageHandlers(bot) {
             q.updatePendingAuctionStatus.run('rejected', id);
             await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
             await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected'), { parse_mode: 'HTML' }).catch(() => {});
+            await sendAdminPanel(bot, chatId, false);
+        }
+
+        if (data.startsWith('adm_pen_reject_reason:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            const [, id, indexStr] = data.split(':');
+            const p = q.getPendingAuction.get(id);
+            if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
+
+            // The callback carries a 1-based index into the predefined reasons.
+            const reasonKey = REJECT_REASON_KEYS[Number(indexStr) - 1];
+            if (!reasonKey) return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
+            const reason = t(reasonKey);
+
+            await cleanupGallery(bot, chatId, from.id);
+            adminSessions.delete(from.id);
+            q.updatePendingAuctionStatus.run('rejected', id);
+            await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
+            await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected_reason', { reason }), { parse_mode: 'HTML' }).catch(() => {});
             await sendAdminPanel(bot, chatId, false);
         }
 

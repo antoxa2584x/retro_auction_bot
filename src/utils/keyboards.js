@@ -139,14 +139,31 @@ export function makeAdminPendingViewKb(id) {
 }
 
 /**
+/**
+ * Locale keys of the predefined rejection reasons offered as quick-select
+ * buttons. The index into this array (1-based) is what the reject-reason
+ * callback carries, so the keyboard and the handler stay in sync.
+ * @type {string[]}
+ */
+export const REJECT_REASON_KEYS = [
+    'admin.pending_auction_reject_reason_1',
+    'admin.pending_auction_reject_reason_2',
+    'admin.pending_auction_reject_reason_3'
+];
+
+/**
  * Creates the keyboard for entering rejection reason.
- * 
+ *
  * @param {number} id - Pending auction ID.
  * @returns {Object} Inline keyboard object.
  */
 export function makeAdminPendingRejectKb(id) {
+    const reasonRows = REJECT_REASON_KEYS.map((key, i) => ([
+        { text: t(key), callback_data: `adm_pen_reject_reason:${id}:${i + 1}` }
+    ]));
     return {
         inline_keyboard: [
+            ...reasonRows,
             [{ text: t('admin.pending_auction_reject_no_reason'), callback_data: `adm_pen_reject_confirm:${id}` }],
             [{ text: t('common.cancel'), callback_data: 'adm_pen_reject_cancel', style: 'danger' }]
         ]
