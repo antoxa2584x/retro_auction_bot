@@ -63,6 +63,7 @@ export function registerChannelPostHandler(bot) {
             title,
             full_text: text,
             photo_id: photoId,
+            photo_ids: photoId ? photoId : null,
             min_bid: minBid,
             step,
             current_price: minBid,

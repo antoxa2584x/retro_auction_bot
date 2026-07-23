@@ -114,6 +114,10 @@ export function registerManageHandlers(bot) {
                 continuous_minutes: a.continuous_minutes
             });
 
+            // All photos of the auction (main + additional). Fall back to the
+            // single main photo_id for auctions posted before photo_ids was tracked.
+            const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
+
             try {
                 let newMsg;
                 const kb = makeKb(targetChatId, 0, minBid, 0);
@@ -139,6 +143,7 @@ export function registerManageHandlers(bot) {
                     title: a.title,
                     full_text: updatedFullText,
                     photo_id: a.photo_id,
+                    photo_ids: a.photo_ids || null,
                     min_bid: minBid,
                     step: step,
                     current_price: minBid,
@@ -156,6 +161,31 @@ export function registerManageHandlers(bot) {
                     chat_id: targetChatId,
                     message_id: newMsg.message_id
                 }).catch(() => {});
+
+                // Repost the additional photos as a gallery under the new post and
+                // remember their message_ids so a future restart can clean them up.
+                if (photoIds.length > 1) {
+                    try {
+                        const galleryMsgs = await sendAuctionGallery(bot, targetChatId, photoIds, newMsg.message_id);
+                        if (Array.isArray(galleryMsgs) && galleryMsgs.length > 0) {
+                            q.setGalleryMsgIds.run(galleryMsgs.map(m => m.message_id).join(','), targetChatId, newMsg.message_id);
+                        }
+                    } catch (e) {
+                        console.error('Failed to repost gallery on restart approval:', e.message);
+                    }
+                }
+
+                // Remove the old finished post and its old gallery so only the
+                // freshly reposted auction remains in the channel.
+                await bot.deleteMessage(targetChatId, targetMsgId).catch(() => {});
+                if (a.gallery_msg_ids) {
+                    for (const oldMsgId of a.gallery_msg_ids.split(',')) {
+                        await bot.deleteMessage(targetChatId, Number(oldMsgId)).catch(() => {});
+                    }
+                }
+                // The old row is keyed by the deleted message_id — drop it so it no
+                // longer surfaces in admin lists or scheduler scans.
+                q.deleteAuction.run(targetChatId, targetMsgId);
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
 
@@ -385,6 +415,7 @@ export function registerManageHandlers(bot) {
                     title: p.title,
                     full_text: auctionPost,
                     photo_id: photoIds[0] || null,
+                    photo_ids: photoIds.length > 0 ? photoIds.join(',') : null,
                     min_bid: p.min_bid,
                     step: p.step,
                     current_price: p.min_bid,
@@ -409,8 +440,11 @@ export function registerManageHandlers(bot) {
                     }
                 });
 
-                if (photoIds.length > 0) {
-                    await sendAuctionGallery(bot, channelId, photoIds, sentMsg.message_id);
+                if (photoIds.length > 1) {
+                    const galleryMsgs = await sendAuctionGallery(bot, channelId, photoIds, sentMsg.message_id);
+                    if (Array.isArray(galleryMsgs) && galleryMsgs.length > 0) {
+                        q.setGalleryMsgIds.run(galleryMsgs.map(m => m.message_id).join(','), channelId, sentMsg.message_id);
+                    }
                 }
 
                 scheduleClose(bot, channelId, sentMsg.message_id, new Date(p.end_at));
@@ -679,6 +713,10 @@ export function registerManageHandlers(bot) {
             // hashtag back (#завершений → #активний) to match the new state.
             updatedFullText = updatedFullText.replace(t('parse.status.finished'), t('parse.status.active'));
 
+            // All photos of the auction (main + additional). Fall back to the
+            // single main photo_id for auctions posted before photo_ids was tracked.
+            const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
+
             let restartOk = false;
             try {
                 let newMsg;
@@ -715,6 +753,7 @@ export function registerManageHandlers(bot) {
                     title: a.title,
                     full_text: updatedFullText,
                     photo_id: a.photo_id,
+                    photo_ids: a.photo_ids || null,
                     min_bid: a.min_bid,
                     step: a.step,
                     current_price: a.min_bid,
@@ -736,6 +775,31 @@ export function registerManageHandlers(bot) {
                 } catch (e) {
                     console.error('Failed to update new post keyboard:', e.message);
                 }
+
+                // Repost the additional photos as a gallery under the new post and
+                // remember their message_ids so a future restart can clean them up.
+                if (photoIds.length > 1) {
+                    try {
+                        const galleryMsgs = await sendAuctionGallery(bot, targetChatId, photoIds, newMsg.message_id);
+                        if (Array.isArray(galleryMsgs) && galleryMsgs.length > 0) {
+                            q.setGalleryMsgIds.run(galleryMsgs.map(m => m.message_id).join(','), targetChatId, newMsg.message_id);
+                        }
+                    } catch (e) {
+                        console.error('Failed to repost gallery on restart:', e.message);
+                    }
+                }
+
+                // Remove the old finished post and its old gallery so only the
+                // freshly reposted auction remains in the channel.
+                await bot.deleteMessage(targetChatId, targetMsgId).catch(() => {});
+                if (a.gallery_msg_ids) {
+                    for (const oldMsgId of a.gallery_msg_ids.split(',')) {
+                        await bot.deleteMessage(targetChatId, Number(oldMsgId)).catch(() => {});
+                    }
+                }
+                // The old row is keyed by the deleted message_id — drop it so it no
+                // longer surfaces in admin lists or scheduler scans.
+                q.deleteAuction.run(targetChatId, targetMsgId);
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
 

@@ -290,6 +290,7 @@ export function registerPostHandlers(bot) {
                     title: sessionData.title,
                     full_text: auctionPost,
                     photo_id: sessionData.photo_id || null,
+                    photo_ids: (sessionData.photo_ids && sessionData.photo_ids.length > 0) ? sessionData.photo_ids.join(',') : null,
                     min_bid: sessionData.min_bid,
                     step: sessionData.step,
                     current_price: sessionData.min_bid,
@@ -314,8 +315,11 @@ export function registerPostHandlers(bot) {
                     }
                 });
 
-                if (sessionData.photo_id) {
-                    await sendAuctionGallery(bot, channelId, sessionData.photo_ids, sentMsg.message_id);
+                if (sessionData.photo_ids && sessionData.photo_ids.length > 1) {
+                    const galleryMsgs = await sendAuctionGallery(bot, channelId, sessionData.photo_ids, sentMsg.message_id);
+                    if (Array.isArray(galleryMsgs) && galleryMsgs.length > 0) {
+                        q.setGalleryMsgIds.run(galleryMsgs.map(m => m.message_id).join(','), channelId, sentMsg.message_id);
+                    }
                 }
 
                 scheduleClose(bot, channelId, sentMsg.message_id, sessionData.end_at);

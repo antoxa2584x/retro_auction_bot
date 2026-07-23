@@ -318,16 +318,17 @@ export function truncateCaption(caption, limit = 1024) {
  * @param {number|string} chatId - Chat ID to send to.
  * @param {string[]} photoIds - Array of photo file IDs.
  * @param {number} replyToId - Message ID to reply to.
+ * @returns {Promise<Array<{message_id: number}>>} The sent gallery messages (empty if nothing sent).
  */
 export async function sendAuctionGallery(bot, chatId, photoIds, replyToId) {
-    if (!photoIds || photoIds.length <= 1) return;
+    if (!photoIds || photoIds.length <= 1) return [];
 
     const media = photoIds.slice(1).map(id => ({
         type: 'photo',
         media: id
     }));
 
-    await bot.sendMediaGroup(chatId, media, {
+    return await bot.sendMediaGroup(chatId, media, {
         reply_parameters: { message_id: replyToId }
     });
 }

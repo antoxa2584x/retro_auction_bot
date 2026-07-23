@@ -141,7 +141,14 @@ const migrations = [
     { name: 'creator_id', type: 'INTEGER' },
     // Guards against two admins restarting the same finished auction: acts as a
     // one-time claim flag so only the first approval/restart is processed.
-    { name: 'restart_handled', type: 'INTEGER DEFAULT 0' }
+    { name: 'restart_handled', type: 'INTEGER DEFAULT 0' },
+    // Comma-separated file_ids of ALL photos (main + gallery). photo_id above is
+    // just photoIds[0]; this preserves the additional photos so a restart can
+    // repost the full gallery.
+    { name: 'photo_ids', type: 'TEXT' },
+    // Comma-separated message_ids of the posted additional-photo gallery, so a
+    // restart can delete the old gallery alongside the old main post.
+    { name: 'gallery_msg_ids', type: 'TEXT' }
 ];
 
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
@@ -242,9 +249,16 @@ export const q = {
    */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes, creator_id)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes, @creator_id)
+      (chat_id, message_id, title, full_text, photo_id, photo_ids, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes, creator_id)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @photo_ids, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes, @creator_id)
   `),
+
+  /**
+   * Stores the message_ids of an auction's posted additional-photo gallery.
+   * Called after the gallery is sent (its message_ids aren't known at insert time).
+   * @type {import('better-sqlite3').Statement}
+   */
+  setGalleryMsgIds: db.prepare(`UPDATE auctions SET gallery_msg_ids=? WHERE chat_id=? AND message_id=?`),
 
   /**
    * Retrieves an auction by its chat ID and message ID.
