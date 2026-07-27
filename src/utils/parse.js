@@ -34,6 +34,15 @@ export function reconstructAuctionText(fullText, newData) {
     let content = fullText;
     if (header && content.startsWith(header)) {
         content = content.substring(header.length).trim();
+        // The header in a live post carries the status hashtag ("Header #активний"),
+        // so drop whichever tag follows it too. Otherwise the old tag survives into
+        // the description and buildAuctionText appends a second one below it.
+        for (const tag of [t('parse.status.active'), t('parse.status.finished')]) {
+            if (content.startsWith(tag)) {
+                content = content.substring(tag.length).trim();
+                break;
+            }
+        }
     }
     if (footer && content.endsWith(footer)) {
         content = content.substring(0, content.length - footer.length).trim();
