@@ -227,8 +227,48 @@ export function deriveTitle(text) {
 }
 
 /**
+ * Removes every auction status hashtag (#активний / #завершений) from a post
+ * text, along with the blank lines a removed standalone tag line leaves behind.
+ *
+ * Older builds could leave a stray tag on its own line in full_text; stripping
+ * unconditionally makes tag handling idempotent and heals those rows.
+ *
+ * @param {string} text - Post text.
+ * @returns {string} Text without status hashtags.
+ */
+export function stripStatusTags(text) {
+    if (!text) return text || '';
+    let out = text;
+    for (const tag of [t('parse.status.active'), t('parse.status.finished')]) {
+        out = out.split(tag).join('');
+    }
+    return out
+        .replace(/[ \t]+$/gm, '')   // trailing space left where a tag was removed
+        .replace(/\n{3,}/g, '\n\n') // blank line left by a removed tag-only line
+        .trim();
+}
+
+/**
+ * Rewrites a post text so the header carries exactly one status hashtag.
+ *
+ * Every existing tag is dropped first, so calling this repeatedly (close →
+ * restart → close) can never accumulate tags. Posts without a header get no
+ * tag, matching buildAuctionText.
+ *
+ * @param {string} text - Post text.
+ * @param {'active'|'finished'} status - Status to tag the header with.
+ * @returns {string} Text with a single status hashtag on the header line.
+ */
+export function setStatusTag(text, status) {
+    const cleaned = stripStatusTags(text);
+    const header = sanitizeHtml(q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header'));
+    if (!cleaned || !header || !cleaned.startsWith(header)) return cleaned;
+    return `${header} ${t(`parse.status.${status}`)}${cleaned.slice(header.length)}`;
+}
+
+/**
  * Constructs the auction post text based on the provided data and settings.
- * 
+ *
  * @param {Object} data - Auction data (full_text, min_bid, step, end_at, user_id, is_continuous, continuous_minutes).
  * @param {boolean} includeUserLabel - Whether to include the subscriber label.
  * @param {boolean} includeSettings - Whether to wrap with header/footer from settings.

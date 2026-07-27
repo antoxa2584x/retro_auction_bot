@@ -2,7 +2,7 @@ import schedule from 'node-schedule';
 import { q } from './db.js';
 import { makeEmptyFinishKb, winnerKeyboard } from '../utils/keyboards.js';
 import { getContactNickname, CHANNEL_USERNAME } from "../config/env.js";
-import { getAuctionLink, escapeHtml, formatUserLink, formatContactLink, truncateCaption } from '../utils/utils.js';
+import { getAuctionLink, escapeHtml, formatUserLink, formatContactLink, truncateCaption, setStatusTag } from '../utils/utils.js';
 import { t, getCurrency } from './i18n.js';
 
 /**
@@ -219,13 +219,12 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     const admins = q.getAllAdmins.all();
 
     // Flip the status hashtag in the post header (#активний → #завершений, in the
-    // bot's language). full_text mirrors the live post text, so a plain replace is
-    // enough — the winner/empty keyboard is re-applied by the branches below.
+    // bot's language). setStatusTag rewrites the header tag instead of patching
+    // occurrences, so a post that picked up a stray tag from an older restart is
+    // cleaned up here — the winner/empty keyboard is re-applied by the branches below.
     if (!alreadyFinished && freshRow.full_text) {
-        const activeTag = t('parse.status.active');
-        const finishedTag = t('parse.status.finished');
-        if (freshRow.full_text.includes(activeTag)) {
-            const updatedText = freshRow.full_text.replace(activeTag, finishedTag);
+        const updatedText = setStatusTag(freshRow.full_text, 'finished');
+        if (updatedText && updatedText !== freshRow.full_text) {
             try {
                 if (freshRow.photo_id) {
                     await bot.editMessageCaption(truncateCaption(updatedText), {

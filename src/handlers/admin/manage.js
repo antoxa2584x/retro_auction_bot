@@ -24,7 +24,8 @@ import {
     sendAuctionGallery,
     safeEditMessage,
     stripHtml,
-    truncateCaption
+    truncateCaption,
+    setStatusTag
 } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { reconstructAuctionText } from '../../utils/parse.js';
@@ -729,9 +730,11 @@ export function registerManageHandlers(bot) {
                 }
             }
 
-            // Restart makes the auction active again — flip the header status
-            // hashtag back (#завершений → #активний) to match the new state.
-            updatedFullText = updatedFullText.replace(t('parse.status.finished'), t('parse.status.active'));
+            // Restart makes the auction active again — retag the header
+            // (#завершений → #активний) to match the new state. setStatusTag drops
+            // any existing tags first, so a post carrying a stray tag from an older
+            // restart ends up with a single #активний instead of two.
+            updatedFullText = setStatusTag(updatedFullText, 'active');
 
             // All photos of the auction (main + additional). Fall back to the
             // single main photo_id for auctions posted before photo_ids was tracked.

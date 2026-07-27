@@ -1,7 +1,7 @@
 import { addYears, isBefore, parse, setYear } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { t, getCurrency } from '../services/i18n.js';
-import { buildAuctionText } from './utils.js';
+import { buildAuctionText, stripStatusTags } from './utils.js';
 import { q } from '../services/db.js';
 
 /**
@@ -30,19 +30,13 @@ export function reconstructAuctionText(fullText, newData) {
     const footer = q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer');
     const priceLabel = t('bid.price_label') || 'Ціна';
 
-    // 1. Strip header and footer if they exist to isolate the content
-    let content = fullText;
+    // 1. Strip header and footer if they exist to isolate the content.
+    // Status hashtags are re-added by buildAuctionText, so drop the ones the live
+    // post carries first — otherwise they survive into the description and the
+    // rebuilt post ends up with a second tag below the header.
+    let content = stripStatusTags(fullText);
     if (header && content.startsWith(header)) {
         content = content.substring(header.length).trim();
-        // The header in a live post carries the status hashtag ("Header #активний"),
-        // so drop whichever tag follows it too. Otherwise the old tag survives into
-        // the description and buildAuctionText appends a second one below it.
-        for (const tag of [t('parse.status.active'), t('parse.status.finished')]) {
-            if (content.startsWith(tag)) {
-                content = content.substring(tag.length).trim();
-                break;
-            }
-        }
     }
     if (footer && content.endsWith(footer)) {
         content = content.substring(0, content.length - footer.length).trim();
