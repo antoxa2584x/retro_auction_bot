@@ -207,6 +207,26 @@ export function stripHtml(html) {
 }
 
 /**
+ * Derives the auction title from the (HTML) auction body.
+ *
+ * The title is the first line of the body — cut at the first newline, not at a
+ * fixed character count — with HTML tags stripped. Lines that are empty once
+ * the tags are removed are skipped, so a body starting with a stray tag or a
+ * blank line still yields a usable title.
+ *
+ * @param {string} text - Auction body, possibly containing HTML.
+ * @returns {string} Plain-text title (may be an empty string for empty input).
+ */
+export function deriveTitle(text) {
+    if (!text) return '';
+    for (const line of text.split('\n')) {
+        const stripped = stripHtml(line);
+        if (stripped) return stripped;
+    }
+    return '';
+}
+
+/**
  * Constructs the auction post text based on the provided data and settings.
  * 
  * @param {Object} data - Auction data (full_text, min_bid, step, end_at, user_id, is_continuous, continuous_minutes).
