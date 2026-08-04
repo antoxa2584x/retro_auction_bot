@@ -495,8 +495,8 @@ export function makeAdminPostContinuousKb(min) {
     return {
         inline_keyboard: [
             [
-                {text: t('admin.continuous_yes', {min}), callback_data: 'post_cont:1'},
-                {text: t('admin.continuous_no'), callback_data: 'post_cont:0', style: 'primary'}
+                {text: t('admin.continuous_yes', {min}), callback_data: 'post_cont:1', style: 'primary'},
+                {text: t('admin.continuous_no'), callback_data: 'post_cont:0'}
             ],
             [{text: t('bid.kb.cancel'), callback_data: 'post_cancel', style: 'danger'}]
         ]
@@ -536,8 +536,8 @@ export function makeUserPostContinuousKb(min) {
     return {
         inline_keyboard: [
             [
-                {text: t('admin.continuous_yes', {min}), callback_data: 'user_post_cont:1', style: 'success'},
-                {text: t('admin.continuous_no'), callback_data: 'user_post_cont:0', style: 'primary'}
+                {text: t('admin.continuous_yes', {min}), callback_data: 'user_post_cont:1', style: 'primary'},
+                {text: t('admin.continuous_no'), callback_data: 'user_post_cont:0'}
             ],
             [{text: t('common.cancel'), callback_data: 'user_post_cancel', style: 'danger'}]
         ]
