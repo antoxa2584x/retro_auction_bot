@@ -298,11 +298,17 @@
       "min_bid": "🔸 Minimum bid",
       "bid_step": "🔸 Bid step",
       "end_date": "🕘 Auction ends",
+      "auction_type": "♻️ Auction type",
       "footer": "To place a bid, just click the button under this post"
     },
     "status": {
       "active": "#active",
       "finished": "#finished"
+    },
+    "type": {
+      "fixed": "fixed end time",
+      "continuous": "with extension",
+      "continuous_note": "every bid in the last {{min}} min extends the auction by another {{min}} min"
     }
   }
 }

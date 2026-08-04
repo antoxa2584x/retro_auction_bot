@@ -26,6 +26,7 @@ export function reconstructAuctionText(fullText, newData) {
     const minBidLabel = q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid');
     const bidStepLabel = q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step');
     const endDateLabel = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
+    const typeLabel = q.getSetting.get('AUCTION_TYPE_TEXT')?.value || t('parse.defaults.auction_type');
     const header = q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header');
     const footer = q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer');
     const priceLabel = t('bid.price_label') || 'Ціна';
@@ -42,8 +43,8 @@ export function reconstructAuctionText(fullText, newData) {
         content = content.substring(0, content.length - footer.length).trim();
     }
 
-    // 2. Remove technical lines (min bid, step, end date, price) from the end
-    const labels = [minBidLabel, bidStepLabel, endDateLabel, priceLabel];
+    // 2. Remove technical lines (min bid, step, end date, auction type, price) from the end
+    const labels = [minBidLabel, bidStepLabel, endDateLabel, typeLabel, priceLabel];
     const lines = content.split('\n');
     const filteredLines = lines.filter(line => {
         const trimmed = line.trim();

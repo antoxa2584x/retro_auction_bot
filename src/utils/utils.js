@@ -284,7 +284,16 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
     const minBidText = sanitizeHtml(q.getSetting.get('AUCTION_MIN_BID_TEXT')?.value || t('parse.defaults.min_bid'));
     const bidStepText = sanitizeHtml(q.getSetting.get('AUCTION_BID_STEP_TEXT')?.value || t('parse.defaults.bid_step'));
     const endDateText = sanitizeHtml(q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date'));
+    const typeText = sanitizeHtml(q.getSetting.get('AUCTION_TYPE_TEXT')?.value || t('parse.defaults.auction_type'));
     const footer = includeSettings ? sanitizeHtml(q.getSetting.get('AUCTION_FOOTER')?.value || t('parse.defaults.footer')) : '';
+
+    // Whether the auction closes at a fixed time or keeps extending on late bids
+    // (see placeBidTransaction in services/db.js). Bidders can't tell the two
+    // apart from the end time alone, so the post spells it out.
+    const contMinutes = data.continuous_minutes || parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5', 10);
+    const typeLine = data.is_continuous
+        ? `${typeText}: <b>${t('parse.type.continuous')}</b> — ${t('parse.type.continuous_note', { min: contMinutes })}`
+        : `${typeText}: <b>${t('parse.type.fixed')}</b>`;
 
     const formattedEnd = formatInTimeZone(new Date(data.end_at), TZ, 'dd.MM о HH:mm');
 
@@ -303,11 +312,8 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
     text += `${sanitizeHtml(data.full_text)}\n\n${userLabel}` +
         `${minBidText}: <b>${data.min_bid} ${cur}</b>\n` +
         `${bidStepText}: <b>${data.step} ${cur}</b>\n` +
-        `${endDateText}: <b>${formattedEnd}</b>\n\n`;
-    
-    if (data.is_continuous !== undefined && includeSettings === false) {
-        text += `Continuous: ${data.is_continuous ? t('admin.kb.yes') : t('admin.kb.no')}\n\n`;
-    }
+        `${endDateText}: <b>${formattedEnd}</b>\n` +
+        `${typeLine}\n\n`;
 
     if (footer) text += `${footer}`;
 
