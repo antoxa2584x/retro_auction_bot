@@ -293,7 +293,7 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
     const contMinutes = data.continuous_minutes || parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5', 10);
     const typeLine = data.is_continuous
         ? `${typeText}: <b>${t('parse.type.continuous')}</b> — ${t('parse.type.continuous_note', { min: contMinutes })}`
-        : `${typeText}: <b>${t('parse.type.fixed')}</b>`;
+        : `${typeText}: <b>${t('parse.type.fixed')}</b> — ${t('parse.type.fixed_note')}`;
 
     const formattedEnd = formatInTimeZone(new Date(data.end_at), TZ, 'dd.MM о HH:mm');
 

@@ -307,6 +307,7 @@
     },
     "type": {
       "fixed": "fixed end time",
+      "fixed_note": "the auction closes exactly at the time above, bids do not extend it",
       "continuous": "with extension",
       "continuous_note": "every bid in the last {{min}} min extends the auction by another {{min}} min"
     }
