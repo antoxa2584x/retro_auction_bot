@@ -19,6 +19,7 @@ import {scheduleClose} from '../../services/scheduler.js';
 import {getCurrency, getLocale, t} from '../../services/i18n.js';
 import {sendAdminPanel} from './manage.js';
 import {calculateImageHash, generateAuctionDetails} from '../../services/openai.js';
+import {buildWatermarkedPhoto, WATERMARK_FILE_OPTIONS} from '../../services/watermark.js';
 import {
     buildAuctionText,
     deriveTitle,
@@ -270,12 +271,23 @@ export function registerPostHandlers(bot) {
                 const auctionPost = buildAuctionText(sessionData);
 
                 const kb = makeKb(channelId, 0, sessionData.min_bid, 0);
+                // The main photo of an admin-posted auction carries the watermark.
+                // Gallery photos and user-submitted auctions are left untouched.
+                let mainPhotoId = sessionData.photo_id || null;
                 if (sessionData.photo_id) {
-                    sentMsg = await bot.sendPhoto(channelId, sessionData.photo_id, {
+                    const watermarked = await buildWatermarkedPhoto(bot, sessionData.photo_id);
+                    sentMsg = await bot.sendPhoto(channelId, watermarked || sessionData.photo_id, {
                         caption: truncateCaption(auctionPost),
                         parse_mode: 'HTML',
                         reply_markup: kb
-                    });
+                    }, watermarked ? WATERMARK_FILE_OPTIONS : undefined);
+
+                    // Uploading a buffer mints a brand new file_id. Persist that one
+                    // rather than the original so every later re-send (restart, winner
+                    // DM, /my_bids preview) shows the watermarked image too.
+                    if (watermarked) {
+                        mainPhotoId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id || sessionData.photo_id;
+                    }
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
                         parse_mode: 'HTML',
@@ -293,8 +305,8 @@ export function registerPostHandlers(bot) {
                     message_id: sentMsg.message_id,
                     title: sessionData.title,
                     full_text: auctionPost,
-                    photo_id: sessionData.photo_id || null,
-                    photo_ids: (sessionData.photo_ids && sessionData.photo_ids.length > 0) ? sessionData.photo_ids.join(',') : null,
+                    photo_id: mainPhotoId,
+                    photo_ids: buildPhotoIdsColumn(sessionData.photo_ids, mainPhotoId),
                     min_bid: sessionData.min_bid,
                     step: sessionData.step,
                     current_price: sessionData.min_bid,
@@ -533,6 +545,22 @@ export async function handlePostInput(bot, msg) {
     }
 
     return false;
+}
+
+/**
+ * Builds the comma-separated photo_ids column, swapping in the watermarked
+ * file_id for the main photo so a restart reposts the watermarked version while
+ * the untouched gallery photos are preserved as-is.
+ *
+ * @param {string[]|undefined} photoIds - Session photo file_ids (main first).
+ * @param {string|null} mainPhotoId - file_id actually posted as the main photo.
+ * @returns {string|null} Column value, or null when there are no photos.
+ */
+function buildPhotoIdsColumn(photoIds, mainPhotoId) {
+    if (!photoIds || photoIds.length === 0) return null;
+    const ids = [...photoIds];
+    if (mainPhotoId) ids[0] = mainPhotoId;
+    return ids.join(',');
 }
 
 async function showPhotoReceivedOptions(bot, chatId, session) {

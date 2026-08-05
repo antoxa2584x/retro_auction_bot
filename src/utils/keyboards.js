@@ -439,6 +439,7 @@ export function makeAdminSettingsKb() {
                 {text: t('admin.settings_template'), callback_data: 'adm_settings_template'},
                 {text: t('admin.settings_defaults'), callback_data: 'adm_settings_defaults'}
             ],
+            [{text: t('admin.settings_watermark'), callback_data: 'adm_settings_watermark'}],
             [{text: t('admin.settings_admins'), callback_data: 'adm_admins'}],
             [{text: `🌐 ${t('admin.lang_button')}`, callback_data: 'adm_lang'}],
             [{text: `💰 ${t('admin.cur_button')}`, callback_data: 'adm_cur'}],
@@ -500,6 +501,55 @@ export function makeAdminSettingsDefaultsKb() {
             [{text: t('common.back'), callback_data: 'adm_settings', style: 'primary'}]
         ]
     };
+}
+
+/**
+ * Creates the watermark settings keyboard.
+ *
+ * @param {boolean} hasImage - Whether a watermark PNG has been uploaded.
+ * @param {boolean} enabled - Whether watermarking is currently switched on.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminSettingsWatermarkKb(hasImage, enabled) {
+    const rows = [
+        [{text: hasImage ? t('admin.wm_replace') : t('admin.wm_upload'), callback_data: 'wm_upload'}]
+    ];
+
+    // Position/size/opacity/preview are meaningless without an image to place.
+    if (hasImage) {
+        rows.push(
+            [{text: `${enabled ? '✅' : '❌'} ${t('admin.wm_enabled')}`, callback_data: 'wm_toggle'}],
+            [{text: `📍 ${t('admin.wm_position')}`, callback_data: 'wm_position'}],
+            [
+                {text: `🔍 ${t('admin.wm_size')}`, callback_data: 'set_conf:WATERMARK_SCALE'},
+                {text: `🌫 ${t('admin.wm_opacity')}`, callback_data: 'set_conf:WATERMARK_OPACITY'}
+            ],
+            [{text: `👁 ${t('admin.wm_preview')}`, callback_data: 'wm_preview'}],
+            [{text: `🗑 ${t('admin.wm_delete')}`, callback_data: 'wm_delete', style: 'danger'}]
+        );
+    }
+
+    rows.push([{text: t('common.back'), callback_data: 'adm_settings', style: 'primary'}]);
+    return {inline_keyboard: rows};
+}
+
+/**
+ * Creates the 3x3 watermark position picker, marking the active cell.
+ *
+ * @param {string[]} positions - The nine gravities, in grid order.
+ * @param {string} current - Currently selected gravity.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminWatermarkPositionKb(positions, current) {
+    const rows = [];
+    for (let i = 0; i < positions.length; i += 3) {
+        rows.push(positions.slice(i, i + 3).map(pos => ({
+            text: pos === current ? `🔘 ${t(`admin.wm_pos_${pos}`)}` : t(`admin.wm_pos_${pos}`),
+            callback_data: `wm_pos:${pos}`
+        })));
+    }
+    rows.push([{text: t('common.back'), callback_data: 'adm_settings_watermark', style: 'primary'}]);
+    return {inline_keyboard: rows};
 }
 
 /**

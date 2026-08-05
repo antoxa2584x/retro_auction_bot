@@ -53,13 +53,13 @@ export function registerAdminHandlers(bot) {
             return;
         }
 
-        // Settings input handling
+        // Settings input handling. Passed unconditionally (not just for text)
+        // because the watermark step expects an uploaded PNG document;
+        // handleSettingsInput returns false for input it can't use.
         if (userSessions.has(msg.from.id)) {
-            if (text) {
-                const handled = await handleSettingsInput(bot, msg, text);
-                if (handled) {
-                    return;
-                }
+            const handled = await handleSettingsInput(bot, msg, text);
+            if (handled) {
+                return;
             }
         }
     });
