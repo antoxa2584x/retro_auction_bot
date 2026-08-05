@@ -139,16 +139,33 @@ export function makeAdminPendingViewKb(id) {
 }
 
 /**
-/**
- * Locale keys of the predefined rejection reasons offered as quick-select
- * buttons. The index into this array (1-based) is what the reject-reason
- * callback carries, so the keyboard and the handler stay in sync.
- * @type {string[]}
+ * Predefined rejection reasons offered as quick-select buttons. `label` is the
+ * short caption shown on the button and quoted back to the user as the reason;
+ * the optional `details` key is appended to that notification to explain how the
+ * user can fix the problem. Reasons with `showRules` also get a link to the
+ * configured rules page, when one is set. The index into this array (1-based) is
+ * what the reject-reason callback carries, so the keyboard and the handler stay
+ * in sync.
+ * @type {{label: string, details?: string, showRules?: boolean}[]}
  */
-export const REJECT_REASON_KEYS = [
-    'admin.pending_auction_reject_reason_1',
-    'admin.pending_auction_reject_reason_2',
-    'admin.pending_auction_reject_reason_3'
+export const REJECT_REASONS = [
+    {
+        label: 'admin.pending_auction_reject_reason_1',
+        details: 'admin.pending_auction_reject_reason_1_details'
+    },
+    {
+        label: 'admin.pending_auction_reject_reason_2',
+        details: 'admin.pending_auction_reject_reason_2_details',
+        showRules: true
+    },
+    {
+        label: 'admin.pending_auction_reject_reason_3',
+        details: 'admin.pending_auction_reject_reason_3_details'
+    },
+    {
+        label: 'admin.pending_auction_reject_reason_4',
+        details: 'admin.pending_auction_reject_reason_4_details'
+    }
 ];
 
 /**
@@ -158,8 +175,8 @@ export const REJECT_REASON_KEYS = [
  * @returns {Object} Inline keyboard object.
  */
 export function makeAdminPendingRejectKb(id) {
-    const reasonRows = REJECT_REASON_KEYS.map((key, i) => ([
-        { text: t(key), callback_data: `adm_pen_reject_reason:${id}:${i + 1}` }
+    const reasonRows = REJECT_REASONS.map((reason, i) => ([
+        { text: t(reason.label), callback_data: `adm_pen_reject_reason:${id}:${i + 1}` }
     ]));
     return {
         inline_keyboard: [

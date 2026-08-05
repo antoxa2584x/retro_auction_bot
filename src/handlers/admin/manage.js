@@ -10,7 +10,7 @@ import {
     makeAdminPendingKb,
     makeAdminPendingViewKb,
     makeAdminPendingRejectKb,
-    REJECT_REASON_KEYS
+    REJECT_REASONS
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
@@ -506,15 +506,22 @@ export function registerManageHandlers(bot) {
             if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
 
             // The callback carries a 1-based index into the predefined reasons.
-            const reasonKey = REJECT_REASON_KEYS[Number(indexStr) - 1];
-            if (!reasonKey) return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
-            const reason = t(reasonKey);
+            const preset = REJECT_REASONS[Number(indexStr) - 1];
+            if (!preset) return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
+
+            // Short label as the reason line, plus the optional how-to-fix note.
+            let notification = t('admin.pending_auction_rejected_reason', { reason: t(preset.label) });
+            if (preset.details) notification += '\n\n' + t(preset.details);
+            // "Read the rules" is only actionable with the link, and the link is
+            // optional in settings — skip the line when it isn't configured.
+            const rulesLink = preset.showRules ? q.getSetting.get('RULES_LINK')?.value : null;
+            if (rulesLink) notification += '\n\n' + t('admin.pending_auction_reject_rules_link', { link: rulesLink });
 
             await cleanupGallery(bot, chatId, from.id);
             adminSessions.delete(from.id);
             q.updatePendingAuctionStatus.run('rejected', id);
             await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_rejected') }).catch(() => {});
-            await bot.sendMessage(p.user_id, t('admin.pending_auction_rejected_reason', { reason }), { parse_mode: 'HTML' }).catch(() => {});
+            await bot.sendMessage(p.user_id, notification, { parse_mode: 'HTML' }).catch(() => {});
             await sendAdminPanel(bot, chatId, false);
         }
 
