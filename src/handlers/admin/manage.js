@@ -13,6 +13,8 @@ import {
     REJECT_REASONS
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
+import { logError, logWarn } from '../../services/logger.js';
+import { verifyAuctionStored } from '../../services/diagnostics.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction, cancelAuctionJobs } from '../../services/scheduler.js';
 import { 
@@ -156,13 +158,29 @@ export function registerManageHandlers(bot) {
                     creator_id: a.creator_id
                 });
 
+                verifyAuctionStored('restart_request_approval', targetChatId, newMsg.message_id, {
+                    creator_id: a.creator_id,
+                    approved_by: from.id,
+                    replaced_message_id: targetMsgId
+                });
+
                 // Patch the keyboard with the real message_id so the deep-link bid
                 // button resolves instead of pointing at message_id 0.
                 const finalKb = makeKb(targetChatId, newMsg.message_id, minBid, 0);
                 await bot.editMessageReplyMarkup(finalKb, {
                     chat_id: targetChatId,
                     message_id: newMsg.message_id
-                }).catch(() => {});
+                }).catch(err => {
+                    if (!err.message.includes('message is not modified')) {
+                        // Buttons keep message_id 0 → bids report "not found".
+                        logError('auction_keyboard_patch_failed', {
+                            source: 'restart_request_approval',
+                            chat_id: targetChatId,
+                            message_id: newMsg.message_id,
+                            error: err
+                        });
+                    }
+                });
 
                 // Repost the additional photos as a gallery under the new post and
                 // remember their message_ids so a future restart can clean them up.
@@ -387,13 +405,15 @@ export function registerManageHandlers(bot) {
             adminSessions.delete(from.id);
 
             let posted = false;
+            // Hoisted so the catch below can report which channel message was left
+            // orphaned when a step after the send fails.
+            let sentMsg = null;
             try {
                 const channelId = getChannelId();
                 const auctionPost = buildAuctionText(p);
 
                 const kb = makeKb(channelId, 0, p.min_bid, 0);
                 const photoIds = p.photo_ids ? p.photo_ids.split(',') : [];
-                let sentMsg;
 
                 if (photoIds.length > 0) {
                     sentMsg = await bot.sendPhoto(channelId, photoIds[0], {
@@ -429,6 +449,13 @@ export function registerManageHandlers(bot) {
                 });
                 posted = true;
 
+                verifyAuctionStored('pending_approval', channelId, sentMsg.message_id, {
+                    pending_id: Number(id),
+                    creator_id: p.user_id,
+                    approved_by: from.id,
+                    photo_count: photoIds.length
+                });
+
                 // Patch the keyboard with the real message_id so the deep-link bid
                 // button resolves (otherwise it points at message_id 0 → bids fail
                 // with "auction not found").
@@ -439,6 +466,16 @@ export function registerManageHandlers(bot) {
                 }).catch(err => {
                     if (!err.message.includes('message is not modified')) {
                         console.error(`Failed to update keyboard after approval:`, err.message);
+                        // The buttons still encode message_id 0, so every bid on
+                        // this post resolves to a lookup for (channel, 0) and
+                        // reports "auction not found".
+                        logError('auction_keyboard_patch_failed', {
+                            source: 'pending_approval',
+                            chat_id: channelId,
+                            message_id: sentMsg.message_id,
+                            pending_id: Number(id),
+                            error: err
+                        });
                     }
                 });
 
@@ -456,6 +493,19 @@ export function registerManageHandlers(bot) {
                 await sendAdminPanel(bot, chatId, false);
             } catch (e) {
                 console.error(e);
+                // `posted` only covers the insert. If the send succeeded but the
+                // insert (or anything before it) threw, the post is live in the
+                // channel with no row behind it — its buttons will report
+                // "auction not found" until someone deletes the message.
+                logError('auction_post_failed', {
+                    source: 'pending_approval',
+                    pending_id: Number(id),
+                    creator_id: p.user_id,
+                    channel_message_id: sentMsg?.message_id ?? null,
+                    row_inserted: posted,
+                    orphaned_channel_post: Boolean(sentMsg) && !posted,
+                    error: e
+                });
                 // Roll the claim back only if nothing was actually posted, so the
                 // admin can retry. If the post already landed, leave it 'approved'
                 // to avoid a duplicate on retry.
@@ -794,6 +844,12 @@ export function registerManageHandlers(bot) {
                     creator_id: a.creator_id
                 });
 
+                verifyAuctionStored('admin_restart', targetChatId, newMsg.message_id, {
+                    creator_id: a.creator_id,
+                    restarted_by: from.id,
+                    replaced_message_id: targetMsgId
+                });
+
                 // Patch the keyboard with the real message_id so the deep-link bid
                 // button resolves instead of pointing at message_id 0.
                 try {
@@ -804,6 +860,13 @@ export function registerManageHandlers(bot) {
                     });
                 } catch (e) {
                     console.error('Failed to update new post keyboard:', e.message);
+                    // Buttons keep message_id 0 → bids report "not found".
+                    logError('auction_keyboard_patch_failed', {
+                        source: 'admin_restart',
+                        chat_id: targetChatId,
+                        message_id: newMsg.message_id,
+                        error: e
+                    });
                 }
 
                 // Repost the additional photos as a gallery under the new post and
@@ -982,8 +1045,17 @@ export function registerManageHandlers(bot) {
 
             const targetChatId = Number(deleteMatch[1]);
             const targetMsgId = Number(deleteMatch[2]);
-            
-            q.deleteAuction.run(targetChatId, targetMsgId);
+
+            // Only the row goes away; the channel post stays up. Its buttons will
+            // report "auction not found" from here on, so record who dropped it.
+            const deleted = q.deleteAuction.run(targetChatId, targetMsgId).changes;
+            logWarn('auction_row_deleted', {
+                source: 'admin_delete',
+                chat_id: targetChatId,
+                message_id: targetMsgId,
+                deleted_by: from.id,
+                rows_deleted: deleted
+            });
             cancelAuctionJobs(targetChatId, targetMsgId);
 
             await bot.sendMessage(chatId, "Аукціон видалено з бази даних.");

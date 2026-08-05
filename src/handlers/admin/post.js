@@ -11,6 +11,8 @@ import {
     makeKb
 } from '../../utils/keyboards.js';
 import {getChannelId, getContactNickname, TZ} from "../../config/env.js";
+import {logError} from '../../services/logger.js';
+import {verifyAuctionStored} from '../../services/diagnostics.js';
 import {formatInTimeZone} from 'date-fns-tz';
 import {addDays, parse, set} from 'date-fns';
 import {scheduleClose} from '../../services/scheduler.js';
@@ -261,11 +263,13 @@ export function registerPostHandlers(bot) {
             }
 
             let posted = false;
+            // Hoisted so the catch below can report which channel message was left
+            // orphaned when a step after the send fails.
+            let sentMsg = null;
             try {
                 const auctionPost = buildAuctionText(sessionData);
 
                 const kb = makeKb(channelId, 0, sessionData.min_bid, 0);
-                let sentMsg;
                 if (sessionData.photo_id) {
                     sentMsg = await bot.sendPhoto(channelId, sessionData.photo_id, {
                         caption: truncateCaption(auctionPost),
@@ -302,6 +306,11 @@ export function registerPostHandlers(bot) {
                 });
                 posted = true;
 
+                verifyAuctionStored('admin_post', channelId, sentMsg.message_id, {
+                    creator_id: from.id,
+                    photo_count: sessionData.photo_ids?.length || (sessionData.photo_id ? 1 : 0)
+                });
+
                 // Patch the keyboard with the real message_id. The deep-link bid
                 // button encodes it; without this it points at message_id 0 and
                 // every bid fails with "auction not found".
@@ -312,6 +321,16 @@ export function registerPostHandlers(bot) {
                 }).catch(err => {
                     if (!err.message.includes('message is not modified')) {
                         console.error(`Failed to update keyboard for admin post ${channelId}:${sentMsg.message_id}:`, err.message);
+                        // The buttons still encode message_id 0, so every bid on
+                        // this post resolves to a lookup for (channel, 0) and
+                        // reports "auction not found".
+                        logError('auction_keyboard_patch_failed', {
+                            source: 'admin_post',
+                            chat_id: channelId,
+                            message_id: sentMsg.message_id,
+                            creator_id: from.id,
+                            error: err
+                        });
                     }
                 });
 
@@ -333,6 +352,19 @@ export function registerPostHandlers(bot) {
                 await sendAdminPanel(bot, chatId, false);
             } catch (e) {
                 console.error('Failed to post auction:', e);
+                // `posted` only covers the insert. If the send succeeded but the
+                // insert (or anything before it) threw, the post is live in the
+                // channel with no row behind it — its buttons will report
+                // "auction not found" until someone deletes the message.
+                logError('auction_post_failed', {
+                    source: 'admin_post',
+                    creator_id: from.id,
+                    channel_id: channelId,
+                    channel_message_id: sentMsg?.message_id ?? null,
+                    row_inserted: posted,
+                    orphaned_channel_post: Boolean(sentMsg) && !posted,
+                    error: e
+                });
                 if (posted) {
                     // Auction is already live in the channel; the failure was in a
                     // follow-up step (gallery / panel). Don't allow a re-post.

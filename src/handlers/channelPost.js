@@ -3,6 +3,7 @@ import {q} from '../services/db.js';
 import {makeKb} from '../utils/keyboards.js';
 import {parsePost} from '../utils/parse.js';
 import {scheduleClose} from '../services/scheduler.js';
+import {verifyAuctionStored} from '../services/diagnostics.js';
 import { t } from '../services/i18n.js';
 
 /**
@@ -73,6 +74,8 @@ export function registerChannelPostHandler(bot) {
             continuous_minutes: continuousMinutes,
             creator_id: null
         });
+
+        verifyAuctionStored('channel_post', post.chat.id, post.message_id, { creator_id: null });
 
         const finalKb = makeKb(post.chat.id, post.message_id, minBid, 0);
         await attachKbToMedia(bot, post, finalKb);

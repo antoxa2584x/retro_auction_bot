@@ -1,6 +1,7 @@
 import { q, placeBidTransaction } from '../../services/db.js';
 import { makeKb, confirmBidKb, confirmManualBidKb, makeOutbidKb } from '../../utils/keyboards.js';
 import { scheduleClose, closeAuction } from "../../services/scheduler.js";
+import { logAuctionNotFound } from '../../services/diagnostics.js';
 import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -68,6 +69,7 @@ export function registerBidHandlers(bot) {
 
                 const auction = q.getAuction.get(targetChatId, targetMsgId);
                 if (!auction) {
+                    logAuctionNotFound('manual_bid_amount', targetChatId, targetMsgId, { user_id: replyMsg.from.id });
                     return bot.sendMessage(chatId, t('bid.not_found'));
                 }
 
@@ -112,6 +114,7 @@ export function registerBidHandlers(bot) {
 
             if (!res.success) {
                 if (res.reason === 'not_found') {
+                    logAuctionNotFound('bid_confirm', target_chat_id, target_message_id, { user_id: user.id, price });
                     await bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
                     return bot.deleteMessage(chatId, messageId).catch(() => {});
                 }

@@ -3,6 +3,7 @@ import { getAuctionLink, truncateCaption, formatUserLinkById } from '../../utils
 import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
+import { logAuctionNotFound } from '../../services/diagnostics.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { 
     confirmBidKb, 
@@ -174,10 +175,14 @@ export function registerUserCommands(bot) {
                 const targetChatId = -Math.abs(Number(parts[1]));
                 const targetMessageId = Number(parts[2]);
                 if (!Number.isFinite(targetChatId) || !Number.isFinite(targetMessageId)) {
+                    logAuctionNotFound('bid_deep_link_unparsable', targetChatId, targetMessageId, { user_id: msg.from.id, payload });
                     return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const row = q.getAuction.get(targetChatId, targetMessageId);
-                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                if (!row) {
+                    logAuctionNotFound('bid_deep_link', targetChatId, targetMessageId, { user_id: msg.from.id });
+                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                }
                 const now = new Date();
                 const end = new Date(row.end_at);
                 if (now >= end || row.status !== 'active') {
@@ -212,10 +217,14 @@ export function registerUserCommands(bot) {
                 const targetChatId = -Math.abs(Number(parts[1]));
                 const targetMessageId = Number(parts[2]);
                 if (!Number.isFinite(targetChatId) || !Number.isFinite(targetMessageId)) {
+                    logAuctionNotFound('notify_deep_link_unparsable', targetChatId, targetMessageId, { user_id: msg.from.id, payload });
                     return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const row = q.getAuction.get(targetChatId, targetMessageId);
-                if (!row) return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                if (!row) {
+                    logAuctionNotFound('notify_deep_link', targetChatId, targetMessageId, { user_id: msg.from.id });
+                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                }
                 const now = new Date();
                 const end = new Date(row.end_at);
                 if (now >= end || row.status !== 'active') {
@@ -420,8 +429,11 @@ export function registerUserCommands(bot) {
             const targetChatId = Number(chatIdParam);
             const targetMessageId = Number(messageIdParam);
             const row = q.getAuction.get(targetChatId, targetMessageId);
-            if (!row) return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-            
+            if (!row) {
+                logAuctionNotFound('request_restart', targetChatId, targetMessageId, { user_id: userId });
+                return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+            }
+
             await bot.answerCallbackQuery(query.id).catch(() => {});
             
             restartSessions.set(userId, {
