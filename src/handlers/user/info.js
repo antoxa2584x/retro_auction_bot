@@ -1,5 +1,6 @@
 import { q } from '../../services/db.js';
 import { closeAuction } from "../../services/scheduler.js";
+import { logAuctionNotFound } from '../../services/diagnostics.js';
 import { escapeHtml } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 
@@ -41,11 +42,13 @@ export function registerInfoHandlers(bot) {
             const target_chat_id = Number(chatIdStr);
             const target_message_id = Number(msgIdStr);
             if (!Number.isFinite(target_chat_id) || !Number.isFinite(target_message_id)) {
+                logAuctionNotFound('auction_info_unparsable', target_chat_id, target_message_id, { user_id: query.from.id, data });
                 return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
             }
 
             const row = q.getAuction.get(target_chat_id, target_message_id);
             if (!row) {
+                logAuctionNotFound('auction_info', target_chat_id, target_message_id, { user_id: query.from.id });
                 try {
                     return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
                 } catch (e) {

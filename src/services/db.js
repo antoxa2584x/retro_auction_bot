@@ -113,6 +113,17 @@ db.exec(`
         PRIMARY KEY (chat_id, message_id, user_id)
     );
 
+    -- Binary assets uploaded by admins (currently just the watermark PNG).
+    -- Kept in the DB rather than on disk so a single sqlite backup carries
+    -- everything the bot needs to run.
+    CREATE TABLE IF NOT EXISTS assets
+    (
+        key TEXT PRIMARY KEY,
+        data BLOB NOT NULL,
+        mime TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Covering index for the hot bid-path queries (getLastBid, getNewLeader,
     -- checkBidExists, selectBidsForInfo, getBidders) which all filter by
     -- (chat_id, message_id) and often order by ts.
@@ -265,6 +276,14 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   getAuction: db.prepare(`SELECT * FROM auctions WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Retrieves auctions by message ID alone, ignoring the chat. Diagnostics only:
+   * when a lookup by (chat_id, message_id) misses, this tells a row that was
+   * never written apart from one stored under a different chat_id.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getAuctionsByMessageId: db.prepare(`SELECT chat_id, message_id, status, end_at FROM auctions WHERE message_id=?`),
 
   /**
    * Updates the current state of an auction (price, leader, participants count).
@@ -541,6 +560,29 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   setSetting: db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`),
+
+  // Binary assets (watermark PNG)
+
+  /**
+   * Retrieves a binary asset by its key.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getAsset: db.prepare(`SELECT data, mime FROM assets WHERE key=?`),
+
+  /**
+   * Stores or replaces a binary asset.
+   * @type {import('better-sqlite3').Statement}
+   */
+  setAsset: db.prepare(`
+    INSERT OR REPLACE INTO assets (key, data, mime, updated_at)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+  `),
+
+  /**
+   * Deletes a binary asset by its key.
+   * @type {import('better-sqlite3').Statement}
+   */
+  deleteAsset: db.prepare(`DELETE FROM assets WHERE key=?`),
 
   /**
    * Initializes default settings if they don't exist.

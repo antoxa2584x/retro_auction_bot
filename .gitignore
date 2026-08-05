@@ -6,3 +6,4 @@
 /auction.sqlite3-wal
 /auction.sqlite3-shm
 .env
+/logs/

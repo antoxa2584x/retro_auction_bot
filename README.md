@@ -27,6 +27,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 - [Admin Panel](#-admin-panel)
 - [Configuration](#-configuration)
 - [Creating an Auction](#-creating-an-auction)
+- [Photo Watermark](#-photo-watermark)
 - [Tech Stack](#-tech-stack)
 - [Project Layout](#-project-layout)
 - [Getting Started](#-getting-started)
@@ -44,6 +45,7 @@ A lightweight Node.js bot that posts and manages auctions in your channel — ea
 | 🤖 **AI generation** | Generate titles & descriptions from a photo with OpenAI. |
 | 🔔 **Smart notifications** | Outbid alerts, custom reminders, and auto 30-min warnings. |
 | 📝 **User submissions** | Users propose lots; admins review, edit, and approve. |
+| 🖼 **Photo watermark** | Stamp your own PNG onto the main photo of every auction you post. |
 | 🛡️ **OTP-secured panel** | Full auction & settings management behind one-time-password auth. |
 
 ---
@@ -150,6 +152,7 @@ Access the panel in three steps:
   - *Main* — Channel ID, Contact Nickname, OpenAI API Key, Language, Currency, Timezone, and Continuous Minutes.
   - *Auction template* — header, footer, and labels (Min Bid, Bid Step, End Date).
   - *Defaults* — default days & time for new auctions, Max Active Auctions per User, the Rules Link, and the User Auctions Posting toggle.
+  - *Watermark* — upload a PNG and choose its position, size, and opacity; it is stamped onto the main photo of auctions posted from the admin panel.
 - **👥 Admin management** — add or remove admins by Telegram User ID.
 - **📢 Broadcast** — message every user who has interacted with the bot.
 
@@ -180,6 +183,29 @@ Auctions are created **through the bot** — there's no need to format channel p
 
 ---
 
+## 🖼 Photo Watermark
+
+Stamp your own logo onto the main photo of every auction you post from the admin panel.
+
+Open **⚙️ Settings → 🖼 Watermark**, upload a PNG, and choose how it sits on the photo:
+
+| Setting | What it does |
+|---------|--------------|
+| **Image** | The watermark PNG itself. Upload once; replace it any time. |
+| **Apply watermark** | Master on/off switch — keeps the image but stops stamping it. |
+| **Position** | A 3×3 grid: any corner, any edge, or dead center. |
+| **Size** | Width as a percentage of the photo (default 25%), so it scales with any image. |
+| **Opacity** | 1–100% (default 100%). |
+| **Preview** | Renders your current settings over a sample image, so you can check placement before anything goes live. |
+
+> ⚠️ **Send the PNG as a file, not as a photo.** Telegram re-encodes photo uploads to JPEG, which destroys transparency and would leave a solid rectangle over your images. Use the paperclip → **File**.
+
+**Scope:** the watermark is applied to the **main photo of auctions published through the admin wizard** only. Extra gallery photos and user-submitted auctions you approve are left untouched. If watermarking fails for any reason, the auction is posted with the original photo rather than being held back.
+
+The PNG is stored in the database, so it travels with your `auction.sqlite3` backup.
+
+---
+
 ## 🧰 Tech Stack
 
 | Dependency | Purpose |
@@ -189,6 +215,7 @@ Auctions are created **through the bot** — there's no need to format channel p
 | **node-schedule** | Scheduled auction closing |
 | **date-fns** / **date-fns-tz** | Date & timezone handling |
 | **openai** | Optional AI title/description generation |
+| **sharp** | Image compositing for photo watermarks |
 | **dotenv** | Environment configuration |
 
 > Requires **Node.js 18+**.
@@ -204,6 +231,7 @@ src/
 ├─ services/
 │  ├─ db.js             # SQLite schema & operations
 │  ├─ i18n.js           # UK/EN internationalization
+│  ├─ watermark.js      # Watermark storage & photo compositing
 │  └─ scheduler.js      # Auction closing & notifications
 ├─ handlers/
 │  ├─ channelPost.js    # Processes new auctions from the channel
