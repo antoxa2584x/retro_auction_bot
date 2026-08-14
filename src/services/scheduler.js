@@ -222,18 +222,35 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     // bot's language). setStatusTag rewrites the header tag instead of patching
     // occurrences, so a post that picked up a stray tag from an older restart is
     // cleaned up here — the winner/empty keyboard is re-applied by the branches below.
-    if (!alreadyFinished && freshRow.full_text) {
+    //
+    // Deliberately NOT gated on !alreadyFinished: the row is marked finished before
+    // this edit runs, so a single failed edit (rate limit, network blip, restart
+    // between the two) would otherwise never be retried and the post would keep
+    // #активний forever. Re-running is safe — setStatusTag is idempotent, and when
+    // the post is already tagged Telegram answers "message is not modified", which
+    // is swallowed below.
+    if (freshRow.full_text) {
         const updatedText = setStatusTag(freshRow.full_text, 'finished');
-        if (updatedText && updatedText !== freshRow.full_text) {
+        if (updatedText) {
+            const editCaption = () => bot.editMessageCaption(truncateCaption(updatedText), {
+                chat_id, message_id, parse_mode: 'HTML'
+            });
+            const editText = () => bot.editMessageText(updatedText, {
+                chat_id, message_id, parse_mode: 'HTML'
+            });
             try {
-                if (freshRow.photo_id) {
-                    await bot.editMessageCaption(truncateCaption(updatedText), {
-                        chat_id, message_id, parse_mode: 'HTML'
-                    });
-                } else {
-                    await bot.editMessageText(updatedText, {
-                        chat_id, message_id, parse_mode: 'HTML'
-                    });
+                try {
+                    await (freshRow.photo_id ? editCaption() : editText());
+                } catch (err) {
+                    // photo_id can disagree with the actual message (post re-sent or
+                    // edited by hand) — try the other edit method before giving up.
+                    if (err.message.includes('there is no text in the message to edit')) {
+                        await editCaption();
+                    } else if (err.message.includes('there is no caption in the message to edit')) {
+                        await editText();
+                    } else {
+                        throw err;
+                    }
                 }
                 q.updateAuctionFullText.run(updatedText, chat_id, message_id);
                 freshRow.full_text = updatedText;
