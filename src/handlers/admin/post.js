@@ -8,7 +8,8 @@ import {
     makeAdminPostContinuousKb,
     makeAdminPostDurationKb,
     makeAdminPostStepKb,
-    makeKb
+    makeKb,
+    withBackButton
 } from '../../utils/keyboards.js';
 import {getChannelId, getContactNickname, TZ} from "../../config/env.js";
 import {logError} from '../../services/logger.js';
@@ -31,8 +32,85 @@ import {
 import fs from 'fs';
 import os from 'os';
 
-/** @type {Map<number, {step: string, data: any}>} */
+/** @type {Map<number, {step: string, data: any, views: string[], viewMsgId: ?number}>} */
 const postSessions = new Map();
+
+/**
+ * Prompt and keyboard for every screen of the posting wizard, keyed by view name.
+ *
+ * A view is what the admin sees; `session.step` is what handlePostInput
+ * dispatches on. They match except where one step has two screens — STEP offers
+ * preset buttons, STEP_CUSTOM asks for a typed amount — so that "back" can
+ * return to the preset buttons instead of skipping the whole step.
+ *
+ * Each entry returns `{ text, kb, step? }` and may prime session.data with
+ * whatever the prompt shows (see DATE), which is why a view is re-run rather
+ * than cached when the admin navigates back to it.
+ *
+ * @type {Object<string, function(Object): {text: string, kb: Object, step?: string}>}
+ */
+const POST_VIEWS = {
+    IMAGE: () => ({
+        text: t('admin.post_step_img'),
+        kb: makeAdminPostCancelKb(true)
+    }),
+    AI_PROMPT: () => ({
+        text: t('admin.kb.ai_received'),
+        kb: makeAdminPostAIGenKb()
+    }),
+    AI_CONFIRM: (session) => ({
+        text: `${t('admin.kb.ai_generated_title')}\n\n<code>${session.data.full_text}</code>`,
+        kb: makeAdminPostAIConfirmKb()
+    }),
+    AI_EDIT: () => ({
+        text: t('admin.kb.ai_edit_prompt'),
+        kb: makeAdminPostCancelKb()
+    }),
+    TITLE: () => ({
+        text: t('admin.post_step_title'),
+        kb: makeAdminPostCancelKb()
+    }),
+    MIN_BID: () => ({
+        text: t('admin.post_step_min_bid'),
+        kb: makeAdminPostCancelKb()
+    }),
+    STEP: () => ({
+        text: t('admin.post_step_step'),
+        kb: makeAdminPostStepKb()
+    }),
+    STEP_CUSTOM: () => ({
+        step: 'STEP',
+        text: t('admin.post_step_step'),
+        kb: makeAdminPostCancelKb()
+    }),
+    DATE: (session) => {
+        const defDate = getDefaultEndDate();
+        session.data.default_date = defDate;
+        return {
+            text: t('admin.post_step_end', { default: formatInTimeZone(defDate, TZ, 'dd.MM.yyyy HH:mm') }),
+            kb: makeAdminPostDurationKb()
+        };
+    },
+    CONTINUOUS: () => {
+        const min = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
+        return {
+            text: t('admin.post_step_continuous', { min }),
+            kb: makeAdminPostContinuousKb(min)
+        };
+    },
+    CONTACT: () => ({
+        text: t('admin.post_step_contact', { default: getContactNickname() }),
+        kb: makeAdminPostContactKb()
+    }),
+    CONTACT_MANUAL: () => ({
+        text: t('admin.kb.enter_contact_manually'),
+        kb: makeAdminPostCancelKb()
+    }),
+    CONFIRM: (session) => ({
+        text: buildConfirmText(session.data),
+        kb: makeAdminPostConfirmKb()
+    })
+};
 
 /**
  * Registers handlers for posting a new auction.
@@ -49,13 +127,28 @@ export function registerPostHandlers(bot) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
             
-            postSessions.set(from.id, { step: 'IMAGE', data: {} });
-            await bot.editMessageText(t('admin.post_step_img'), {
+            const session = { step: 'IMAGE', data: {}, views: ['IMAGE'], viewMsgId: null };
+            postSessions.set(from.id, session);
+
+            // First step: rendered into the panel message instead of a new one,
+            // and with no back button since there is nothing behind it.
+            const { text, kb } = POST_VIEWS.IMAGE(session);
+            await bot.editMessageText(text, {
                 chat_id: chatId,
                 message_id: messageId,
                 parse_mode: 'HTML',
-                reply_markup: makeAdminPostCancelKb(true)
+                reply_markup: kb
             });
+            session.viewMsgId = messageId;
+        }
+
+        if (data === 'post_back') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = postSessions.get(from.id);
+            if (!session) return;
+
+            await goBack(bot, chatId, session);
         }
 
         if (data === 'post_skip' || data === 'post_continue') {
@@ -68,16 +161,10 @@ export function registerPostHandlers(bot) {
                 if (session.data.photo_ids && session.data.photo_ids.length > 0) {
                     session.data.photo_id = session.data.photo_ids[0];
                 }
-                session.step = 'TITLE';
-                await bot.editMessageText(t('admin.post_step_title'), {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                await goToView(bot, chatId, session, 'TITLE');
             } else if (session.step === 'DATE') {
                 session.data.end_at = session.data.default_date;
-                await goToContinuousStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'CONTINUOUS');
             }
         }
 
@@ -117,24 +204,16 @@ export function registerPostHandlers(bot) {
 
                 session.data.full_text = aiText;
                 session.data.title = deriveTitle(aiText);
-                session.step = 'AI_CONFIRM';
 
                 await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-                await bot.sendMessage(chatId, `${t('admin.kb.ai_generated_title')}\n\n<code>${aiText}</code>`, {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostAIConfirmKb()
-                });
+                await goToView(bot, chatId, session, 'AI_CONFIRM');
             } catch (e) {
                 console.error('AI Gen error:', e);
                 const errorKey = e.message === 'OPENAI_API_KEY_NOT_SET' ? 'Set OpenAI API Key in settings first!' : t('common.error_try_again');
                 await bot.sendMessage(chatId, `❌ Error: ${errorKey}`, { parse_mode: 'HTML' });
-                
+
                 // Re-show manual title input
-                session.step = 'TITLE';
-                await bot.sendMessage(chatId, t('admin.post_step_title'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                await goToView(bot, chatId, session, 'TITLE');
             }
         }
 
@@ -151,11 +230,7 @@ export function registerPostHandlers(bot) {
                 q.insertAiTrainingData.run(session.data.image_hash, session.data.full_text, getLocale());
             }
 
-            session.step = 'MIN_BID';
-            await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
-                parse_mode: 'HTML',
-                reply_markup: makeAdminPostCancelKb()
-            });
+            await goToView(bot, chatId, session, 'MIN_BID');
         }
 
         if (data === 'post_ai_edit') {
@@ -166,11 +241,7 @@ export function registerPostHandlers(bot) {
             }
             bot.answerCallbackQuery(query.id).catch(() => {});
 
-            session.step = 'AI_EDIT';
-            await bot.sendMessage(chatId, t('admin.kb.ai_edit_prompt'), {
-                parse_mode: 'HTML',
-                reply_markup: makeAdminPostCancelKb()
-            });
+            await goToView(bot, chatId, session, 'AI_EDIT');
         }
 
         const stepMatch = data.match(/^post_step:(.+)$/);
@@ -182,13 +253,10 @@ export function registerPostHandlers(bot) {
 
             const val = stepMatch[1];
             if (val === 'custom') {
-                await bot.sendMessage(chatId, t('admin.post_step_step'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                await goToView(bot, chatId, session, 'STEP_CUSTOM');
             } else {
                 session.data.step = parseInt(val);
-                await goToDateStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'DATE');
             }
         }
 
@@ -202,15 +270,9 @@ export function registerPostHandlers(bot) {
             const val = contactMatch[1];
             if (val === 'default') {
                 session.data.admin_contact = getContactNickname();
-                await goToConfirmStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'CONFIRM');
             } else {
-                session.step = 'CONTACT_MANUAL';
-                await bot.editMessageText(t('admin.kb.enter_contact_manually'), {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                await goToView(bot, chatId, session, 'CONTACT_MANUAL');
             }
         }
 
@@ -227,7 +289,7 @@ export function registerPostHandlers(bot) {
             date = set(date, { hours, minutes, seconds: 0, milliseconds: 0 });
 
             session.data.end_at = date;
-            await goToContinuousStep(bot, chatId, session);
+            await goToView(bot, chatId, session, 'CONTINUOUS');
         }
 
         if (data.startsWith('post_cont:')) {
@@ -238,8 +300,8 @@ export function registerPostHandlers(bot) {
 
             session.data.is_continuous = parseInt(data.split(':')[1]);
             session.data.continuous_minutes = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
-            
-            await goToContactStep(bot, chatId, session);
+
+            await goToView(bot, chatId, session, 'CONTACT');
         }
 
         if (data === 'post_confirm') {
@@ -455,11 +517,7 @@ export async function handlePostInput(bot, msg) {
 
                 session.data.full_text = sanitizedText;
                 session.data.title = deriveTitle(sanitizedText);
-                session.step = 'MIN_BID';
-                await bot.sendMessage(chatId, t('admin.post_step_min_bid'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostCancelKb()
-                });
+                await goToView(bot, chatId, session, 'MIN_BID');
                 return true;
             }
             break;
@@ -480,11 +538,7 @@ export async function handlePostInput(bot, msg) {
                     return true;
                 }
                 session.data.min_bid = val;
-                session.step = 'STEP';
-                await bot.sendMessage(chatId, t('admin.post_step_step'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeAdminPostStepKb()
-                });
+                await goToView(bot, chatId, session, 'STEP');
                 return true;
             }
             break;
@@ -505,7 +559,7 @@ export async function handlePostInput(bot, msg) {
                     return true;
                 }
                 session.data.step = val;
-                await goToDateStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'DATE');
                 return true;
             }
             break;
@@ -530,7 +584,7 @@ export async function handlePostInput(bot, msg) {
                     }
                 }
                 session.data.end_at = date;
-                await goToContinuousStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'CONTINUOUS');
                 return true;
             }
             break;
@@ -538,7 +592,7 @@ export async function handlePostInput(bot, msg) {
         case 'CONTACT_MANUAL':
             if (text) {
                 session.data.admin_contact = text.startsWith('@') ? text : '@' + text;
-                await goToConfirmStep(bot, chatId, session);
+                await goToView(bot, chatId, session, 'CONFIRM');
                 return true;
             }
             break;
@@ -565,76 +619,37 @@ function buildPhotoIdsColumn(photoIds, mainPhotoId) {
 
 async function showPhotoReceivedOptions(bot, chatId, session) {
     if (session.data.photo_ids.length > 1) {
-        await bot.sendMessage(chatId, t('admin.post_photo_added', { count: session.data.photo_ids.length }), {
+        // Still on the IMAGE step — this only offers to move on, so it replaces
+        // the step's live keyboard rather than opening a new view.
+        await clearActiveKeyboard(bot, chatId, session);
+        const sent = await bot.sendMessage(chatId, t('admin.post_photo_added', { count: session.data.photo_ids.length }), {
             reply_markup: makeAdminPostCancelKb(false, false, true)
         });
+        session.viewMsgId = sent.message_id;
         return;
     }
 
     const hasApiKey = !!q.getSetting.get('OPENAI_API_KEY')?.value || !!process.env.OPENAI_API_KEY;
     if (hasApiKey) {
-        session.step = 'AI_PROMPT';
         session.data.photo_id = session.data.photo_ids[0]; // For AI gen
-        await bot.sendMessage(chatId, t('admin.kb.ai_received'), {
-            parse_mode: 'HTML',
-            reply_markup: makeAdminPostAIGenKb()
-        });
+        await goToView(bot, chatId, session, 'AI_PROMPT');
     } else {
-        session.step = 'TITLE';
-        await bot.sendMessage(chatId, t('admin.post_step_title'), {
-            parse_mode: 'HTML',
-            reply_markup: makeAdminPostCancelKb()
-        });
+        await goToView(bot, chatId, session, 'TITLE');
     }
-}
-
-async function goToDateStep(bot, chatId, session) {
-    session.step = 'DATE';
-    
-    // Calculate default date
-    const defDate = getDefaultEndDate();
-    
-    session.data.default_date = defDate;
-    const formattedDef = formatInTimeZone(defDate, TZ, 'dd.MM.yyyy HH:mm');
-
-    await bot.sendMessage(chatId, t('admin.post_step_end', { default: formattedDef }), {
-        parse_mode: 'HTML',
-        reply_markup: makeAdminPostDurationKb()
-    });
-}
-
-async function goToContinuousStep(bot, chatId, session) {
-    session.step = 'CONTINUOUS';
-    const min = parseInt(q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5');
-    await bot.sendMessage(chatId, t('admin.post_step_continuous', { min }), {
-        parse_mode: 'HTML',
-        reply_markup: makeAdminPostContinuousKb(min)
-    });
-}
-
-async function goToContactStep(bot, chatId, session) {
-    session.step = 'CONTACT';
-    const defaultContact = getContactNickname();
-    await bot.sendMessage(chatId, t('admin.post_step_contact', { default: defaultContact }), {
-        parse_mode: 'HTML',
-        reply_markup: makeAdminPostContactKb()
-    });
 }
 
 // Special skip for date step
 export async function handleDateSkip(bot, chatId, userId) {
     const session = postSessions.get(userId);
     if (!session || session.step !== 'DATE') return false;
-    
+
     session.data.end_at = session.data.default_date;
-    await goToContinuousStep(bot, chatId, session);
+    await goToView(bot, chatId, session, 'CONTINUOUS');
     return true;
 }
 
-async function goToConfirmStep(bot, chatId, session) {
-    session.step = 'CONFIRM';
-    const { data } = session;
-    const text = t('admin.post_confirm', {
+function buildConfirmText(data) {
+    return t('admin.post_confirm', {
         full_text: buildAuctionText(data, false, false),
         min_bid: data.min_bid,
         step: data.step,
@@ -643,11 +658,78 @@ async function goToConfirmStep(bot, chatId, session) {
         contact: data.admin_contact,
         cur: getCurrency()
     });
+}
 
-    await bot.sendMessage(chatId, text, {
+/**
+ * Advances the wizard to `view`, pushing it onto the session's view stack so
+ * `post_back` knows where to return to.
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number} chatId - Chat to prompt in.
+ * @param {Object} session - Posting session.
+ * @param {string} view - Key of POST_VIEWS to render.
+ */
+async function goToView(bot, chatId, session, view) {
+    session.views.push(view);
+    await renderView(bot, chatId, session);
+}
+
+/**
+ * Steps back to the previous view. Nothing happens on the first step, which has
+ * no back button anyway.
+ *
+ * @returns {Promise<boolean>} Whether the wizard actually moved.
+ */
+async function goBack(bot, chatId, session) {
+    if (session.views.length < 2) return false;
+    session.views.pop();
+
+    // Returning to the photo step starts the album over: appending to the old
+    // list would keep the very photo the admin came back to replace.
+    if (session.views[session.views.length - 1] === 'IMAGE') {
+        delete session.data.photo_ids;
+        delete session.data.photo_id;
+        delete session.limit_alert_sent;
+    }
+
+    await renderView(bot, chatId, session);
+    return true;
+}
+
+/**
+ * Sends the prompt for the view currently on top of the stack and remembers its
+ * message id, so the next transition can retire that keyboard.
+ */
+async function renderView(bot, chatId, session) {
+    await clearActiveKeyboard(bot, chatId, session);
+
+    const view = session.views[session.views.length - 1];
+    const { text, kb, step = view } = POST_VIEWS[view](session);
+    session.step = step;
+
+    const sent = await bot.sendMessage(chatId, text, {
         parse_mode: 'HTML',
-        reply_markup: makeAdminPostConfirmKb()
+        reply_markup: session.views.length > 1 ? withBackButton(kb, 'post_back') : kb
     });
+    session.viewMsgId = sent.message_id;
+}
+
+/**
+ * Strips the keyboard off the prompt the wizard is currently showing.
+ *
+ * Every step used to leave its buttons live, which was harmless while the
+ * wizard only moved forward. With a back button they would let the admin answer
+ * a step they have already left and desync the view stack, so the outgoing
+ * prompt is retired on each transition.
+ */
+async function clearActiveKeyboard(bot, chatId, session) {
+    const msgId = session.viewMsgId;
+    if (!msgId) return;
+    session.viewMsgId = null;
+    await bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+        chat_id: chatId,
+        message_id: msgId
+    }).catch(() => {});
 }
 
 function isAdmin(userId) {

@@ -752,6 +752,26 @@ export function makeAdminPostContactKb() {
 }
 
 /**
+ * Appends a "back" row to an existing keyboard.
+ *
+ * Used by the step-by-step posting wizards so every prompt past the first one
+ * can return to the previous step without each keyboard builder having to know
+ * about it.
+ *
+ * @param {Object} kb - Inline keyboard to extend.
+ * @param {string} callbackData - Callback data for the back button.
+ * @returns {Object} New inline keyboard object with the back row appended.
+ */
+export function withBackButton(kb, callbackData) {
+    return {
+        inline_keyboard: [
+            ...kb.inline_keyboard,
+            [{text: t('common.back'), callback_data: callbackData, style: 'primary'}]
+        ]
+    };
+}
+
+/**
  * Creates the confirmation keyboard for posting an auction.
  *
  * @returns {Object} Inline keyboard object.
