@@ -253,17 +253,35 @@ export function stripStatusTags(text) {
  *
  * Every existing tag is dropped first, so calling this repeatedly (close →
  * restart → close) can never accumulate tags. Posts without a header get no
- * tag, matching buildAuctionText.
+ * tag, matching buildAuctionText — except for a post that already carries a
+ * tag, which is retagged in place (see below).
  *
  * @param {string} text - Post text.
  * @param {'active'|'finished'} status - Status to tag the header with.
  * @returns {string} Text with a single status hashtag on the header line.
  */
 export function setStatusTag(text, status) {
+    if (!text) return text || '';
+    const tag = t(`parse.status.${status}`);
+    const hadTag = text.includes(t('parse.status.active')) || text.includes(t('parse.status.finished'));
     const cleaned = stripStatusTags(text);
+    if (!cleaned) return cleaned;
+
     const header = sanitizeHtml(q.getSetting.get('AUCTION_HEADER')?.value || t('parse.defaults.header'));
-    if (!cleaned || !header || !cleaned.startsWith(header)) return cleaned;
-    return `${header} ${t(`parse.status.${status}`)}${cleaned.slice(header.length)}`;
+    if (header && cleaned.startsWith(header)) {
+        return `${header} ${tag}${cleaned.slice(header.length)}`;
+    }
+
+    // The header setting no longer matches this post — typically because an admin
+    // edited AUCTION_HEADER after the post went out. Returning `cleaned` here would
+    // strip the tag the post already had and add nothing back, so a closing auction
+    // would lose #активний without ever gaining #завершений. Retag the first line
+    // instead; posts that never had a tag still get none.
+    if (!hadTag) return cleaned;
+    const nl = cleaned.indexOf('\n');
+    const firstLine = nl === -1 ? cleaned : cleaned.slice(0, nl);
+    const rest = nl === -1 ? '' : cleaned.slice(nl);
+    return `${firstLine.trimEnd()} ${tag}${rest}`;
 }
 
 /**
