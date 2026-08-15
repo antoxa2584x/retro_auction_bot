@@ -78,23 +78,8 @@ export function registerUserPostHandlers(bot) {
         const chatId = message.chat.id;
         if (data === 'user_post') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
-            
-            if (!isUserPostEnabled()) {
-                return bot.sendMessage(chatId, t('admin.user_post_disabled'), {
-                    parse_mode: 'HTML'
-                });
-            }
 
-            const pendingCount = q.countPendingAuctionsByUser.get(from.id).count;
-            const activeCount = q.countActiveAuctionsByUser.get(from.id).count;
-            const totalCount = pendingCount + activeCount;
-
-            const maxAuctions = getMaxUserAuctions();
-            if (totalCount >= maxAuctions) {
-                return bot.sendMessage(chatId, t('admin.user_post_too_many', { count: maxAuctions }), {
-                    parse_mode: 'HTML'
-                });
-            }
+            if (await refusePosting(bot, chatId, from.id)) return;
 
             const rulesLink = q.getSetting.get('RULES_LINK')?.value;
             if (rulesLink) {
@@ -110,6 +95,12 @@ export function registerUserPostHandlers(bot) {
 
         if (data === 'user_rules_confirm') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
+
+            // Re-checked here, not just on user_post: the rules message keeps its
+            // "I agree" button forever, so scrolling back to an old one would
+            // otherwise start a submission that skipped the limit entirely.
+            if (await refusePosting(bot, chatId, from.id)) return;
+
             await startSession(bot, chatId, from.id);
         }
 
@@ -330,6 +321,48 @@ export async function handleUserPostInput(bot, msg) {
             }
             break;
     }
+    return false;
+}
+
+/**
+ * How much of the user's MAX_USER_AUCTIONS allowance is taken.
+ *
+ * Both halves count: auctions live in the channel and submissions still sitting
+ * in the admins' review queue. A user with the limit in active lots and nothing
+ * queued is just as blocked as one with everything queued and nothing live.
+ *
+ * @param {number} userId - Telegram user id.
+ * @returns {{allowed: boolean, active: number, pending: number, max: number}}
+ */
+function getAuctionAllowance(userId) {
+    const pending = q.countPendingAuctionsByUser.get(userId).count;
+    const active = q.countActiveAuctionsByUser.get(userId).count;
+    const max = getMaxUserAuctions();
+    return { allowed: pending + active < max, active, pending, max };
+}
+
+/**
+ * Tells the user why they can't start a submission, if they can't.
+ *
+ * @returns {Promise<boolean>} True when posting was refused and the caller
+ *   should stop.
+ */
+async function refusePosting(bot, chatId, userId) {
+    if (!isUserPostEnabled()) {
+        await bot.sendMessage(chatId, t('admin.user_post_disabled'), { parse_mode: 'HTML' });
+        return true;
+    }
+
+    const { allowed, active, pending, max } = getAuctionAllowance(userId);
+    if (!allowed) {
+        // Spell out the split — a queued submission is invisible to the user, so
+        // "you have too many" on top of two visible lots reads as a bug.
+        await bot.sendMessage(chatId, t('admin.user_post_too_many', { count: max, active, pending }), {
+            parse_mode: 'HTML'
+        });
+        return true;
+    }
+
     return false;
 }
 

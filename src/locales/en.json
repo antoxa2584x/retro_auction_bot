@@ -143,7 +143,7 @@
     "notify_error_time": "⚠️ Invalid time. Please enter a number from 1 to 12 that does not exceed the time until the auction ends.",
     "notify_reminder": "🔔 <b>Reminder!</b>\n\nAuction <a href=\"{{link}}\">\"{{title}}\"</a> will end in {{hours}}h!\nCurrent price: <b>{{price}} {{cur}}</b>",
     "user_post_confirm": "📦 <b>Confirm Your Auction Submission</b>\n\n{{full_text}}\n\nMin Bid: <b>{{min_bid}} {{cur}}</b>\nStep: <b>{{step}} {{cur}}</b>\nEnds at: <b>{{end_at}}</b>\nContinuous: <b>{{continuous}}</b>",
-    "user_post_too_many": "⚠️ You cannot have more than {{count}} active or pending auctions at a time. Please wait until your previous submissions are reviewed or finished.",
+    "user_post_too_many": "⚠️ You cannot have more than {{count}} active or pending auctions at a time. Please wait until your previous submissions are reviewed or finished.\n\n📊 Right now you have: <b>{{active}}</b> active, <b>{{pending}}</b> awaiting review.",
     "user_post_disabled": "⚠️ Auction submission by users is currently disabled by administrator.",
     "post_cancelled": "❌ Auction creation cancelled.",
     "privacy_warning": "⚠️ <b>Note:</b> If your profile is private (link to account in forwarded messages is disabled), others might not be able to see your profile link in the winner banner. This won't prevent you from bidding or winning.",
