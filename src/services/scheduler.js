@@ -175,8 +175,75 @@ export async function sendReminder(bot, chat_id, message_id) {
 }
 
 /**
+ * Rate-limit retries in flight, keyed by `chat_id:message_id`.
+ *
+ * A single close edits the post twice (status tag, then keyboard). Without this
+ * map each failed edit queued its own retry, so one rate-limited close became
+ * two, then four — a storm that kept the bot rate-limited indefinitely. One
+ * retry per auction at a time, and a cap so it eventually gives up.
+ *
+ * @type {Map<string, {timer: ?NodeJS.Timeout, attempts: number}>}
+ */
+const closeRetries = new Map();
+
+/** How many times a rate-limited close is retried before it is abandoned. */
+const MAX_CLOSE_RETRIES = 10;
+
+function isRateLimit(err) {
+    return err.message.includes('Too Many Requests') || err.response?.status === 429;
+}
+
+/**
+ * Seconds Telegram asked us to wait, or null when it didn't say.
+ */
+function parseRetryAfter(err) {
+    const fromBody = err.response?.body?.parameters?.retry_after;
+    if (Number.isFinite(fromBody)) return fromBody;
+    const match = /retry after (\d+)/i.exec(err.message || '');
+    return match ? Number(match[1]) : null;
+}
+
+/**
+ * Queues one retry of a rate-limited close, honouring Telegram's retry_after.
+ *
+ * A retry already in flight wins: further failures from the same close (or from
+ * a concurrent one on the same auction) are dropped rather than stacked.
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number} chat_id - The chat ID where the auction is posted.
+ * @param {number} message_id - The message ID of the auction post.
+ * @param {Error} err - The 429 that triggered the retry.
+ */
+function scheduleCloseRetry(bot, chat_id, message_id, err) {
+    const key = `${chat_id}:${message_id}`;
+    const entry = closeRetries.get(key) || { timer: null, attempts: 0 };
+    if (entry.timer) return;
+
+    if (entry.attempts >= MAX_CLOSE_RETRIES) {
+        console.error(`Giving up closing auction ${key} after ${entry.attempts} rate-limited attempts. The post may still show the active hashtag or the old keyboard.`);
+        return;
+    }
+
+    entry.attempts++;
+    // Telegram's retry_after is authoritative; back off on our own only when it
+    // didn't tell us how long to wait.
+    const retryAfter = parseRetryAfter(err);
+    const seconds = retryAfter !== null
+        ? retryAfter + 1 + Math.floor(Math.random() * 5)
+        : Math.min(30 * entry.attempts, 600) + Math.floor(Math.random() * 30);
+
+    console.warn(`Too Many Requests while closing auction ${key}. Retry ${entry.attempts}/${MAX_CLOSE_RETRIES} in ${seconds}s`);
+    entry.timer = setTimeout(() => {
+        entry.timer = null;
+        closeAuction(bot, chat_id, message_id).catch(e =>
+            console.error(`Retry of closeAuction ${key} failed:`, e.message));
+    }, seconds * 1000);
+    closeRetries.set(key, entry);
+}
+
+/**
  * Closes an auction, updates the UI, and notifies the winner and admins.
- * 
+ *
  * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chat_id - The chat ID where the auction is posted.
  * @param {number} message_id - The message ID of the auction post.
@@ -205,14 +272,14 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     const freshRow = q.getAuction.get(chat_id, message_id);
     if (!freshRow) return;
 
+    const retryKey = `${chat_id}:${message_id}`;
+    let rateLimited = false;
+
     const rescheduleIfLimit = async (err) => {
-        if (err.message.includes('Too Many Requests') || (err.response && err.response.status === 429)) {
-            const delay = Math.floor(Math.random() * (60 - 30 + 1) + 30) * 1000;
-            console.warn(`Too Many Requests while updating keyboard for auction ${chat_id}:${message_id}. Rescheduling in ${delay / 1000}s`);
-            setTimeout(() => closeAuction(bot, chat_id, message_id), delay);
-            return true;
-        }
-        return false;
+        if (!isRateLimit(err)) return false;
+        rateLimited = true;
+        scheduleCloseRetry(bot, chat_id, message_id, err);
+        return true;
     };
 
     const auctionLink = getAuctionLink(chat_id, message_id);
@@ -226,12 +293,12 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     // Deliberately NOT gated on !alreadyFinished: the row is marked finished before
     // this edit runs, so a single failed edit (rate limit, network blip, restart
     // between the two) would otherwise never be retried and the post would keep
-    // #активний forever. Re-running is safe — setStatusTag is idempotent, and when
-    // the post is already tagged Telegram answers "message is not modified", which
-    // is swallowed below.
+    // #активний forever. full_text is only written back once Telegram accepts the
+    // edit, so a post still carrying #активний still differs here and is retried,
+    // while one already flipped compares equal and costs no API call.
     if (freshRow.full_text) {
         const updatedText = setStatusTag(freshRow.full_text, 'finished');
-        if (updatedText) {
+        if (updatedText && updatedText !== freshRow.full_text) {
             const editCaption = () => bot.editMessageCaption(truncateCaption(updatedText), {
                 chat_id, message_id, parse_mode: 'HTML'
             });
@@ -255,7 +322,11 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                 q.updateAuctionFullText.run(updatedText, chat_id, message_id);
                 freshRow.full_text = updatedText;
             } catch (err) {
-                if (!(await rescheduleIfLimit(err)) && !err.message.includes('message is not modified')) {
+                // Bail out on a rate limit instead of falling through to the
+                // keyboard edit: that call would only collect its own 429 and
+                // the queued retry redoes both edits anyway.
+                if (await rescheduleIfLimit(err)) return;
+                if (!err.message.includes('message is not modified')) {
                     console.error(`Failed to update status tag for auction ${chat_id}:${message_id}:`, err.message);
                 }
             }
@@ -352,6 +423,10 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
             console.error('Error closing auction without winner:', e.message);
         }
     }
+
+    // Got through without a 429: drop the attempt counter so a later close of
+    // this auction (after a restart) starts from a clean budget.
+    if (!rateLimited) closeRetries.delete(retryKey);
 }
 
 /**
