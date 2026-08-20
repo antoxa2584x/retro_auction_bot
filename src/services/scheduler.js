@@ -264,8 +264,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
         }
     }
 
-    const alreadyFinished = row.status === 'finished';
-    if (!alreadyFinished) {
+    if (row.status !== 'finished') {
         q.finish.run(chat_id, message_id);
     }
 
@@ -274,6 +273,16 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
 
     const retryKey = `${chat_id}:${message_id}`;
     let rateLimited = false;
+    // Claim the DMs on their own flag rather than gating them on the status.
+    // The row is marked finished above, before any post edit runs, so a close
+    // that dies on a rate-limited edit used to come back as "already finished"
+    // and skip the winner/admin notifications for good. The claim is atomic so
+    // two concurrent closes of the same auction still send them only once.
+    const shouldNotify = q.claimCloseNotify.run(chat_id, message_id).changes === 1;
+    // A rate limit on the channel post is not a reason to withhold the DMs —
+    // they go to different chats and are not what Telegram throttled. Only the
+    // remaining post edit is left to the queued retry.
+    let skipPostEdits = false;
 
     const rescheduleIfLimit = async (err) => {
         if (!isRateLimit(err)) return false;
@@ -290,7 +299,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
     // occurrences, so a post that picked up a stray tag from an older restart is
     // cleaned up here — the winner/empty keyboard is re-applied by the branches below.
     //
-    // Deliberately NOT gated on !alreadyFinished: the row is marked finished before
+    // Deliberately NOT gated on a first-close check: the row is marked finished before
     // this edit runs, so a single failed edit (rate limit, network blip, restart
     // between the two) would otherwise never be retried and the post would keep
     // #активний forever. full_text is only written back once Telegram accepts the
@@ -322,11 +331,12 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                 q.updateAuctionFullText.run(updatedText, chat_id, message_id);
                 freshRow.full_text = updatedText;
             } catch (err) {
-                // Bail out on a rate limit instead of falling through to the
-                // keyboard edit: that call would only collect its own 429 and
-                // the queued retry redoes both edits anyway.
-                if (await rescheduleIfLimit(err)) return;
-                if (!err.message.includes('message is not modified')) {
+                // Skip the keyboard edit on a rate limit instead of attempting
+                // it: that call would only collect its own 429 and the queued
+                // retry redoes both edits anyway. The notifications below still
+                // run — they are DMs, not edits to the throttled channel post.
+                if (await rescheduleIfLimit(err)) skipPostEdits = true;
+                else if (!err.message.includes('message is not modified')) {
                     console.error(`Failed to update status tag for auction ${chat_id}:${message_id}:`, err.message);
                 }
             }
@@ -335,7 +345,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
 
     if (freshRow.leader_id) {
         try {
-            await bot.editMessageReplyMarkup(
+            if (!skipPostEdits) await bot.editMessageReplyMarkup(
                 winnerKeyboard(freshRow.leader_id, freshRow.leader_name, freshRow.current_price),
                 { chat_id: chat_id, message_id: message_id }
             ).catch(async (err) => {
@@ -354,7 +364,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                 }
             });
 
-            if (!alreadyFinished) {
+            if (shouldNotify) {
                 // Notify winner
                 const nickname = freshRow.admin_contact || getContactNickname();
                 const adminLink = formatContactLink(nickname);
@@ -395,10 +405,12 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
             }
         } catch (e) {
             console.error('Error closing auction with winner:', e.message);
+            // Hand the claim back so the queued retry can still send the DMs.
+            if (shouldNotify) q.releaseCloseNotify.run(chat_id, message_id);
         }
     } else {
         try {
-            await bot.editMessageReplyMarkup(
+            if (!skipPostEdits) await bot.editMessageReplyMarkup(
                 makeEmptyFinishKb(),
                 { chat_id: chat_id, message_id: message_id }
             ).catch(async (err) => {
@@ -408,7 +420,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                 }
             });
 
-            if (!alreadyFinished) {
+            if (shouldNotify) {
                 // Notify admins about no bids
                 const adminNotifyText = t('scheduler.admin_no_bids_notify', {
                     link: auctionLink,
@@ -421,6 +433,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
             }
         } catch (e) {
             console.error('Error closing auction without winner:', e.message);
+            if (shouldNotify) q.releaseCloseNotify.run(chat_id, message_id);
         }
     }
 

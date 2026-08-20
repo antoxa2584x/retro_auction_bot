@@ -159,7 +159,12 @@ const migrations = [
     { name: 'photo_ids', type: 'TEXT' },
     // Comma-separated message_ids of the posted additional-photo gallery, so a
     // restart can delete the old gallery alongside the old main post.
-    { name: 'gallery_msg_ids', type: 'TEXT' }
+    { name: 'gallery_msg_ids', type: 'TEXT' },
+    // One-time claim flag for the "auction ended" DMs (winner + admins). Kept
+    // separate from status because the row is marked finished before the post
+    // edits run: a close that dies on a rate-limited edit is retried, and the
+    // retry would otherwise see 'finished' and skip the notifications forever.
+    { name: 'close_notified', type: 'INTEGER DEFAULT 0' }
 ];
 
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
@@ -180,6 +185,12 @@ for (const m of migrations) {
     if (!columnNames.includes(m.name)) {
         console.log(`Migrating: Adding column ${m.name} to auctions table`);
         db.exec(`ALTER TABLE auctions ADD COLUMN ${m.name} ${m.type}`);
+        // Auctions that finished before the flag existed already had their DMs
+        // sent (or permanently lost); either way a later close must not mail
+        // their winners again, so claim them all up front.
+        if (m.name === 'close_notified') {
+            db.exec(`UPDATE auctions SET close_notified=1 WHERE status='finished'`);
+        }
     }
 }
 
@@ -308,6 +319,22 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   claimRestart: db.prepare(`UPDATE auctions SET restart_handled=1 WHERE chat_id=? AND message_id=? AND restart_handled=0`),
+
+  /**
+   * Atomically claims the close notifications (winner DM + admin "ended" DM) for
+   * an auction, so a close that gets retried after a rate-limited post edit
+   * still sends them exactly once. Returns `changes === 1` for the winning claim
+   * and `changes === 0` when they were already sent.
+   * @type {import('better-sqlite3').Statement}
+   */
+  claimCloseNotify: db.prepare(`UPDATE auctions SET close_notified=1 WHERE chat_id=? AND message_id=? AND close_notified=0`),
+
+  /**
+   * Releases the close-notification claim so the queued close retry can send the
+   * DMs, used when the claiming attempt failed before it got to them.
+   * @type {import('better-sqlite3').Statement}
+   */
+  releaseCloseNotify: db.prepare(`UPDATE auctions SET close_notified=0 WHERE chat_id=? AND message_id=?`),
 
   /**
    * Releases a previously-claimed restart so it can be retried after a failure.
@@ -543,7 +570,7 @@ export const q = {
    */
   restartAuction: db.prepare(`
     UPDATE auctions 
-       SET status='active', end_at=?, current_price=min_bid, leader_id=NULL, leader_name=NULL, participants_count=0
+       SET status='active', end_at=?, current_price=min_bid, leader_id=NULL, leader_name=NULL, participants_count=0, close_notified=0
      WHERE chat_id=? AND message_id=?
   `),
 
