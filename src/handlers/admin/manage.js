@@ -14,7 +14,7 @@ import {
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { logError, logWarn } from '../../services/logger.js';
-import { verifyAuctionStored } from '../../services/diagnostics.js';
+import { verifyAuctionStored, logAuctionNotFound } from '../../services/diagnostics.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { scheduleClose, closeAuction, cancelAuctionJobs } from '../../services/scheduler.js';
 import { 
@@ -55,6 +55,67 @@ async function cleanupGallery(bot, chatId, userId) {
         }
         session.gallery_msg_ids = [];
     }
+}
+
+/**
+ * Renders the admin card for a single auction: details plus the action keyboard.
+ *
+ * Shared by the "view auction" callback and by the actions that change the
+ * auction in place — they re-render this card instead of bouncing the admin
+ * back to the panel.
+ *
+ * @param {TelegramBot} bot
+ * @param {number} chatId - Admin chat holding the card.
+ * @param {number} messageId - Message to edit in place.
+ * @param {number} targetChatId - Auction's chat ID.
+ * @param {number} targetMsgId - Auction's message ID.
+ * @returns {Promise<boolean>} false when the auction row no longer exists.
+ */
+async function sendAdminAuctionView(bot, chatId, messageId, targetChatId, targetMsgId) {
+    const a = q.getAuction.get(targetChatId, targetMsgId);
+    if (!a) return false;
+
+    const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM.yyyy HH:mm');
+    const link = getAuctionLink(targetChatId, targetMsgId);
+
+    const statusText = a.status === 'active' ? t('admin.status_active') : t('admin.status_finished');
+
+    const winner = a.leader_id
+        ? formatUserLink(a.leader_id, a.leader_name)
+        : t('bid.no_bids');
+
+    const contactLink = formatContactLink(a.admin_contact);
+
+    const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
+    const priceLabel = a.leader_id ? currentBidText : t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '');
+
+    const text = t('admin.panel_header') + '\n\n' +
+        t('admin.auction_details', {
+            title: a.title,
+            chat_id: targetChatId,
+            message_id: targetMsgId,
+            price: `${a.current_price} (${priceLabel})`,
+            status: statusText,
+            end_at: endDate,
+            winner: winner,
+            contact_link: contactLink,
+            link: link
+        });
+
+    const kb = makeAdminAuctionActionKb(targetChatId, targetMsgId, a.status);
+    try {
+        await safeEditMessage(bot, chatId, messageId, text, {
+            parse_mode: 'HTML',
+            reply_markup: kb
+        });
+    } catch (e) {
+        await bot.deleteMessage(chatId, messageId).catch(() => {});
+        await bot.sendMessage(chatId, text, {
+            parse_mode: 'HTML',
+            reply_markup: kb
+        });
+    }
+    return true;
 }
 
 /**
@@ -678,56 +739,11 @@ export function registerManageHandlers(bot) {
 
             const targetChatId = Number(viewMatch[1]);
             const targetMsgId = Number(viewMatch[2]);
-            const a = q.getAuction.get(targetChatId, targetMsgId);
 
-            if (!a) {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
-                } catch (e) {
-                    console.error('Error answering adm_view not_found callback:', e.message);
-                    return;
-                }
-            }
-
-            const endDate = formatInTimeZone(new Date(a.end_at), TZ, 'dd.MM.yyyy HH:mm');
-            const link = getAuctionLink(targetChatId, targetMsgId);
-            
-            const statusText = a.status === 'active' ? t('admin.status_active') : t('admin.status_finished');
-            
-            const winner = a.leader_id 
-                ? formatUserLink(a.leader_id, a.leader_name)
-                : t('bid.no_bids');
-
-            const contactLink = formatContactLink(a.admin_contact);
-
-            const currentBidText = q.getSetting.get('AUCTION_CURRENT_BID_TEXT')?.value || t('bid.current_bid_label');
-            const priceLabel = a.leader_id ? currentBidText : t('admin.auction_min_bid_text').replace(/^(🔸|💰)\s*/, '');
-
-            const text = t('admin.panel_header') + '\n\n' +
-                t('admin.auction_details', {
-                    title: a.title,
-                    chat_id: targetChatId,
-                    message_id: targetMsgId,
-                    price: `${a.current_price} (${priceLabel})`,
-                    status: statusText,
-                    end_at: endDate,
-                    winner: winner,
-                    contact_link: contactLink,
-                    link: link
-                });
-
-            const kb = makeAdminAuctionActionKb(targetChatId, targetMsgId, a.status);
-            try {
-                await safeEditMessage(bot, chatId, messageId, text, {
-                    parse_mode: 'HTML',
-                    reply_markup: kb
-                });
-            } catch (e) {
-                await bot.deleteMessage(chatId, messageId).catch(() => {});
-                await bot.sendMessage(chatId, text, {
-                    parse_mode: 'HTML',
-                    reply_markup: kb
-                });
+            const shown = await sendAdminAuctionView(bot, chatId, messageId, targetChatId, targetMsgId);
+            if (!shown) {
+                logAuctionNotFound('adm_view', targetChatId, targetMsgId, { user_id: from.id });
+                await bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
             }
         }
 
@@ -943,17 +959,23 @@ export function registerManageHandlers(bot) {
         const undoBidMatch = data.match(/^adm_undo_bid:(.+):(.+)$/);
         if (undoBidMatch) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
-            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(undoBidMatch[1]);
             const targetMsgId = Number(undoBidMatch[2]);
             
             const res = undoLastBidTransaction(targetChatId, targetMsgId);
 
+            // The outcome goes into the callback answer rather than a chat message:
+            // the admin stays on the auction card and can remove the next bid
+            // straight away instead of walking back down from the panel.
             if (!res.success) {
                 const errorKey = res.reason === 'no_bids' ? 'admin.undo_bid_no_bids' : 'bid.not_found';
-                return bot.sendMessage(chatId, t(errorKey), { parse_mode: 'HTML' });
+                return bot.answerCallbackQuery(query.id, { text: stripHtml(t(errorKey)), show_alert: true }).catch(() => {});
             }
+
+            bot.answerCallbackQuery(query.id, {
+                text: stripHtml(t('admin.undo_bid_success', { price: res.newPrice, cur: getCurrency() }))
+            }).catch(() => {});
 
             const auctionLink = getAuctionLink(targetChatId, targetMsgId);
 
@@ -1029,13 +1051,8 @@ export function registerManageHandlers(bot) {
                 console.error('Failed to update channel post keyboard after undo bid:', err.message);
             }
 
-            // 3. Confirm to admin
-            await bot.sendMessage(chatId, t('admin.undo_bid_success', {
-                price: res.newPrice,
-                cur: getCurrency()
-            }), { parse_mode: 'HTML' });
-            
-            await sendAdminPanel(bot, chatId, true, messageId);
+            // 3. Refresh the auction card in place with the new price and leader
+            await sendAdminAuctionView(bot, chatId, messageId, targetChatId, targetMsgId);
         }
         
         const deleteMatch = data.match(/^adm_delete:(.+):(.+)$/);

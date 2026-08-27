@@ -43,6 +43,8 @@
     "pending_auction_reject_reason_3_details": "The auction text must not contain emojis.\n\nRemove them from the title and description and submit the auction for review again.",
     "pending_auction_reject_reason_4": "Poor photos",
     "pending_auction_reject_reason_4_details": "The photos have the wrong orientation, poor lighting, or do not show the item's condition well enough.\n\nTake the photos in daylight or bright light, in the correct orientation, and show the item from every side — including any defects.\n\nAfter that, submit the auction for review again.",
+    "pending_auction_reject_reason_5": "Missing photo of the disc's working side",
+    "pending_auction_reject_reason_5_details": "Discs must be shown from the working side.\n\nAdd a photo of the disc's working side so that its condition and any defects are visible.\n\nAfter that, submit the auction for review again.",
     "pending_auction_reject_rules_link": "📜 <a href=\"{{link}}\">View the rules</a>",
     "pending_auction_reject_cancelled": "❌ Rejection cancelled.",
     "pending_auction_alert_approved": "Approved and posted!",
