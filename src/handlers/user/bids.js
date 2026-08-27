@@ -2,6 +2,7 @@ import { q, placeBidTransaction } from '../../services/db.js';
 import { makeKb, confirmBidKb, confirmManualBidKb, makeOutbidKb } from '../../utils/keyboards.js';
 import { scheduleClose, closeAuction } from "../../services/scheduler.js";
 import { logAuctionNotFound } from '../../services/diagnostics.js';
+import { isProfileVisible } from '../../services/visibility.js';
 import { getAuctionLink, truncateCaption } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -110,6 +111,17 @@ export function registerBidHandlers(bot) {
             const price = Number(priceStr);
 
             const user = from;
+
+            // A hidden profile (Telegram privacy: "Forwarded Messages" set to
+            // Nobody) can't be linked to, so the seller would have no way to
+            // reach the winner once the auction closes. Keep those bids out
+            // rather than discover the problem at hand-over time.
+            if (!(await isProfileVisible(bot, user.id, chatId))) {
+                await bot.answerCallbackQuery(query.id, { text: t('bid.hidden_account_alert'), show_alert: true }).catch(() => {});
+                await bot.sendMessage(chatId, t('bid.hidden_account_text'), { parse_mode: 'HTML' }).catch(() => {});
+                return;
+            }
+
             const res = placeBidTransaction(target_chat_id, target_message_id, user, price);
 
             if (!res.success) {

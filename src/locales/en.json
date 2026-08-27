@@ -43,6 +43,8 @@
     "pending_auction_reject_reason_3_details": "The auction text must not contain emojis.\n\nRemove them from the title and description and submit the auction for review again.",
     "pending_auction_reject_reason_4": "Poor photos",
     "pending_auction_reject_reason_4_details": "The photos have the wrong orientation, poor lighting, or do not show the item's condition well enough.\n\nTake the photos in daylight or bright light, in the correct orientation, and show the item from every side — including any defects.\n\nAfter that, submit the auction for review again.",
+    "pending_auction_reject_reason_5": "Missing photo of the disc's working side",
+    "pending_auction_reject_reason_5_details": "Discs must be shown from the working side.\n\nAdd a photo of the disc's working side so that its condition and any defects are visible.\n\nAfter that, submit the auction for review again.",
     "pending_auction_reject_rules_link": "📜 <a href=\"{{link}}\">View the rules</a>",
     "pending_auction_reject_cancelled": "❌ Rejection cancelled.",
     "pending_auction_alert_approved": "Approved and posted!",
@@ -279,6 +281,8 @@
   "bid": {
     "not_found": "Auction not found",
     "finished": "Auction already finished",
+    "hidden_account_alert": "Your account is hidden. Set \"Forwarded Messages\" to \"Everybody\" to place bids.",
+    "hidden_account_text": "🔒 <b>Your account is hidden</b>\n\nTo place bids, the seller must be able to contact you once the auction ends.\n\nCheck your profile privacy settings: <b>Forwarded Messages</b> must be set to <b>Everybody</b>.\n\nAfter that, place your bid again.",
     "confirm_text": "You are about to bid on the auction:\n\n{{title}}\n\nBid amount: <b>{{price}} {{cur}}</b>",
     "welcome": "Hi! I am an auction bot. You can bid in the channel.\n\nCommands:\n/menu - User menu (won, active, watchlist)\n/my - My active auctions\n/won - My won auctions\n/about - About the bot",
     "about_text": "🎯 <b>Retro Auction Bot</b> — smart auctions inside Telegram\nVersion: v{{version}}\n\nTurn regular channel posts into fully interactive auctions with bidding buttons, real-time updates, and automatic winner selection.\n\n⚡ <b>Features:</b>\n• One-tap bidding with confirmation\n• Anti-sniping (auto time extension)\n• Real-time notifications (outbid / win)\n• Rich media preview (photo + full description)\n• /my and /won commands for user tracking\n• Custom currency, language, and templates\n• Ukrainian & English support\n• AI-generated auction titles and descriptions\n\n🛠 <b>Admin tools:</b>\n• Step-by-step auction creation wizard\n• Direct posting to channel\n• Advanced admin panel & settings\n• Restart or instantly finish auctions\n\n🔗 <b>GitHub:</b> https://github.com/antoxa2584x/retro_auction_bot\n\n🔨 Perfect for Telegram channels that want fast, clean, and automated auction workflows.",

@@ -113,6 +113,15 @@ db.exec(`
         PRIMARY KEY (chat_id, message_id, user_id)
     );
 
+    -- Cached result of the "can this user be linked to?" probe, i.e. their
+    -- Telegram "Forwarded Messages" privacy setting. See services/visibility.js.
+    CREATE TABLE IF NOT EXISTS user_visibility
+    (
+        user_id INTEGER PRIMARY KEY,
+        visible INTEGER NOT NULL,
+        checked_at INTEGER NOT NULL -- epoch ms of the probe
+    );
+
     -- Binary assets uploaded by admins (currently just the watermark PNG).
     -- Kept in the DB rather than on disk so a single sqlite backup carries
     -- everything the bot needs to run.
@@ -716,6 +725,13 @@ export const q = {
     FROM notifications n
     JOIN auctions a ON n.chat_id = a.chat_id AND n.message_id = a.message_id
     WHERE a.status = 'active'
+  `),
+
+  // Profile visibility probe cache (see services/visibility.js)
+  getUserVisibility: db.prepare(`SELECT visible, checked_at FROM user_visibility WHERE user_id = ?`),
+  setUserVisibility: db.prepare(`
+    INSERT INTO user_visibility (user_id, visible, checked_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET visible = excluded.visible, checked_at = excluded.checked_at
   `),
 
   // Support messages
