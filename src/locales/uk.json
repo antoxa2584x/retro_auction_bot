@@ -43,6 +43,7 @@
     "pending_auction_reject_cancelled": "❌ Відхилення скасовано.",
     "pending_auction_alert_approved": "Схвалено та опубліковано!",
     "pending_auction_alert_rejected": "Відхилено.",
+    "pending_auction_already_handled": "⚠️ Цей аукціон уже опрацьовано іншим адміністратором.",
     "finished_auctions_header": "<b>Завершені аукціони:</b>",
     "no_finished_auctions": "Немає завершених аукціонів.",
     "auction_details": "<b>{{title}}</b>\n\nID: <code>{{chat_id}}:{{message_id}}</code>\nЦіна: <b>{{price}} {{cur}}</b>\nСтатус: <b>{{status}}</b>\nЗавершення: <b>{{end_at}}</b>\nЛідер: {{winner}}\nКонтакт: {{contact_link}}\n\n<a href=\"{{link}}\">Посилання на пост</a>",

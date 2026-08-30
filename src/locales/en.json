@@ -49,6 +49,7 @@
     "pending_auction_reject_cancelled": "❌ Rejection cancelled.",
     "pending_auction_alert_approved": "Approved and posted!",
     "pending_auction_alert_rejected": "Rejected.",
+    "pending_auction_already_handled": "⚠️ This auction has already been processed by another admin.",
     "finished_auctions_header": "<b>Finished auctions:</b>",
     "no_finished_auctions": "No finished auctions.",
     "auction_details": "<b>{{title}}</b>\n\nID: <code>{{chat_id}}:{{message_id}}</code>\nPrice: <b>{{price}} {{cur}}</b>\nStatus: <b>{{status}}</b>\nEnds at: <b>{{end_at}}</b>\nLeader: {{winner}}\nContact: {{contact_link}}\n\n<a href=\"{{link}}\">Link to post</a>",

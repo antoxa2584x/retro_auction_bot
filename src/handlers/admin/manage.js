@@ -295,10 +295,12 @@ export function registerManageHandlers(bot) {
             const targetMsgId = Number(targetMsgIdParam);
 
             const a = q.getAuction.get(targetChatId, targetMsgId);
-            const title = a?.title || '';
 
             // Claim the request so it can't also be approved/rejected by another admin.
-            if (a && q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
+            // A missing row means another admin already approved it: the approval
+            // reposts the auction under a new message_id and drops the old row, so
+            // there is nothing left to reject.
+            if (!a || q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
                 await bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
                 await bot.editMessageText(t('admin.restart_already_handled'), {
                     chat_id: chatId,
@@ -310,13 +312,13 @@ export function registerManageHandlers(bot) {
 
             await bot.answerCallbackQuery(query.id).catch(() => {});
 
-            await bot.editMessageText(t('admin.post_restart_rejected', { title }), {
+            await bot.editMessageText(t('admin.post_restart_rejected', { title: a.title }), {
                 chat_id: chatId,
                 message_id: messageId,
                 parse_mode: 'HTML'
             }).catch(() => {});
 
-            await bot.sendMessage(targetUserId, t('admin.post_restart_rejected', { title }), { parse_mode: 'HTML' }).catch(() => {});
+            await bot.sendMessage(targetUserId, t('admin.post_restart_rejected', { title: a.title }), { parse_mode: 'HTML' }).catch(() => {});
         }
 
         if (data === 'adm_list') {
@@ -457,7 +459,7 @@ export function registerManageHandlers(bot) {
             // would otherwise re-read it as still 'pending' and post the auction
             // to the channel twice.
             if (p.status !== 'pending') {
-                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_alert_approved') }).catch(() => {});
+                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_already_handled'), show_alert: true }).catch(() => {});
             }
             q.updatePendingAuctionStatus.run('approved', id);
 
@@ -581,6 +583,12 @@ export function registerManageHandlers(bot) {
             const p = q.getPendingAuction.get(id);
             if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
 
+            // Another admin may have approved or rejected it while this card was
+            // open — don't start a rejection flow for a settled auction.
+            if (p.status !== 'pending') {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_already_handled'), show_alert: true }).catch(() => {});
+            }
+
             bot.answerCallbackQuery(query.id).catch(() => {});
             
             // Cleanup gallery if exists
@@ -602,6 +610,13 @@ export function registerManageHandlers(bot) {
             const p = q.getPendingAuction.get(id);
             if (!p) return;
 
+            // Claim the auction before notifying: without this a second admin (or a
+            // double click) could reject one that is already approved and live in
+            // the channel, telling the user it was rejected.
+            if (p.status !== 'pending') {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_already_handled'), show_alert: true }).catch(() => {});
+            }
+
             await cleanupGallery(bot, chatId, from.id);
             adminSessions.delete(from.id);
             q.updatePendingAuctionStatus.run('rejected', id);
@@ -615,6 +630,12 @@ export function registerManageHandlers(bot) {
             const [, id, indexStr] = data.split(':');
             const p = q.getPendingAuction.get(id);
             if (!p) return bot.answerCallbackQuery(query.id, { text: "Not found." }).catch(() => {});
+
+            // Same race as the plain confirm above: an already-settled auction must
+            // not send the user a rejection.
+            if (p.status !== 'pending') {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_already_handled'), show_alert: true }).catch(() => {});
+            }
 
             // The callback carries a 1-based index into the predefined reasons.
             const preset = REJECT_REASONS[Number(indexStr) - 1];
