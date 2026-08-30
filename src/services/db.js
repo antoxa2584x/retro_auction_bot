@@ -740,7 +740,21 @@ export const q = {
     VALUES (?, ?, ?)
   `),
   getSupportMessage: db.prepare(`SELECT * FROM support_messages WHERE id = ?`),
-  getAllSupportMessages: db.prepare(`SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 50`),
+
+  /**
+   * Retrieves support messages for the history panel, newest first. created_at
+   * only has second granularity, so id breaks ties — without it two messages
+   * from the same second could swap places between pages and one of them would
+   * show up twice while the other never appeared.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getSupportMessagesPaginated: db.prepare(`SELECT * FROM support_messages ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`),
+
+  /**
+   * Counts all support messages, for the page count.
+   * @type {import('better-sqlite3').Statement}
+   */
+  countSupportMessages: db.prepare(`SELECT COUNT(*) as count FROM support_messages`),
   // Only closes a message that is still open, so two admins replying at the
   // same time can't both deliver a reply. `changes === 0` means another admin
   // already answered it.

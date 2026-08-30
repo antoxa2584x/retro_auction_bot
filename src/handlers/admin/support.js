@@ -1,6 +1,6 @@
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
-import { makeAdminSupportHistoryKb, makeAdminSupportViewKb } from '../../utils/keyboards.js';
+import { makeAdminSupportHistoryKb, makeAdminSupportViewKb, SUPPORT_HISTORY_PAGE_SIZE } from '../../utils/keyboards.js';
 import { safeEditMessage, escapeHtml } from '../../utils/utils.js';
 
 export const adminSupportSessions = new Map();
@@ -62,19 +62,30 @@ export function registerAdminSupportHandlers(bot) {
             return;
         }
 
-        if (data === 'adm_support_history') {
+        // Bare 'adm_support_history' is the entry point from the admin panel;
+        // the ':<page>' form comes from the pager and the detail view's back button.
+        if (data === 'adm_support_history' || data.startsWith('adm_support_history:')) {
             await bot.answerCallbackQuery(query.id).catch(() => {});
+
+            let page = Math.max(0, parseInt(data.split(':')[1], 10) || 0);
             let messages;
+            let totalCount;
             try {
-                messages = q.getAllSupportMessages.all();
-                console.log(`[DEBUG] Found ${messages?.length} messages for history`);
+                totalCount = q.countSupportMessages.get().count;
+                // A page can fall off the end if messages were removed since the
+                // keyboard was drawn — clamp instead of showing an empty list.
+                const lastPage = Math.max(0, Math.ceil(totalCount / SUPPORT_HISTORY_PAGE_SIZE) - 1);
+                if (page > lastPage) page = lastPage;
+
+                messages = q.getSupportMessagesPaginated.all(SUPPORT_HISTORY_PAGE_SIZE, page * SUPPORT_HISTORY_PAGE_SIZE);
+                console.log(`[DEBUG] Found ${messages?.length} messages for history page ${page} of ${totalCount} total`);
             } catch (err) {
                 console.error(`[ERROR] Failed to fetch support messages:`, err);
                 return bot.sendMessage(query.from.id, "Error fetching history from DB").catch(() => {});
             }
             
             const text = (!messages || messages.length === 0) ? t('support.empty') : t('support.history_title');
-            const kb = makeAdminSupportHistoryKb(messages || []);
+            const kb = makeAdminSupportHistoryKb(messages || [], page, totalCount);
             
             try {
                 console.log(`[DEBUG] Attempting to update support history. Previous msg isPhoto: ${!!message.photo}`);
@@ -104,7 +115,9 @@ export function registerAdminSupportHandlers(bot) {
         }
 
         if (data.startsWith('adm_support_view:')) {
-            const supportId = parseInt(data.split(':')[1], 10);
+            const [, idParam, pageParam] = data.split(':');
+            const supportId = parseInt(idParam, 10);
+            const page = Math.max(0, parseInt(pageParam, 10) || 0);
             const supportMsg = q.getSupportMessage.get(supportId);
 
             if (!supportMsg) {
@@ -122,7 +135,7 @@ export function registerAdminSupportHandlers(bot) {
                 reply: supportMsg.admin_reply ? escapeHtml(String(supportMsg.admin_reply)) : t('support.no_reply')
             });
 
-            const kb = makeAdminSupportViewKb(supportMsg);
+            const kb = makeAdminSupportViewKb(supportMsg, page);
             console.log(`[DEBUG] Support view KB for message ${supportId}:`, JSON.stringify(kb));
             await safeEditMessage(bot, query.from.id, message.message_id, text, {
                 reply_markup: kb.reply_markup || kb,

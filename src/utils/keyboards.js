@@ -254,22 +254,42 @@ export function makeAdminActiveKb(auctions, page = 0, totalCount = 0) {
     return {inline_keyboard: buttons};
 }
 
+/** Support messages listed per page of the history panel. */
+export const SUPPORT_HISTORY_PAGE_SIZE = 10;
+
 /**
  * Creates a keyboard for support messages history.
  * 
- * @param {Array} messages - List of support messages.
+ * @param {Array} messages - Support messages on the current page.
+ * @param {number} [page=0] - Zero-based page index.
+ * @param {number} [totalCount=0] - Total messages across all pages.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminSupportHistoryKb(messages) {
+export function makeAdminSupportHistoryKb(messages, page = 0, totalCount = 0) {
     const buttons = (messages || []).map(m => {
         const date = m.created_at ? new Date(m.created_at).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) : '??.??';
         const status = m.status === 'open' ? '✉️' : '✅';
         const truncatedMessage = m.message ? (m.message.length > 20 ? m.message.substring(0, 20) + '...' : m.message) : '...';
         return [{
+            // The page travels with the message so "back" from the detail view
+            // returns to the page the admin opened it from.
             text: `${status} ${date} | ${m.user_name || 'User'}: ${truncatedMessage}`,
-            callback_data: `adm_support_view:${m.id}`
+            callback_data: `adm_support_view:${m.id}:${page}`
         }];
     });
+
+    const totalPages = Math.ceil(totalCount / SUPPORT_HISTORY_PAGE_SIZE);
+    if (totalPages > 1) {
+        const row = [];
+        if (page > 0) {
+            row.push({ text: '⬅️', callback_data: `adm_support_history:${page - 1}` });
+        }
+        row.push({ text: `${page + 1} / ${totalPages}`, callback_data: 'none' });
+        if (page < totalPages - 1) {
+            row.push({ text: '➡️', callback_data: `adm_support_history:${page + 1}` });
+        }
+        buttons.push(row);
+    }
 
     buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
     return { inline_keyboard: buttons };
@@ -279,16 +299,17 @@ export function makeAdminSupportHistoryKb(messages) {
  * Creates a keyboard for viewing a specific support message.
  * 
  * @param {Object} message - Support message object.
+ * @param {number} [page=0] - History page to return to.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminSupportViewKb(message) {
+export function makeAdminSupportViewKb(message, page = 0) {
     const buttons = [];
     const canReply = message.status === 'open' || !message.admin_reply || String(message.admin_reply).trim() === '';
     
     if (canReply) {
         buttons.push([{ text: t('admin.kb.reply'), callback_data: `support_reply:${message.id}` }]);
     }
-    buttons.push([{ text: t('admin.kb.prev'), callback_data: 'adm_support_history' }]);
+    buttons.push([{ text: t('admin.kb.prev'), callback_data: `adm_support_history:${page}` }]);
     return { inline_keyboard: buttons };
 }
 
