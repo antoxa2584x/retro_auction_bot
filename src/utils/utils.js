@@ -54,6 +54,32 @@ export function formatUserLinkById(userId) {
 }
 
 /**
+ * The contact value to store on an auction for a given admin.
+ *
+ * Admins without a Telegram @username are still reachable by id — the same form
+ * user-submitted auctions use — and formatContactLink renders both.
+ *
+ * @param {{user_id: number, username?: string|null}} admin - Row from the admins table.
+ * @returns {string} "@nick" or "tg://user?id=...".
+ */
+export function adminContactValue(admin) {
+    return admin.username ? '@' + admin.username : `tg://user?id=${admin.user_id}`;
+}
+
+/**
+ * The label for an admin in the contact picker: their @username when they have
+ * one, otherwise their name, falling back to the raw id.
+ *
+ * @param {{user_id: number, username?: string|null, first_name?: string|null, last_name?: string|null}} admin
+ * @returns {string} Plain text — inline button labels aren't HTML-parsed.
+ */
+export function adminContactLabel(admin) {
+    if (admin.username) return '@' + admin.username;
+    const name = [admin.first_name, admin.last_name].filter(Boolean).join(' ');
+    return name || `ID ${admin.user_id}`;
+}
+
+/**
  * Formats a contact link (either username or tg://user?id=...) with a display name.
  * 
  * @param {string} nickname - The contact nickname or link.

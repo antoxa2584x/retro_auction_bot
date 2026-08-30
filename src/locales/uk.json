@@ -43,6 +43,7 @@
     "pending_auction_reject_cancelled": "❌ Відхилення скасовано.",
     "pending_auction_alert_approved": "Схвалено та опубліковано!",
     "pending_auction_alert_rejected": "Відхилено.",
+    "contact_admin_unavailable": "⚠️ Цей адміністратор більше недоступний. Виберіть інший контакт.",
     "pending_auction_already_handled": "⚠️ Цей аукціон уже опрацьовано іншим адміністратором.",
     "finished_auctions_header": "<b>Завершені аукціони:</b>",
     "no_finished_auctions": "Немає завершених аукціонів.",

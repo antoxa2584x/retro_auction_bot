@@ -1,6 +1,7 @@
-import {BOT_USERNAME, isUserPostEnabled} from '../config/env.js';
+import {BOT_USERNAME, isUserPostEnabled, getContactNickname} from '../config/env.js';
 import {t, getCurrency} from '../services/i18n.js';
 import { q } from '../services/db.js';
+import { adminContactLabel, adminContactValue } from './utils.js';
 
 /**
  * Creates the main auction keyboard for the channel post.
@@ -743,11 +744,30 @@ export function makeAdminPostAIConfirmKb() {
 /**
  * Creates the keyboard for selecting an admin contact.
  *
+ * Every verified admin is offered as a one-tap choice so the poster doesn't have
+ * to retype a nickname. The admin doing the posting comes first — it's their own
+ * auction most of the time — and whoever already matches the settings contact is
+ * left out, since that's the button below the list.
+ *
+ * @param {number} [currentAdminId] - Admin building the post, listed first.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminPostContactKb() {
+export function makeAdminPostContactKb(currentAdminId) {
+    // CONTACT_NICKNAME is stored exactly as an admin typed it, so "@Nick", "Nick"
+    // and "nick" all have to compare equal for the dedupe to catch anything.
+    const normalize = (v) => String(v || '').replace(/^@/, '').toLowerCase();
+    const settingsContact = normalize(getContactNickname());
+
+    const admins = q.getAllAdmins.all()
+        .filter(a => normalize(adminContactValue(a)) !== settingsContact)
+        .sort((a, b) => (b.user_id === currentAdminId) - (a.user_id === currentAdminId));
+
     return {
         inline_keyboard: [
+            ...admins.map(a => [{
+                text: adminContactLabel(a),
+                callback_data: `post_contact:admin:${a.user_id}`
+            }]),
             [{text: t('admin.kb.enter_contact_manually'), callback_data: 'post_contact:manual'}],
             [{text: t('admin.kb.use_settings_contact'), callback_data: 'post_contact:default', style: 'primary'}],
             [{text: t('common.cancel'), callback_data: 'post_cancel', style: 'danger'}]

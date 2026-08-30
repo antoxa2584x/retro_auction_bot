@@ -49,6 +49,7 @@
     "pending_auction_reject_cancelled": "❌ Rejection cancelled.",
     "pending_auction_alert_approved": "Approved and posted!",
     "pending_auction_alert_rejected": "Rejected.",
+    "contact_admin_unavailable": "⚠️ That admin is no longer available. Pick another contact.",
     "pending_auction_already_handled": "⚠️ This auction has already been processed by another admin.",
     "finished_auctions_header": "<b>Finished auctions:</b>",
     "no_finished_auctions": "No finished auctions.",

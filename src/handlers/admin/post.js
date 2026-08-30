@@ -27,12 +27,13 @@ import {
     getDefaultEndDate,
     sanitizeHtml,
     sendAuctionGallery,
-    truncateCaption
+    truncateCaption,
+    adminContactValue
 } from '../../utils/utils.js';
 import fs from 'fs';
 import os from 'os';
 
-/** @type {Map<number, {step: string, data: any, views: string[], viewMsgId: ?number}>} */
+/** @type {Map<number, {admin_id: number, step: string, data: any, views: string[], viewMsgId: ?number}>} */
 const postSessions = new Map();
 
 /**
@@ -98,9 +99,9 @@ const POST_VIEWS = {
             kb: makeAdminPostContinuousKb(min)
         };
     },
-    CONTACT: () => ({
+    CONTACT: (session) => ({
         text: t('admin.post_step_contact', { default: getContactNickname() }),
-        kb: makeAdminPostContactKb()
+        kb: makeAdminPostContactKb(session.admin_id)
     }),
     CONTACT_MANUAL: () => ({
         text: t('admin.kb.enter_contact_manually'),
@@ -127,7 +128,7 @@ export function registerPostHandlers(bot) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
             bot.answerCallbackQuery(query.id).catch(() => {});
             
-            const session = { step: 'IMAGE', data: {}, views: ['IMAGE'], viewMsgId: null };
+            const session = { admin_id: from.id, step: 'IMAGE', data: {}, views: ['IMAGE'], viewMsgId: null };
             postSessions.set(from.id, session);
 
             // First step: rendered into the panel message instead of a new one,
@@ -270,6 +271,18 @@ export function registerPostHandlers(bot) {
             const val = contactMatch[1];
             if (val === 'default') {
                 session.data.admin_contact = getContactNickname();
+                await goToView(bot, chatId, session, 'CONFIRM');
+            } else if (val.startsWith('admin:')) {
+                // Re-read the admin instead of trusting the callback: the keyboard
+                // may have been built before they were removed or renamed.
+                const admin = q.getAdmin.get(Number(val.slice('admin:'.length)));
+                if (!admin || admin.otp_code !== null) {
+                    // The query was already answered above, so say it in chat and
+                    // redraw the step — the list rebuilds without the stale entry.
+                    await bot.sendMessage(chatId, t('admin.contact_admin_unavailable'), { parse_mode: 'HTML' });
+                    return renderView(bot, chatId, session);
+                }
+                session.data.admin_contact = adminContactValue(admin);
                 await goToView(bot, chatId, session, 'CONFIRM');
             } else {
                 await goToView(bot, chatId, session, 'CONTACT_MANUAL');
