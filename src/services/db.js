@@ -163,9 +163,15 @@ const migrations = [
     { name: 'is_continuous', type: 'INTEGER DEFAULT 0' },
     { name: 'continuous_minutes', type: 'INTEGER DEFAULT 5' },
     { name: 'creator_id', type: 'INTEGER' },
-    // Guards against two admins restarting the same finished auction: acts as a
-    // one-time claim flag so only the first approval/restart is processed.
+    // One-time claim flag for a user's restart *request*: whoever approves or
+    // rejects it first settles it, and a rejected request stays claimed forever so
+    // a second admin can't settle it again. Never used as an in-flight lock — see
+    // restart_in_progress.
     { name: 'restart_handled', type: 'INTEGER DEFAULT 0' },
+    // Short-lived lock held while a restart is actually being posted to the
+    // channel, so two admins (or a double tap) can't post it twice. Cleared on
+    // startup because a process that dies mid-restart can't release it itself.
+    { name: 'restart_in_progress', type: 'INTEGER DEFAULT 0' },
     // Comma-separated file_ids of ALL photos (main + gallery). photo_id above is
     // just photoIds[0]; this preserves the additional photos so a restart can
     // repost the full gallery.
@@ -230,6 +236,11 @@ for (const m of migrations) {
 // too early aborted startup with "no such column: creator_id" — which only ever
 // hit fresh installs, since every migrated database already had the column.
 db.exec(`CREATE INDEX IF NOT EXISTS idx_auctions_creator ON auctions (creator_id)`);
+
+// A restart that was interrupted by a crash or a redeploy leaves its lock behind,
+// and nothing else ever clears it: the auction's restart button would stay dead
+// for good. No restart can be in flight while the process is starting up.
+db.exec(`UPDATE auctions SET restart_in_progress=0 WHERE restart_in_progress<>0`);
 
 // Migration: titles were historically derived by truncating raw HTML to 50
 // chars, which could split an HTML tag in half (e.g. a dangling "<b>"). When
@@ -350,9 +361,11 @@ export const q = {
   finish: db.prepare(`UPDATE auctions SET status='finished' WHERE chat_id=? AND message_id=?`),
 
   /**
-   * Atomically claims a finished auction for restart so that only the first
-   * admin who approves/restarts it succeeds. Returns `changes === 1` for the
-   * winning claim and `changes === 0` when another admin already handled it.
+   * Atomically claims a user's restart *request* so that only the first admin who
+   * approves or rejects it succeeds. Returns `changes === 1` for the winning claim
+   * and `changes === 0` when another admin already settled it. A rejected request
+   * keeps the claim for good, so this must not be used to guard the admin-panel
+   * restart — that uses {@link lockRestart}.
    * @type {import('better-sqlite3').Statement}
    */
   claimRestart: db.prepare(`UPDATE auctions SET restart_handled=1 WHERE chat_id=? AND message_id=? AND restart_handled=0`),
@@ -378,6 +391,21 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   releaseRestart: db.prepare(`UPDATE auctions SET restart_handled=0 WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Takes the in-flight lock for posting a restart of this auction. Returns
+   * `changes === 1` for the winning caller and `changes === 0` while another
+   * restart of the same auction is still being posted.
+   * @type {import('better-sqlite3').Statement}
+   */
+  lockRestart: db.prepare(`UPDATE auctions SET restart_in_progress=1 WHERE chat_id=? AND message_id=? AND restart_in_progress=0`),
+
+  /**
+   * Releases the in-flight restart lock so the restart can be retried. A restart
+   * that succeeds deletes the row instead, taking the lock with it.
+   * @type {import('better-sqlite3').Statement}
+   */
+  unlockRestart: db.prepare(`UPDATE auctions SET restart_in_progress=0 WHERE chat_id=? AND message_id=?`),
 
   /**
    * Deletes an auction record.

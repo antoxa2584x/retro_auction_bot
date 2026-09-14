@@ -153,37 +153,49 @@ export function registerManageHandlers(bot) {
                 return;
             }
 
-            await bot.answerCallbackQuery(query.id).catch(() => {});
-
-            let minBid = a.min_bid;
-            let step = a.step;
-            let durationDays = 4;
-            let endHour = new Date(a.end_at).getHours();
-
-            if (parts.length >= 8) {
-                minBid = Number(parts[4]);
-                step = Number(parts[5]);
-                durationDays = Number(parts[6]);
-                endHour = Number(parts[7]);
+            // Settling the request doesn't stop an admin from restarting the same
+            // auction from the panel at that very moment — take the posting lock too,
+            // and hand the request back if someone else is already posting it.
+            if (q.lockRestart.run(targetChatId, targetMsgId).changes === 0) {
+                q.releaseRestart.run(targetChatId, targetMsgId);
+                await bot.answerCallbackQuery(query.id, { text: t('admin.restart_in_progress'), show_alert: true }).catch(() => {});
+                return;
             }
 
-            const newEnd = new Date();
-            newEnd.setDate(newEnd.getDate() + durationDays);
-            newEnd.setHours(endHour, 0, 0, 0);
+            await bot.answerCallbackQuery(query.id).catch(() => {});
 
-            const updatedFullText = reconstructAuctionText(a.full_text, {
-                min_bid: minBid,
-                step: step,
-                end_at: newEnd.toISOString(),
-                is_continuous: a.is_continuous,
-                continuous_minutes: a.continuous_minutes
-            });
-
-            // All photos of the auction (main + additional). Fall back to the
-            // single main photo_id for auctions posted before photo_ids was tracked.
-            const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
-
+            let restartOk = false;
             try {
+                // Inside the try so that a throw in the date/text building — an
+                // unparsable end_at, say — still releases the claim and the lock.
+                let minBid = a.min_bid;
+                let step = a.step;
+                let durationDays = 4;
+                let endHour = new Date(a.end_at).getHours();
+
+                if (parts.length >= 8) {
+                    minBid = Number(parts[4]);
+                    step = Number(parts[5]);
+                    durationDays = Number(parts[6]);
+                    endHour = Number(parts[7]);
+                }
+
+                const newEnd = new Date();
+                newEnd.setDate(newEnd.getDate() + durationDays);
+                newEnd.setHours(endHour, 0, 0, 0);
+
+                const updatedFullText = reconstructAuctionText(a.full_text, {
+                    min_bid: minBid,
+                    step: step,
+                    end_at: newEnd.toISOString(),
+                    is_continuous: a.is_continuous,
+                    continuous_minutes: a.continuous_minutes
+                });
+
+                // All photos of the auction (main + additional). Fall back to the
+                // single main photo_id for auctions posted before photo_ids was tracked.
+                const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
+
                 let newMsg;
                 const kb = makeKb(targetChatId, 0, minBid, 0);
                 if (a.photo_id) {
@@ -267,6 +279,7 @@ export function registerManageHandlers(bot) {
                 // The old row is keyed by the deleted message_id — drop it so it no
                 // longer surfaces in admin lists or scheduler scans.
                 q.deleteAuction.run(targetChatId, targetMsgId);
+                restartOk = true;
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
 
@@ -282,7 +295,12 @@ export function registerManageHandlers(bot) {
                 // Posting the restart failed — release the claim so it can be retried.
                 console.error('Error approving auction restart:', e.message);
                 q.releaseRestart.run(targetChatId, targetMsgId);
-                await bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true }).catch(() => {});
+                // The query was already answered, so a second answer would never reach
+                // the admin — report the failure as a message instead of silence.
+                await bot.sendMessage(chatId, t('common.error_try_again'), { parse_mode: 'HTML' }).catch(() => {});
+            } finally {
+                // A successful restart deletes the row, taking the lock with it.
+                if (!restartOk) q.unlockRestart.run(targetChatId, targetMsgId);
             }
         }
 
@@ -771,94 +789,84 @@ export function registerManageHandlers(bot) {
         const restartMatch = data.match(/^adm_restart:(.+):(.+)$/);
         if (restartMatch) {
             if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
-            bot.answerCallbackQuery(query.id).catch(() => {});
 
             const targetChatId = Number(restartMatch[1]);
             const targetMsgId = Number(restartMatch[2]);
             const a = q.getAuction.get(targetChatId, targetMsgId);
 
+            // Every bail-out below answers the query itself. Answering it up front
+            // (as this handler used to) swallows those alerts — Telegram shows only
+            // the first answer — so a refused restart looked like a dead button.
             if (!a) {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
-                } catch (e) {
-                    console.error('Error answering adm_restart not_found callback:', e.message);
-                    return;
-                }
+                logAuctionNotFound('adm_restart', targetChatId, targetMsgId, { user_id: from.id });
+                return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true }).catch(() => {});
             }
             if (a.status !== 'finished') {
-                try {
-                    return bot.answerCallbackQuery(query.id, { text: 'Only finished auctions can be restarted', show_alert: true });
-                } catch (e) {
-                    console.error('Error answering adm_restart not_finished callback:', e.message);
-                    return;
-                }
+                return bot.answerCallbackQuery(query.id, { text: t('admin.restart_only_finished'), show_alert: true }).catch(() => {});
             }
 
-            // Atomically claim this auction so two admins can't restart it twice.
-            if (q.claimRestart.run(targetChatId, targetMsgId).changes === 0) {
-                return bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
+            // Take the in-flight lock so two admins (or a double tap) can't post the
+            // restart twice. Deliberately not restart_handled: that flag permanently
+            // records a settled restart *request*, so guarding the panel button with
+            // it left the button dead for good once a request had been rejected.
+            if (q.lockRestart.run(targetChatId, targetMsgId).changes === 0) {
+                return bot.answerCallbackQuery(query.id, { text: t('admin.restart_in_progress'), show_alert: true }).catch(() => {});
             }
 
-            const originalEnd = new Date(a.end_at);
-            const newEnd = new Date();
-            newEnd.setDate(newEnd.getDate() + 4);
-            newEnd.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
-
-            const newEndStr = formatInTimeZone(newEnd, TZ, 'dd.MM');
-            const newTimeStr = formatInTimeZone(newEnd, TZ, 'HH:mm');
-
-            // Find the line that starts with what's in admin.auction_end_date_text ("Завершення аукціону")
-            const endDateText = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
-            const reEnd = new RegExp(`(${endDateText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:?\\s*)[0-3]?\\d\\.[01]?\\d\\s*о\\s*[0-2]?\\d:[0-5]\\d`, 'i');
-            
-            let updatedFullText;
-            if (reEnd.test(a.full_text)) {
-                updatedFullText = a.full_text.replace(reEnd, `$1${newEndStr} о ${newTimeStr}`);
-            } else {
-                // If regex doesn't match for some reason, we might need a more generic fallback 
-                const fallbackRe = /([0-3]?\d\.[01]?\d)\s*о\s*([0-2]?\d:[0-5]\d)/;
-                if (fallbackRe.test(a.full_text)) {
-                    updatedFullText = a.full_text.replace(fallbackRe, `${newEndStr} о ${newTimeStr}`);
-                } else {
-                    updatedFullText = a.full_text;
-                }
-            }
-
-            // Restart makes the auction active again — retag the header
-            // (#завершений → #активний) to match the new state. setStatusTag drops
-            // any existing tags first, so a post carrying a stray tag from an older
-            // restart ends up with a single #активний instead of two.
-            updatedFullText = setStatusTag(updatedFullText, 'active');
-
-            // All photos of the auction (main + additional). Fall back to the
-            // single main photo_id for auctions posted before photo_ids was tracked.
-            const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
             let restartOk = false;
             try {
-                let newMsg;
-                try {
-                    const kb = makeKb(targetChatId, 0, a.min_bid, 0);
-                    if (a.photo_id) {
-                        newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
-                            caption: truncateCaption(updatedFullText),
-                            parse_mode: 'HTML',
-                            reply_markup: kb
-                        });
+                // Everything below runs inside the try so that a throw — an unparsable
+                // end_at reaching formatInTimeZone, say — still releases the lock.
+                const originalEnd = new Date(a.end_at);
+                const newEnd = new Date();
+                newEnd.setDate(newEnd.getDate() + 4);
+                newEnd.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
+
+                const newEndStr = formatInTimeZone(newEnd, TZ, 'dd.MM');
+                const newTimeStr = formatInTimeZone(newEnd, TZ, 'HH:mm');
+
+                // Find the line that starts with what's in admin.auction_end_date_text ("Завершення аукціону")
+                const endDateText = q.getSetting.get('AUCTION_END_DATE_TEXT')?.value || t('parse.defaults.end_date');
+                const reEnd = new RegExp(`(${endDateText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:?\\s*)[0-3]?\\d\\.[01]?\\d\\s*о\\s*[0-2]?\\d:[0-5]\\d`, 'i');
+
+                let updatedFullText;
+                if (reEnd.test(a.full_text)) {
+                    updatedFullText = a.full_text.replace(reEnd, `$1${newEndStr} о ${newTimeStr}`);
+                } else {
+                    // If regex doesn't match for some reason, we might need a more generic fallback 
+                    const fallbackRe = /([0-3]?\d\.[01]?\d)\s*о\s*([0-2]?\d:[0-5]\d)/;
+                    if (fallbackRe.test(a.full_text)) {
+                        updatedFullText = a.full_text.replace(fallbackRe, `${newEndStr} о ${newTimeStr}`);
                     } else {
-                        newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
-                            parse_mode: 'HTML',
-                            reply_markup: kb
-                        });
+                        updatedFullText = a.full_text;
                     }
-                } catch (e) {
-                    console.error('Failed to create new post for restart:', e.message);
-                    try {
-                        return bot.answerCallbackQuery(query.id, { text: t('common.error_try_again'), show_alert: true });
-                    } catch (err) {
-                        console.error('Error answering adm_restart error callback:', err.message);
-                        return;
-                    }
+                }
+
+                // Restart makes the auction active again — retag the header
+                // (#завершений → #активний) to match the new state. setStatusTag drops
+                // any existing tags first, so a post carrying a stray tag from an older
+                // restart ends up with a single #активний instead of two.
+                updatedFullText = setStatusTag(updatedFullText, 'active');
+
+                // All photos of the auction (main + additional). Fall back to the
+                // single main photo_id for auctions posted before photo_ids was tracked.
+                const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
+
+                let newMsg;
+                const kb = makeKb(targetChatId, 0, a.min_bid, 0);
+                if (a.photo_id) {
+                    newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
+                        caption: truncateCaption(updatedFullText),
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
+                } else {
+                    newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
+                        parse_mode: 'HTML',
+                        reply_markup: kb
+                    });
                 }
 
                 // Insert synchronously right after the send (before any further
@@ -928,20 +936,34 @@ export function registerManageHandlers(bot) {
                     }
                 }
                 // The old row is keyed by the deleted message_id — drop it so it no
-                // longer surfaces in admin lists or scheduler scans.
+                // longer surfaces in admin lists or scheduler scans. This takes the
+                // in-flight lock with it.
                 q.deleteAuction.run(targetChatId, targetMsgId);
+                restartOk = true;
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
 
+                // Already restarted at this point — never let the confirmation itself
+                // fail the whole thing and tell the admin to try again.
                 await bot.sendMessage(chatId, t('admin.restart_success', {
                     title: a.title,
                     date: formatInTimeZone(newEnd, TZ, 'dd.MM.yyyy HH:mm')
-                }), { parse_mode: 'HTML' });
-                await sendAdminPanel(bot, chatId, true, messageId);
-                restartOk = true;
+                }), { parse_mode: 'HTML' }).catch(() => {});
+                await sendAdminPanel(bot, chatId, true, messageId).catch(() => {});
+            } catch (e) {
+                // The query was already answered, so a second answer would never reach
+                // the admin — report the failure as a message instead of silence.
+                console.error('Error restarting auction:', e.message);
+                logError('admin_restart_failed', {
+                    chat_id: targetChatId,
+                    message_id: targetMsgId,
+                    error: e
+                });
+                await bot.sendMessage(chatId, t('common.error_try_again'), { parse_mode: 'HTML' }).catch(() => {});
             } finally {
-                // Release the claim if the restart didn't complete, so it can be retried.
-                if (!restartOk) q.releaseRestart.run(targetChatId, targetMsgId);
+                // Release the lock if the restart didn't get as far as replacing the
+                // row, so the admin can simply press the button again.
+                if (!restartOk) q.unlockRestart.run(targetChatId, targetMsgId);
             }
         }
 
