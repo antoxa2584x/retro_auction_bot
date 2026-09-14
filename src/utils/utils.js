@@ -444,6 +444,54 @@ export async function sendAuctionGallery(bot, chatId, photoIds, replyToId) {
 }
 
 /**
+ * Splits a stored comma-separated file_id list into an array.
+ *
+ * @param {string|null|undefined} value - Raw column value.
+ * @returns {string[]} File ids, empty when nothing is stored.
+ */
+export function parsePhotoIds(value) {
+    if (!value) return [];
+    return String(value).split(',').map(id => id.trim()).filter(Boolean);
+}
+
+/**
+ * Sends a message that may carry photos. With no photos it is a plain
+ * sendMessage; with photos the text becomes the caption of the first one (so
+ * any inline keyboard stays attached to the message the text is on) and the
+ * rest follow as a gallery replying to it.
+ *
+ * A failure to send the gallery is logged rather than thrown: the caption and
+ * the keyboard already made it, and losing the extra photos must not look like
+ * the whole delivery failed.
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number|string} chatId - Chat to send to.
+ * @param {string} text - Message text (HTML), truncated to the caption limit when photos are present.
+ * @param {string[]} [photoIds] - Photo file ids; the first one carries the text.
+ * @param {Object} [options] - Extra options merged into the send call (e.g. reply_markup).
+ * @returns {Promise<Object>} The sent message carrying the text.
+ */
+export async function sendMessageWithPhotos(bot, chatId, text, photoIds = [], options = {}) {
+    const ids = (photoIds || []).filter(Boolean);
+    if (ids.length === 0) {
+        return bot.sendMessage(chatId, text, { parse_mode: 'HTML', ...options });
+    }
+
+    const sent = await bot.sendPhoto(chatId, ids[0], {
+        caption: truncateCaption(text),
+        parse_mode: 'HTML',
+        ...options
+    });
+
+    if (ids.length > 1) {
+        await sendAuctionGallery(bot, chatId, ids, sent.message_id)
+            .catch(e => console.error(`Failed to send photo gallery to ${chatId}:`, e.message));
+    }
+
+    return sent;
+}
+
+/**
  * Calculates the default end date for an auction.
  * 
  * @returns {Date} Default end date.

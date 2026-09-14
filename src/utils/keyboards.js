@@ -269,7 +269,10 @@ export function makeAdminSupportHistoryKb(messages, page = 0, totalCount = 0) {
     const buttons = (messages || []).map(m => {
         const date = m.created_at ? new Date(m.created_at).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' }) : '??.??';
         const status = m.status === 'open' ? '✉️' : '✅';
-        const truncatedMessage = m.message ? (m.message.length > 20 ? m.message.substring(0, 20) + '...' : m.message) : '...';
+        // A photo-only ticket has no text to preview — mark it so the row
+        // isn't an anonymous '...' in the list.
+        const preview = m.message && m.message.trim() ? m.message.trim() : (m.photo_ids ? '📷' : '...');
+        const truncatedMessage = preview.length > 20 ? preview.substring(0, 20) + '...' : preview;
         return [{
             // The page travels with the message so "back" from the detail view
             // returns to the page the admin opened it from.
@@ -302,12 +305,20 @@ export function makeAdminSupportHistoryKb(messages, page = 0, totalCount = 0) {
  * @param {number} [page=0] - History page to return to.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminSupportViewKb(message, page = 0) {
+export function makeAdminSupportViewKb(message, page = 0, photoCount = 0) {
     const buttons = [];
-    const canReply = message.status === 'open' || !message.admin_reply || String(message.admin_reply).trim() === '';
+    // A photo-only answer is still an answer, so it counts as a reply even
+    // though admin_reply is empty — otherwise the button would invite a second
+    // reply to a ticket that was already handled.
+    const hasReply = (message.admin_reply && String(message.admin_reply).trim() !== '')
+        || !!message.reply_photo_ids;
+    const canReply = message.status === 'open' || !hasReply;
     
     if (canReply) {
         buttons.push([{ text: t('admin.kb.reply'), callback_data: `support_reply:${message.id}` }]);
+    }
+    if (photoCount > 0) {
+        buttons.push([{ text: t('support.kb_show_photos', { count: photoCount }), callback_data: `adm_support_photos:${message.id}` }]);
     }
     buttons.push([{ text: t('admin.kb.prev'), callback_data: `adm_support_history:${page}` }]);
     return { inline_keyboard: buttons };

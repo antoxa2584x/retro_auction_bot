@@ -132,6 +132,8 @@
     "post_restart_approved": "✅ Restart request for auction \"{{title}}\" approved! New end date: {{date}}",
     "post_restart_rejected": "❌ Restart request for auction \"{{title}}\" rejected.",
     "post_restart_sent": "✅ Restart request sent to administrator.",
+    "restart_in_progress": "⏳ This auction is already being restarted by another admin.",
+    "restart_only_finished": "⚠️ Only finished auctions can be restarted.",
     "restart_already_handled": "⚠️ This request has already been processed by another administrator.",
     "restart_step_min_bid": "💰 <b>Step 1/4: New Price</b>\n\nEnter a new starting price or click skip to keep current: <b>{{price}}</b>",
     "restart_step_step": "📈 <b>Step 2/4: New Step</b>\n\nEnter a new bid step or click skip to keep current: <b>{{step}}</b>",
@@ -261,10 +263,10 @@
     "wm_warn_no_alpha": "⚠️ This PNG has no transparent areas, so it will cover the photo as a solid rectangle."
   },
   "support": {
-    "welcome": "📍 <b>Contact Admin</b>\n\nWrite your message to the administrator. We will answer you as soon as possible.",
+    "welcome": "📍 <b>Contact Admin</b>\n\nWrite your message to the administrator. You can also attach photos — send them with your text as the caption.\n\nWe will answer you as soon as possible.",
     "sent": "✅ Your message has been sent to the administrator!",
     "new_message": "✉️ <b>New message from user!</b>\n\nUser: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: <code>{{user_id}}</code>)\n\nMessage:\n{{message}}",
-    "reply_prompt": "📝 <b>Reply to user <a href=\"tg://user?id={{user_id}}\">{{name}}</a></b>\n\nEnter your reply:",
+    "reply_prompt": "📝 <b>Reply to user <a href=\"tg://user?id={{user_id}}\">{{name}}</a></b>\n\nEnter your reply. You can also attach photos — send them with your reply as the caption:",
     "replied": "✅ Reply sent to user!",
     "already_answered": "⚠️ This message has already been answered by another administrator.",
     "admin_reply_header": "🔔 <b>Reply from administrator</b>\n\nYour message:\n<i>{{user_message}}</i>\n\n<b>Reply:</b>\n{{admin_message}}",
@@ -272,7 +274,16 @@
     "history_title": "📜 <b>Last 50 messages</b>",
     "message_view": "👤 <b>User:</b> <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (<code>{{user_id}}</code>)\n📅 <b>Date:</b> {{date}}\n💬 <b>Message:</b>\n{{message}}\n\n✅ <b>Reply:</b>\n{{reply}}",
     "no_reply": "<i>no reply yet</i>",
-    "empty": "No support messages yet."
+    "empty": "No support messages yet.",
+    "photo_only": "<i>(photo only)</i>",
+    "too_many_photos": "⚠️ You can attach up to {{max}} photos. The extra ones were ignored.",
+    "attachments": "📎 <b>Attachments:</b> {{count}}",
+    "attachments_from_user": "📎 Attachments from <b>{{name}}</b>:",
+    "attachments_from_admin": "📎 Attachments sent with the reply:",
+    "attachments_error": "❌ Could not load the attachments.",
+    "no_attachments": "No attachments on this message.",
+    "kb_show_photos": "📎 Show attachments ({{count}})"
+
   },
   "user": {
     "rules_title": "📜 <b>Rules Confirmation</b>",
@@ -349,7 +360,8 @@
   },
   "scheduler": {
     "winner_notify": "🏆 Congratulations! You won the auction <a href=\"{{link}}\">\"{{title}}\"</a>!\nFinal price: <b>{{price}} {{cur}}</b>\n\nFor further steps, contact {{admin_link}}",
-    "admin_finished_notify": "🏁 <b>Auction finished!</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>\n💰 Price: <b>{{price}} {{cur}}</b>\n👤 Winner: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
+    "admin_finished_notify": "🏆🏆🏆 <b>SOLD — YOU HAVE A WINNER!</b>\n➖➖➖➖➖➖➖➖➖➖\n📦 Item: <a href=\"{{link}}\">{{title}}</a>\n💰 Price: <b>{{price}} {{cur}}</b>\n👤 Winner: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})\n➖➖➖➖➖➖➖➖➖➖\n✅ Contact the winner to arrange payment and delivery.",
+    "admin_finished_notify_other": "🏁 <b>Auction finished — sold.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>\n💰 Price: <b>{{price}} {{cur}}</b>\n👤 Winner: <a href=\"tg://user?id={{user_id}}\">{{name}}</a> (ID: {{user_id}})",
     "admin_no_bids_notify": "🏁 <b>Auction finished without bids.</b>\n\n📦 Item: <a href=\"{{link}}\">{{title}}</a>",
     "reminder_30m": "⏳ <b>The auction <a href=\"{{link}}\">\"{{title}}\"</a> ends in 30 minutes!</b>\nCurrent price: <b>{{price}} {{cur}}</b>\n\nDon't miss your chance!"
   },

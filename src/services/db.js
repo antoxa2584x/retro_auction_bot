@@ -98,7 +98,9 @@ db.exec(`
         user_id INTEGER,
         user_name TEXT,
         message TEXT,
+        photo_ids TEXT, -- Comma-separated file_ids attached by the user
         admin_reply TEXT,
+        reply_photo_ids TEXT, -- Comma-separated file_ids attached by the answering admin
         status TEXT DEFAULT 'open', -- open, closed
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         replied_at DATETIME
@@ -143,8 +145,10 @@ db.exec(`
     -- the auctions table (selectActive/getAllActiveAuctions, getCreatedAuctions,
     -- getWonAuctions).
     CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions (status);
-    CREATE INDEX IF NOT EXISTS idx_auctions_creator ON auctions (creator_id);
     CREATE INDEX IF NOT EXISTS idx_auctions_leader ON auctions (status, leader_id);
+    -- NOTE: the index on creator_id can't live here — the column is added by the
+    -- migration loop below, so on a fresh database it doesn't exist yet. It is
+    -- created right after that loop instead.
 `);
 
 // Migration: add missing columns to auctions table if they don't exist
@@ -176,6 +180,23 @@ const migrations = [
     { name: 'close_notified', type: 'INTEGER DEFAULT 0' }
 ];
 
+const supportColumns = db.prepare("PRAGMA table_info(support_messages)").all();
+const supportColumnNames = supportColumns.map(c => c.name);
+const supportMigrations = [
+    // Photos attached to a support ticket: the user's on the way in, the
+    // answering admin's on the way out. Comma-separated file_ids, first one
+    // carries the caption when the ticket is re-sent.
+    { name: 'photo_ids', type: 'TEXT' },
+    { name: 'reply_photo_ids', type: 'TEXT' }
+];
+
+for (const m of supportMigrations) {
+    if (!supportColumnNames.includes(m.name)) {
+        console.log(`Migrating: Adding column ${m.name} to support_messages table`);
+        db.exec(`ALTER TABLE support_messages ADD COLUMN ${m.name} ${m.type}`);
+    }
+}
+
 const adminColumns = db.prepare("PRAGMA table_info(admins)").all();
 const adminColumnNames = adminColumns.map(c => c.name);
 const adminMigrations = [
@@ -202,6 +223,13 @@ for (const m of migrations) {
         }
     }
 }
+
+// Indexes over migrated columns belong here rather than in the schema block
+// above: CREATE TABLE only defines the original columns, so on a brand-new
+// database creator_id exists only once the loop above has added it. Running this
+// too early aborted startup with "no such column: creator_id" — which only ever
+// hit fresh installs, since every migrated database already had the column.
+db.exec(`CREATE INDEX IF NOT EXISTS idx_auctions_creator ON auctions (creator_id)`);
 
 // Migration: titles were historically derived by truncating raw HTML to 50
 // chars, which could split an HTML tag in half (e.g. a dangling "<b>"). When
@@ -736,8 +764,8 @@ export const q = {
 
   // Support messages
   insertSupportMessage: db.prepare(`
-    INSERT INTO support_messages (user_id, user_name, message)
-    VALUES (?, ?, ?)
+    INSERT INTO support_messages (user_id, user_name, message, photo_ids)
+    VALUES (?, ?, ?, ?)
   `),
   getSupportMessage: db.prepare(`SELECT * FROM support_messages WHERE id = ?`),
 
@@ -760,7 +788,7 @@ export const q = {
   // already answered it.
   updateSupportReply: db.prepare(`
     UPDATE support_messages
-    SET admin_reply = ?, status = 'closed', replied_at = CURRENT_TIMESTAMP
+    SET admin_reply = ?, reply_photo_ids = ?, status = 'closed', replied_at = CURRENT_TIMESTAMP
     WHERE id = ? AND status = 'open'
   `)
 };

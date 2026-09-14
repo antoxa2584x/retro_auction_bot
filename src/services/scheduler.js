@@ -388,19 +388,30 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                     console.error(`Failed to notify winner ${freshRow.leader_id}:`, err.message);
                 }
 
-                // Notify admins
+                // Notify admins. The admin who created the auction gets the loud
+                // "sold" banner so their own sale stands out in a DM list that
+                // also carries every other admin's closings; everyone else gets
+                // the quiet variant. creator_id is null for auctions picked up
+                // from a raw channel post, and is the submitting user's id for
+                // approved user auctions — in both cases no admin owns it and
+                // all of them get the quiet text.
                 const escapedWinnerName = escapeHtml(freshRow.leader_name);
-                const adminNotifyText = t('scheduler.admin_finished_notify', {
+                const notifyVars = {
                     link: auctionLink,
                     title: freshRow.title,
                     price: freshRow.current_price,
                     user_id: freshRow.leader_id,
                     name: escapedWinnerName,
                     mention: formatUserLink(freshRow.leader_id, freshRow.leader_name)
-                });
+                };
+                const ownerNotifyText = t('scheduler.admin_finished_notify', notifyVars);
+                const otherNotifyText = t('scheduler.admin_finished_notify_other', notifyVars);
                 await Promise.allSettled(admins.map(admin =>
-                    bot.sendMessage(admin.user_id, adminNotifyText, { parse_mode: 'HTML' })
-                        .catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
+                    bot.sendMessage(
+                        admin.user_id,
+                        freshRow.creator_id === admin.user_id ? ownerNotifyText : otherNotifyText,
+                        { parse_mode: 'HTML' }
+                    ).catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
                 ));
             }
         } catch (e) {
