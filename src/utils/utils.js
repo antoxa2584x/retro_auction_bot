@@ -54,6 +54,27 @@ export function formatUserLinkById(userId) {
 }
 
 /**
+ * The mention shown in the "lot from ..." line of an auction post.
+ *
+ * Prefers a public t.me/<nick> link: the post lives in the channel, where a
+ * tg://user?id= mention only resolves for readers whose client already knows
+ * the user. Lots submitted before the poster's handle was stored (see the
+ * pending_auctions migration in services/db.js) fall back to the id lookup.
+ *
+ * @param {{user_id: number, username?: string|null, first_name?: string|null, last_name?: string|null}} data - Pending auction row.
+ * @returns {string} HTML-formatted link.
+ */
+export function formatPosterLink(data) {
+    if (data.username) {
+        const cleanNick = String(data.username).replace('@', '');
+        return `<a href="https://t.me/${cleanNick}">@${escapeHtml(cleanNick)}</a>`;
+    }
+    const name = [data.first_name, data.last_name].filter(Boolean).join(' ');
+    if (name) return `<a href="tg://user?id=${data.user_id}">${escapeHtml(name)}</a>`;
+    return formatUserLinkById(data.user_id);
+}
+
+/**
  * The contact value to store on an auction for a given admin.
  *
  * Admins without a Telegram @username are still reachable by id — the same form
@@ -344,11 +365,9 @@ export function buildAuctionText(data, includeUserLabel = true, includeSettings 
     let userLabel = '';
     if (includeUserLabel && data.user_id) {
         const count = q.countApprovedAuctionsByUser.get(data.user_id).count;
-        if (count >= 5) {
-            userLabel = t('admin.kb.lot_from_verified_subscriber') + '\n\n';
-        } else {
-            userLabel = t('admin.kb.lot_from_subscriber') + '\n\n';
-        }
+        const user = formatPosterLink(data);
+        const key = count >= 5 ? 'lot_from_verified_subscriber' : 'lot_from_subscriber';
+        userLabel = t(`admin.kb.${key}`, { user }) + '\n\n';
     }
 
     let text = '';

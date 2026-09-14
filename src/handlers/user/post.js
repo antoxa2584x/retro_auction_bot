@@ -13,7 +13,7 @@ import { TZ, getMaxUserAuctions, isUserPostEnabled } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, sanitizeHtml, deriveTitle, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
+import { buildAuctionText, sanitizeHtml, deriveTitle, truncateCaption, formatPosterLink } from '../../utils/utils.js';
 
 /** @type {Map<number, {step: string, data: any, views: string[], viewMsgId: ?number}>} */
 const userSessions = new Map();
@@ -90,7 +90,7 @@ export function registerUserPostHandlers(bot) {
                 return;
             }
 
-            await startSession(bot, chatId, from.id);
+            await startSession(bot, chatId, from);
         }
 
         if (data === 'user_rules_confirm') {
@@ -101,7 +101,7 @@ export function registerUserPostHandlers(bot) {
             // otherwise start a submission that skipped the limit entirely.
             if (await refusePosting(bot, chatId, from.id)) return;
 
-            await startSession(bot, chatId, from.id);
+            await startSession(bot, chatId, from);
         }
 
         if (data === 'user_post_back') {
@@ -193,6 +193,9 @@ export function registerUserPostHandlers(bot) {
 
             q.insertPendingAuction.run({
                 user_id: sessionData.user_id,
+                username: sessionData.username,
+                first_name: sessionData.first_name,
+                last_name: sessionData.last_name,
                 title: sessionData.title,
                 full_text: sessionData.full_text,
                 photo_ids: sessionData.photo_ids ? sessionData.photo_ids.join(',') : null,
@@ -205,7 +208,10 @@ export function registerUserPostHandlers(bot) {
 
             // Notify admins
             const admins = q.getAllAdmins.all();
-            const userLink = formatUserLinkById(from.id);
+            // Built from the session, not looked up by id: a first-time poster
+            // isn't in `participants` yet, so the lookup would hand admins a bare
+            // "ID 123456789" instead of a handle they can tap.
+            const userLink = formatPosterLink(sessionData);
             const notificationText = t('admin.kb.admin_new_pending')
                 .replace('%user%', userLink)
                 .replace('%title%', sessionData.title);
@@ -388,8 +394,10 @@ function buildConfirmText(data) {
         cur: q.getSetting.get('CURRENCY')?.value || '₴'
     });
 
-    const user = q.getUserFromAnywhere.get(data.user_id, data.user_id, data.user_id, data.user_id);
-    if (user && !user.username) {
+    // Only users without an @username depend on a tg://user?id= link — for
+    // everyone else the post and the winner banner link to t.me/<nick>, which
+    // no privacy setting can hide.
+    if (!data.username) {
         confirmText += `\n\n${t('admin.privacy_warning')}`;
     }
 
@@ -399,13 +407,24 @@ function buildConfirmText(data) {
 /**
  * Starts a fresh posting session on the first step.
  *
+ * The submitter's handle is copied onto the session up front: it decides both
+ * how the approved post credits them (see formatPosterLink in utils/utils.js)
+ * and whether the confirm step warns about profile privacy, and neither can be
+ * looked up later — nothing in the schema records a user who has never bid.
+ *
  * @param {TelegramBot} bot - Telegram bot instance.
  * @param {number} chatId - Chat to prompt in.
- * @param {number} userId - Owner of the session.
+ * @param {{id: number, username?: string, first_name?: string, last_name?: string}} from - Owner of the session.
  */
-async function startSession(bot, chatId, userId) {
-    const session = { step: 'IMAGE', data: { user_id: userId }, views: [], viewMsgId: null };
-    userSessions.set(userId, session);
+async function startSession(bot, chatId, from) {
+    const data = {
+        user_id: from.id,
+        username: from.username || null,
+        first_name: from.first_name || null,
+        last_name: from.last_name || null
+    };
+    const session = { step: 'IMAGE', data, views: [], viewMsgId: null };
+    userSessions.set(from.id, session);
     await goToView(bot, chatId, session, 'IMAGE');
 }
 

@@ -205,8 +205,8 @@
       "pending_auctions": "⏳ Черга аукціонів",
       "approve": "✅ Схвалити",
       "reject": "❌ Відхилити",
-      "lot_from_subscriber": "Лот від підписника",
-      "lot_from_verified_subscriber": "Лот від <b>перевіреного</b> підписника",
+      "lot_from_subscriber": "Лот від {{user}}",
+      "lot_from_verified_subscriber": "Лот від {{user}} (<b>перевірений</b>)",
       "support": "Зворотній зв'язок",
       "reply": "Відповісти",
       "support_history": "📜 Історія звернень"

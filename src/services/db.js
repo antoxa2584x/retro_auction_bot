@@ -217,6 +217,26 @@ for (const m of adminMigrations) {
     }
 }
 
+const pendingColumns = db.prepare("PRAGMA table_info(pending_auctions)").all();
+const pendingColumnNames = pendingColumns.map(c => c.name);
+const pendingMigrations = [
+    // Who submitted the lot. The approved post credits them by name (see
+    // buildAuctionText in utils/utils.js), and the poster isn't guaranteed to
+    // appear in `participants` — submitting a lot isn't bidding on one — so the
+    // handle has to be captured at submission time. Rows predating this fall
+    // back to a lookup by id.
+    { name: 'username', type: 'TEXT' },
+    { name: 'first_name', type: 'TEXT' },
+    { name: 'last_name', type: 'TEXT' }
+];
+
+for (const m of pendingMigrations) {
+    if (!pendingColumnNames.includes(m.name)) {
+        console.log(`Migrating: Adding column ${m.name} to pending_auctions table`);
+        db.exec(`ALTER TABLE pending_auctions ADD COLUMN ${m.name} ${m.type}`);
+    }
+}
+
 for (const m of migrations) {
     if (!columnNames.includes(m.name)) {
         console.log(`Migrating: Adding column ${m.name} to auctions table`);
@@ -765,8 +785,8 @@ export const q = {
   countApprovedAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'approved'"),
   countPendingAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'pending'"),
   insertPendingAuction: db.prepare(`
-    INSERT INTO pending_auctions (user_id, title, full_text, photo_ids, min_bid, step, end_at, is_continuous, continuous_minutes)
-    VALUES (:user_id, :title, :full_text, :photo_ids, :min_bid, :step, :end_at, :is_continuous, :continuous_minutes)
+    INSERT INTO pending_auctions (user_id, username, first_name, last_name, title, full_text, photo_ids, min_bid, step, end_at, is_continuous, continuous_minutes)
+    VALUES (:user_id, :username, :first_name, :last_name, :title, :full_text, :photo_ids, :min_bid, :step, :end_at, :is_continuous, :continuous_minutes)
   `),
   updatePendingAuctionStatus: db.prepare("UPDATE pending_auctions SET status = ? WHERE id = ?"),
   deletePendingAuction: db.prepare("DELETE FROM pending_auctions WHERE id = ?"),

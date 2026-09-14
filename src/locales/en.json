@@ -205,8 +205,8 @@
       "pending_auctions": "⏳ Pending Auctions",
       "approve": "✅ Approve",
       "reject": "❌ Reject",
-      "lot_from_subscriber": "Lot from subscriber",
-      "lot_from_verified_subscriber": "Lot from <b>verified</b> subscriber",
+      "lot_from_subscriber": "Lot from {{user}}",
+      "lot_from_verified_subscriber": "Lot from {{user}} (<b>verified</b>)",
       "support": "Contact Admin",
       "reply": "Reply",
       "support_history": "📜 Support History"
