@@ -49,8 +49,12 @@ export function registerInfoHandlers(bot) {
             const row = q.getAuction.get(target_chat_id, target_message_id);
             if (!row) {
                 logAuctionNotFound('auction_info', target_chat_id, target_message_id, { user_id: query.from.id });
+                // message_id 0 is the placeholder a post carries until its
+                // keyboard is attached — the lot exists, the button doesn't
+                // point at it yet.
+                const text = target_message_id === 0 ? t('bid.still_publishing') : t('bid.not_found');
                 try {
-                    return bot.answerCallbackQuery(query.id, { text: t('bid.not_found'), show_alert: true });
+                    return bot.answerCallbackQuery(query.id, { text, show_alert: true });
                 } catch (e) {
                     console.error('Error answering info not_found callback:', e.message);
                     return;

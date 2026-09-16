@@ -293,6 +293,7 @@
   },
   "bid": {
     "not_found": "Auction not found",
+    "still_publishing": "This lot is still being published — its buttons aren't ready yet. Try again in a few seconds.",
     "finished": "Auction already finished",
     "hidden_account_alert": "Your account is hidden. Set \"Forwarded Messages\" to \"Everybody\" to place bids.",
     "hidden_account_text": "🔒 <b>Your account is hidden</b>\n\nTo place bids, the seller must be able to contact you once the auction ends.\n\nCheck your profile privacy settings: <b>Forwarded Messages</b> must be set to <b>Everybody</b>.\n\nAfter that, place your bid again.",

@@ -181,7 +181,11 @@ export function registerUserCommands(bot) {
                 const row = q.getAuction.get(targetChatId, targetMessageId);
                 if (!row) {
                     logAuctionNotFound('bid_deep_link', targetChatId, targetMessageId, { user_id: msg.from.id });
-                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                    // message_id 0 is the placeholder a post carries until its
+                    // keyboard is attached: the lot is real, its buttons just
+                    // aren't wired to it yet, so don't send the user away.
+                    const text = targetMessageId === 0 ? t('bid.still_publishing') : t('bid.not_found');
+                    return bot.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const now = new Date();
                 const end = new Date(row.end_at);
@@ -223,7 +227,11 @@ export function registerUserCommands(bot) {
                 const row = q.getAuction.get(targetChatId, targetMessageId);
                 if (!row) {
                     logAuctionNotFound('notify_deep_link', targetChatId, targetMessageId, { user_id: msg.from.id });
-                    return bot.sendMessage(chatId, t('bid.not_found'), { parse_mode: 'HTML' }).catch(() => {});
+                    // message_id 0 is the placeholder a post carries until its
+                    // keyboard is attached: the lot is real, its buttons just
+                    // aren't wired to it yet, so don't send the user away.
+                    const text = targetMessageId === 0 ? t('bid.still_publishing') : t('bid.not_found');
+                    return bot.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => {});
                 }
                 const now = new Date();
                 const end = new Date(row.end_at);

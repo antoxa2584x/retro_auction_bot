@@ -8,12 +8,12 @@ import {
     makeAdminPostContinuousKb,
     makeAdminPostDurationKb,
     makeAdminPostStepKb,
-    makeKb,
     withBackButton
 } from '../../utils/keyboards.js';
 import {getChannelId, getContactNickname, TZ} from "../../config/env.js";
 import {logError} from '../../services/logger.js';
 import {verifyAuctionStored} from '../../services/diagnostics.js';
+import {attachAuctionKeyboard} from '../../utils/publish.js';
 import {formatInTimeZone} from 'date-fns-tz';
 import {addDays, parse, set} from 'date-fns';
 import {scheduleClose} from '../../services/scheduler.js';
@@ -345,16 +345,17 @@ export function registerPostHandlers(bot) {
             try {
                 const auctionPost = buildAuctionText(sessionData);
 
-                const kb = makeKb(channelId, 0, sessionData.min_bid, 0);
                 // The main photo of an admin-posted auction carries the watermark.
                 // Gallery photos and user-submitted auctions are left untouched.
+                //
+                // Posted without a keyboard: the buttons encode the message_id
+                // Telegram only assigns on send, so they're attached below.
                 let mainPhotoId = sessionData.photo_id || null;
                 if (sessionData.photo_id) {
                     const watermarked = await buildWatermarkedPhoto(bot, sessionData.photo_id);
                     sentMsg = await bot.sendPhoto(channelId, watermarked || sessionData.photo_id, {
                         caption: truncateCaption(auctionPost),
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     }, watermarked ? WATERMARK_FILE_OPTIONS : undefined);
 
                     // Uploading a buffer mints a brand new file_id. Persist that one
@@ -365,8 +366,7 @@ export function registerPostHandlers(bot) {
                     }
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 }
 
@@ -398,27 +398,13 @@ export function registerPostHandlers(bot) {
                     photo_count: sessionData.photo_ids?.length || (sessionData.photo_id ? 1 : 0)
                 });
 
-                // Patch the keyboard with the real message_id. The deep-link bid
-                // button encodes it; without this it points at message_id 0 and
-                // every bid fails with "auction not found".
-                const finalKb = makeKb(channelId, sentMsg.message_id, sessionData.min_bid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
-                    chat_id: channelId,
-                    message_id: sentMsg.message_id
-                }).catch(err => {
-                    if (!err.message.includes('message is not modified')) {
-                        console.error(`Failed to update keyboard for admin post ${channelId}:${sentMsg.message_id}:`, err.message);
-                        // The buttons still encode message_id 0, so every bid on
-                        // this post resolves to a lookup for (channel, 0) and
-                        // reports "auction not found".
-                        logError('auction_keyboard_patch_failed', {
-                            source: 'admin_post',
-                            chat_id: channelId,
-                            message_id: sentMsg.message_id,
-                            creator_id: from.id,
-                            error: err
-                        });
-                    }
+                // Now that the message_id exists, give the post its buttons.
+                await attachAuctionKeyboard(bot, {
+                    source: 'admin_post',
+                    chatId: channelId,
+                    messageId: sentMsg.message_id,
+                    price: sessionData.min_bid,
+                    extra: { creator_id: from.id }
                 });
 
                 if (sessionData.photo_ids && sessionData.photo_ids.length > 1) {

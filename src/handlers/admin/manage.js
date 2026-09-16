@@ -30,6 +30,7 @@ import {
     setStatusTag
 } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
+import { attachAuctionKeyboard } from '../../utils/publish.js';
 import { reconstructAuctionText } from '../../utils/parse.js';
 
 function isAdmin(userId) {
@@ -196,18 +197,17 @@ export function registerManageHandlers(bot) {
                 // single main photo_id for auctions posted before photo_ids was tracked.
                 const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
 
+                // Posted without a keyboard: the buttons encode the message_id
+                // Telegram only assigns on send, so they're attached below.
                 let newMsg;
-                const kb = makeKb(targetChatId, 0, minBid, 0);
                 if (a.photo_id) {
                     newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
                         caption: truncateCaption(updatedFullText),
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 } else {
                     newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 }
 
@@ -237,22 +237,13 @@ export function registerManageHandlers(bot) {
                     replaced_message_id: targetMsgId
                 });
 
-                // Patch the keyboard with the real message_id so the deep-link bid
-                // button resolves instead of pointing at message_id 0.
-                const finalKb = makeKb(targetChatId, newMsg.message_id, minBid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
-                    chat_id: targetChatId,
-                    message_id: newMsg.message_id
-                }).catch(err => {
-                    if (!err.message.includes('message is not modified')) {
-                        // Buttons keep message_id 0 → bids report "not found".
-                        logError('auction_keyboard_patch_failed', {
-                            source: 'restart_request_approval',
-                            chat_id: targetChatId,
-                            message_id: newMsg.message_id,
-                            error: err
-                        });
-                    }
+                // Now that the message_id exists, give the post its buttons.
+                await attachAuctionKeyboard(bot, {
+                    source: 'restart_request_approval',
+                    chatId: targetChatId,
+                    messageId: newMsg.message_id,
+                    price: minBid,
+                    extra: { replaced_message_id: targetMsgId }
                 });
 
                 // Repost the additional photos as a gallery under the new post and
@@ -493,19 +484,18 @@ export function registerManageHandlers(bot) {
                 const channelId = getChannelId();
                 const auctionPost = buildAuctionText(p);
 
-                const kb = makeKb(channelId, 0, p.min_bid, 0);
                 const photoIds = p.photo_ids ? p.photo_ids.split(',') : [];
 
+                // Posted without a keyboard: the buttons encode the message_id
+                // Telegram only assigns on send, so they're attached below.
                 if (photoIds.length > 0) {
                     sentMsg = await bot.sendPhoto(channelId, photoIds[0], {
                         caption: truncateCaption(auctionPost),
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 } else {
                     sentMsg = await bot.sendMessage(channelId, auctionPost, {
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 }
 
@@ -537,27 +527,13 @@ export function registerManageHandlers(bot) {
                     photo_count: photoIds.length
                 });
 
-                // Patch the keyboard with the real message_id so the deep-link bid
-                // button resolves (otherwise it points at message_id 0 → bids fail
-                // with "auction not found").
-                const finalKb = makeKb(channelId, sentMsg.message_id, p.min_bid, 0);
-                await bot.editMessageReplyMarkup(finalKb, {
-                    chat_id: channelId,
-                    message_id: sentMsg.message_id
-                }).catch(err => {
-                    if (!err.message.includes('message is not modified')) {
-                        console.error(`Failed to update keyboard after approval:`, err.message);
-                        // The buttons still encode message_id 0, so every bid on
-                        // this post resolves to a lookup for (channel, 0) and
-                        // reports "auction not found".
-                        logError('auction_keyboard_patch_failed', {
-                            source: 'pending_approval',
-                            chat_id: channelId,
-                            message_id: sentMsg.message_id,
-                            pending_id: Number(id),
-                            error: err
-                        });
-                    }
+                // Now that the message_id exists, give the post its buttons.
+                await attachAuctionKeyboard(bot, {
+                    source: 'pending_approval',
+                    chatId: channelId,
+                    messageId: sentMsg.message_id,
+                    price: p.min_bid,
+                    extra: { pending_id: Number(id), creator_id: p.user_id }
                 });
 
                 if (photoIds.length > 1) {
@@ -854,18 +830,17 @@ export function registerManageHandlers(bot) {
                 // single main photo_id for auctions posted before photo_ids was tracked.
                 const photoIds = a.photo_ids ? a.photo_ids.split(',') : (a.photo_id ? [a.photo_id] : []);
 
+                // Posted without a keyboard: the buttons encode the message_id
+                // Telegram only assigns on send, so they're attached below.
                 let newMsg;
-                const kb = makeKb(targetChatId, 0, a.min_bid, 0);
                 if (a.photo_id) {
                     newMsg = await bot.sendPhoto(targetChatId, a.photo_id, {
                         caption: truncateCaption(updatedFullText),
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 } else {
                     newMsg = await bot.sendMessage(targetChatId, updatedFullText, {
-                        parse_mode: 'HTML',
-                        reply_markup: kb
+                        parse_mode: 'HTML'
                     });
                 }
 
@@ -895,24 +870,14 @@ export function registerManageHandlers(bot) {
                     replaced_message_id: targetMsgId
                 });
 
-                // Patch the keyboard with the real message_id so the deep-link bid
-                // button resolves instead of pointing at message_id 0.
-                try {
-                    const finalKb = makeKb(targetChatId, newMsg.message_id, a.min_bid, 0);
-                    await bot.editMessageReplyMarkup(finalKb, {
-                        chat_id: targetChatId,
-                        message_id: newMsg.message_id
-                    });
-                } catch (e) {
-                    console.error('Failed to update new post keyboard:', e.message);
-                    // Buttons keep message_id 0 → bids report "not found".
-                    logError('auction_keyboard_patch_failed', {
-                        source: 'admin_restart',
-                        chat_id: targetChatId,
-                        message_id: newMsg.message_id,
-                        error: e
-                    });
-                }
+                // Now that the message_id exists, give the post its buttons.
+                await attachAuctionKeyboard(bot, {
+                    source: 'admin_restart',
+                    chatId: targetChatId,
+                    messageId: newMsg.message_id,
+                    price: a.min_bid,
+                    extra: { restarted_by: from.id, replaced_message_id: targetMsgId }
+                });
 
                 // Repost the additional photos as a gallery under the new post and
                 // remember their message_ids so a future restart can clean them up.
