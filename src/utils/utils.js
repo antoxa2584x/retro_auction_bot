@@ -203,6 +203,10 @@ export function sanitizeHtml(html) {
 
     // This regex matches any tag: <(/?)tag( [^>]*)?>
     // We replace it with either the original tag (if supported) or an empty string/escaped version.
+    // An <a> with no usable href is dropped, and so is its matching </a> — links
+    // don't nest, so one flag is enough to remember what happened to the open tag.
+    let droppedLink = false;
+
     text = text.replace(/<(\/?)([a-z1-6]+)([^>]*)>/gi, (match, closingSlash, tagName, attributes) => {
         const lowerTagName = tagName.toLowerCase();
         
@@ -215,12 +219,23 @@ export function sanitizeHtml(html) {
 
         if (supportedTags.includes(finalTagName)) {
             if (finalTagName === 'a') {
+                // A closing tag carries no href, so it must be handled before the
+                // href check — otherwise every </a> is stripped and the surviving
+                // <a href> leaves Telegram with an unterminated entity.
+                if (closingSlash) {
+                    if (droppedLink) {
+                        droppedLink = false;
+                        return '';
+                    }
+                    return '</a>';
+                }
                 // For <a> tags, we only allow href attribute
                 const hrefMatch = attributes.match(/href=["']([^"']*)["']/i);
                 if (hrefMatch) {
-                    return `<${closingSlash}${finalTagName} href="${hrefMatch[1]}">`;
+                    return `<a href="${hrefMatch[1]}">`;
                 }
                 // If no href, just strip the tag but keep content (handled by returning empty string for tag)
+                droppedLink = true;
                 return '';
             }
             return `<${closingSlash}${finalTagName}>`;
