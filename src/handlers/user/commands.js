@@ -262,16 +262,16 @@ export function registerUserCommands(bot) {
             reply_markup: makeUserMenuKb()
         });
     });
-    bot.onText(/^\/my$/, async (msg) => {
-        const userId = msg.from.id;
-        const chatId = msg.chat.id;
-        const auctions = q.getParticipatingAuctions.all(userId);
+    /**
+     * Opens an auction carousel on its first item, or says the list is empty.
+     */
+    async function sendAuctionCarousel(chatId, auctions, noItemsKey, prefix, formatter) {
         if (auctions.length === 0) {
-            return bot.sendMessage(chatId, t('bid.no_my_active'), { parse_mode: 'HTML' });
+            return bot.sendMessage(chatId, t(noItemsKey), { parse_mode: 'HTML' });
         }
         const a = auctions[0];
-        const caption = formatMyAuctionCaption(a, userId);
-        const replyMarkup = makeMyCarouselKb(0, auctions.length, 'my', a);
+        const caption = formatter(a);
+        const replyMarkup = makeMyCarouselKb(0, auctions.length, prefix, a);
         if (a.photo_id) {
             await bot.sendPhoto(chatId, a.photo_id, {
                 caption,
@@ -285,6 +285,18 @@ export function registerUserCommands(bot) {
                 link_preview_options: { is_disabled: true }
             });
         }
+    }
+    // Auctions the user posted, active first, then finished.
+    bot.onText(/^\/my$/, async (msg) => {
+        const userId = msg.from.id;
+        await sendAuctionCarousel(msg.chat.id, q.getCreatedAuctions.all(userId),
+            'bid.no_created', 'created', formatCreatedAuctionCaption);
+    });
+    // Active auctions the user has bid on.
+    bot.onText(/^\/bids$/, async (msg) => {
+        const userId = msg.from.id;
+        await sendAuctionCarousel(msg.chat.id, q.getParticipatingAuctions.all(userId),
+            'bid.no_my_active', 'my', (a) => formatMyAuctionCaption(a, userId));
     });
     bot.on('callback_query', async (query) => {
         const { data, message, from } = query;
@@ -411,25 +423,7 @@ export function registerUserCommands(bot) {
                 prefix = 'my';
                 formatter = (a) => formatMyAuctionCaption(a, userId);
             }
-            if (auctions.length === 0) {
-                return bot.sendMessage(chatId, t(noItemsKey), { parse_mode: 'HTML' });
-            }
-            const a = auctions[0];
-            const caption = formatter(a);
-            const replyMarkup = makeMyCarouselKb(0, auctions.length, prefix, a);
-            if (a.photo_id) {
-                await bot.sendPhoto(chatId, a.photo_id, {
-                    caption,
-                    parse_mode: 'HTML',
-                    reply_markup: replyMarkup
-                });
-            } else {
-                await bot.sendMessage(chatId, caption, {
-                    parse_mode: 'HTML',
-                    reply_markup: replyMarkup,
-                    link_preview_options: { is_disabled: true }
-                });
-            }
+            await sendAuctionCarousel(chatId, auctions, noItemsKey, prefix, formatter);
             return;
         }
         if (data.startsWith('request_restart:')) {

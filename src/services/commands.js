@@ -19,18 +19,19 @@ function commonCommands() {
     return [
         { command: 'menu', description: t('commands.menu') },
         { command: 'my', description: t('commands.my') },
+        { command: 'bids', description: t('commands.bids') },
         { command: 'won', description: t('commands.won') },
         { command: 'about', description: t('commands.about') }
     ];
 }
 
 /**
- * Commands offered to a verified admin: the panel on top of the common ones.
+ * Commands offered to a verified admin: the panel first, then the common ones.
  *
  * @returns {Array<{command: string, description: string}>}
  */
 function adminCommands() {
-    return [...commonCommands(), { command: 'admin_panel', description: t('commands.admin_panel') }];
+    return [{ command: 'admin_panel', description: t('commands.admin_panel') }, ...commonCommands()];
 }
 
 /**

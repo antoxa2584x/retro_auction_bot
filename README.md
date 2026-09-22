@@ -118,7 +118,8 @@ flowchart LR
 |---------|-------------|
 | `/start` | Start the bot and see the welcome message. |
 | `/menu` | Main menu — active bids, won auctions, watchlist, and submit new auctions. |
-| `/my` | Active bids where you are leading or outbid. |
+| `/my` | Auctions you posted — active and finished. |
+| `/bids` | Active auctions you have bid on (leading or outbid). |
 | `/won` | Auctions you have won. |
 | `/about` | Bot information and current version. |
 
@@ -235,7 +236,7 @@ src/
 │  └─ scheduler.js      # Auction closing & notifications
 ├─ handlers/
 │  ├─ channelPost.js    # Processes new auctions from the channel
-│  ├─ user/             # /start, /menu, /my, /won, bidding, info
+│  ├─ user/             # /start, /menu, /my, /bids, /won, bidding, info
 │  └─ admin/            # Panel, auth, settings, posting wizard
 ├─ locales/             # Translations (uk.json, en.json)
 └─ utils/               # Shared helpers & keyboards
