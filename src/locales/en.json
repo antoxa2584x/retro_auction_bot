@@ -1,4 +1,11 @@
 {
+  "commands": {
+    "menu": "Main menu",
+    "my": "My auctions",
+    "won": "Won auctions",
+    "about": "About the bot",
+    "admin_panel": "Admin panel"
+  },
   "common": {
     "cancel": "Cancel",
     "back": "Back",

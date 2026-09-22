@@ -13,6 +13,7 @@ import {
 import { getChannelId, getContactNickname } from "../../config/env.js";
 import { formatUserLink, sanitizeHtml } from '../../utils/utils.js';
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
+import { clearAdminCommands, syncBotCommands } from '../../services/commands.js';
 import {
     composeWatermark,
     deleteWatermark,
@@ -207,6 +208,7 @@ export function registerSettingsHandlers(bot) {
             }
 
             q.deleteAdmin.run(delUserId);
+            clearAdminCommands(bot, delUserId); // back to the public command menu
             await bot.answerCallbackQuery(query.id, { text: t('admin.admin_deleted', { user_id: delUserId }), show_alert: true }).catch(() => {});
             await sendAdminManagementPanel(bot, chatId, from.id, true, messageId);
         }
@@ -264,6 +266,7 @@ export function registerSettingsHandlers(bot) {
             const lang = setLangMatch[1];
             setLocale(lang);
             q.setSetting.run('LOCALE', lang);
+            syncBotCommands(bot); // command descriptions are localized
 
             try {
                 await bot.answerCallbackQuery(query.id, { text: t('admin.language_changed'), show_alert: true }).catch(() => {});

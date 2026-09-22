@@ -11,6 +11,7 @@ import { registerAdminHandlers } from './handlers/admin.js';
 import { restoreJobs } from './services/scheduler.js';
 import { q } from './services/db.js';
 import { setLocale, setCurrency } from './services/i18n.js';
+import { syncBotCommands } from './services/commands.js';
 import { logInfo, logError, pruneOldLogs, LOG_RETENTION_DAYS } from './services/logger.js';
 
 // Load global locale from DB
@@ -35,6 +36,11 @@ bot.getMe().then((me) => {
 }).catch((err) => {
     console.error('Error fetching bot info:', err.message);
 });
+
+// Rebuild the "/" menu on every start: the public list plus a chat-scoped one
+// for each current admin, so /admin_panel stays invisible to regular users and
+// a revoked admin loses it after a restart too.
+syncBotCommands(bot);
 
 // Handlers
 registerCallbackHandler(bot);

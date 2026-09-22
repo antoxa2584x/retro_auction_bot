@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
 import { escapeHtml } from '../../utils/utils.js';
+import { applyAdminCommands } from '../../services/commands.js';
 
 // In-memory failed-verification counter (user_id -> count). Caps brute-force
 // guessing of the 6-digit OTP within its 10-minute window. Reset on success,
@@ -107,6 +108,8 @@ export function handleOtpInput(bot, msg, text) {
         }
 
         otpAttempts.delete(userId);
+        // Swap this chat's command menu over: /admin_panel in, /admin out.
+        applyAdminCommands(bot, userId);
         {
             // Notify other admins
             const otherAdmins = q.getAllAdmins.all();
