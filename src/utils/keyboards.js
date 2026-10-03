@@ -104,9 +104,10 @@ export function makeUserMenuKb() {
  * Creates the keyboard for managing pending auctions.
  * 
  * @param {Array} pending - List of pending auctions.
+ * @param {number} [restartCount] - Number of open restart requests.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminPendingKb(pending) {
+export function makeAdminPendingKb(pending, restartCount = 0) {
     const buttons = pending.map(p => {
         const user = q.getUserFromAnywhere.get(p.user_id, p.user_id, p.user_id, p.user_id);
         const name = user?.name || p.user_id;
@@ -116,8 +117,24 @@ export function makeAdminPendingKb(pending) {
         }];
     });
 
+    buttons.push([{ text: t('admin.kb.restart_queue', { count: restartCount }), callback_data: 'adm_restart_queue' }]);
     buttons.push([{ text: t('admin.kb.back_to_panel'), callback_data: 'adm_list' }]);
 
+    return { inline_keyboard: buttons };
+}
+
+/**
+ * Creates the keyboard listing users' open restart requests.
+ *
+ * @param {Array} requests - Rows from getRestartRequests.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeAdminRestartQueueKb(requests) {
+    const buttons = requests.map(r => [{
+        text: `🔄 ${r.title} (${r.user_name || r.user_id})`,
+        callback_data: `adm_rq_view:${r.chat_id}:${r.message_id}`
+    }]);
+    buttons.push([{ text: t('common.back'), callback_data: 'adm_pending' }]);
     return { inline_keyboard: buttons };
 }
 
@@ -446,21 +463,22 @@ export function makeUserRestartTimeKb() {
  * @param {number} chatId - Auction chat ID.
  * @param {number} msgId - Auction message ID.
  * @param {Object} params - New parameters for restart.
+ * @param {boolean} [withBack] - Add a back button to the restart queue.
  * @returns {Object} Inline keyboard object.
  */
-export function makeAdminRestartRequestKb(userId, chatId, msgId, params = null) {
+export function makeAdminRestartRequestKb(userId, chatId, msgId, params = null, withBack = false) {
     let approveData = `adm_res_approve:${userId}:${chatId}:${msgId}`;
     if (params) {
         approveData += `:${params.min_bid}:${params.step}:${params.duration_days}:${params.hour}`;
     }
-    return {
-        inline_keyboard: [
-            [
-                { text: t('admin.kb.approve'), callback_data: approveData, style: 'success' },
-                { text: t('admin.kb.reject'), callback_data: `adm_res_reject:${userId}:${chatId}:${msgId}`, style: 'danger' }
-            ]
+    const rows = [
+        [
+            { text: t('admin.kb.approve'), callback_data: approveData, style: 'success' },
+            { text: t('admin.kb.reject'), callback_data: `adm_res_reject:${userId}:${chatId}:${msgId}`, style: 'danger' }
         ]
-    };
+    ];
+    if (withBack) rows.push([{ text: t('common.back'), callback_data: 'adm_restart_queue' }]);
+    return { inline_keyboard: rows };
 }
 
 /**

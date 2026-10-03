@@ -10,6 +10,8 @@ import {
     makeAdminPendingKb,
     makeAdminPendingViewKb,
     makeAdminPendingRejectKb,
+    makeAdminRestartQueueKb,
+    makeAdminRestartRequestKb,
     REJECT_REASONS
 } from '../../utils/keyboards.js';
 import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
@@ -130,6 +132,27 @@ async function sendAdminAuctionView(bot, chatId, messageId, targetChatId, target
         });
     }
     return true;
+}
+
+/**
+ * Shows a text-only admin list screen in place of the panel message, replacing
+ * the message instead when it is a photo card or can't be edited.
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {Object} message - The message the callback came from.
+ * @param {string} text - Screen text.
+ * @param {Object} replyMarkup - Inline keyboard.
+ */
+async function showAdminList(bot, message, text, replyMarkup) {
+    const chatId = message.chat.id;
+    const opts = { parse_mode: 'HTML', reply_markup: replyMarkup, link_preview_options: { is_disabled: true } };
+    if (!message.photo) {
+        try {
+            return await safeEditMessage(bot, chatId, message.message_id, text, opts);
+        } catch (e) {}
+    }
+    await bot.deleteMessage(chatId, message.message_id).catch(() => {});
+    return await bot.sendMessage(chatId, text, opts);
 }
 
 /**
@@ -283,6 +306,7 @@ export function registerManageHandlers(bot) {
                 // The old row is keyed by the deleted message_id — drop it so it no
                 // longer surfaces in admin lists or scheduler scans.
                 q.deleteAuction.run(targetChatId, targetMsgId);
+                q.deleteRestartRequest.run(targetChatId, targetMsgId);
                 restartOk = true;
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);
@@ -332,6 +356,7 @@ export function registerManageHandlers(bot) {
                 return;
             }
 
+            q.deleteRestartRequest.run(targetChatId, targetMsgId);
             await bot.answerCallbackQuery(query.id).catch(() => {});
 
             await bot.editMessageText(t('admin.post_restart_rejected', { title: a.title }), {
@@ -364,57 +389,45 @@ export function registerManageHandlers(bot) {
             adminSessions.delete(from.id);
 
             const pending = q.getPendingAuctions.all();
-            if (pending.length === 0) {
-                const noPendingText = t('admin.no_pending_auctions') || "No pending auctions.";
-                const noPendingKb = makeAdminPanelKb();
-                
-                // If previous message was photo, delete it to keep list text-only
-                if (message.photo) {
-                    await bot.deleteMessage(chatId, messageId).catch(() => {});
-                    return await bot.sendMessage(chatId, noPendingText, {
-                        parse_mode: 'HTML',
-                        reply_markup: noPendingKb
-                    });
-                }
+            const pendingText = pending.length > 0
+                ? t('admin.pending_auctions_header')
+                : t('admin.no_pending_auctions');
+            const pendingKb = makeAdminPendingKb(pending, q.getRestartRequests.all().length);
+            await showAdminList(bot, message, pendingText, pendingKb);
+        }
 
-                try {
-                    return await safeEditMessage(bot, chatId, messageId, noPendingText, {
-                        parse_mode: 'HTML',
-                        reply_markup: noPendingKb
-                    });
-                } catch (e) {
-                    await bot.deleteMessage(chatId, messageId).catch(() => {});
-                    return await bot.sendMessage(chatId, noPendingText, {
-                        parse_mode: 'HTML',
-                        reply_markup: noPendingKb
-                    });
-                }
-            }
+        if (data === 'adm_restart_queue') {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
 
-            const pendingHeader = t('admin.pending_auctions_header') || "Pending auctions:";
-            const pendingKb = makeAdminPendingKb(pending);
+            const requests = q.getRestartRequests.all();
+            const text = requests.length > 0
+                ? t('admin.restart_queue_header')
+                : t('admin.no_restart_requests');
+            await showAdminList(bot, message, text, makeAdminRestartQueueKb(requests));
+        }
 
-            // If previous message was photo, delete it to keep list text-only
-            if (message.photo) {
-                await bot.deleteMessage(chatId, messageId).catch(() => {});
-                return await bot.sendMessage(chatId, pendingHeader, {
-                    parse_mode: 'HTML',
-                    reply_markup: pendingKb
-                });
-            }
+        if (data.startsWith('adm_rq_view:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
 
-            try {
-                await safeEditMessage(bot, chatId, messageId, pendingHeader, {
-                    parse_mode: 'HTML',
-                    reply_markup: pendingKb
-                });
-            } catch (e) {
-                await bot.deleteMessage(chatId, messageId).catch(() => {});
-                await bot.sendMessage(chatId, pendingHeader, {
-                    parse_mode: 'HTML',
-                    reply_markup: pendingKb
-                });
-            }
+            const [, chatIdParam, msgIdParam] = data.split(':');
+            const r = q.getRestartRequest.get(Number(chatIdParam), Number(msgIdParam));
+            if (!r) return bot.answerCallbackQuery(query.id, { text: t('admin.restart_already_handled'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+
+            const text = t('admin.post_restart_request', {
+                user_id: r.user_id,
+                name: r.user_name || r.user_id,
+                link: getAuctionLink(r.chat_id, r.message_id),
+                title: r.title,
+                price: r.min_bid,
+                step: r.step,
+                duration: r.duration_days,
+                time: r.hour,
+                cur: getCurrency()
+            });
+            const kb = makeAdminRestartRequestKb(r.user_id, r.chat_id, r.message_id, r, true);
+            await showAdminList(bot, message, text, kb);
         }
 
         if (data.startsWith('adm_pen_view:')) {
@@ -933,6 +946,7 @@ export function registerManageHandlers(bot) {
                 // longer surfaces in admin lists or scheduler scans. This takes the
                 // in-flight lock with it.
                 q.deleteAuction.run(targetChatId, targetMsgId);
+                q.deleteRestartRequest.run(targetChatId, targetMsgId);
                 restartOk = true;
 
                 scheduleClose(bot, targetChatId, newMsg.message_id, newEnd);

@@ -92,6 +92,22 @@ db.exec(`
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Users' restart requests still awaiting an admin, for the admin-panel restart
+    -- queue. One per auction: a newer request replaces the older one.
+    CREATE TABLE IF NOT EXISTS restart_requests
+    (
+        chat_id INTEGER,
+        message_id INTEGER,
+        user_id INTEGER,
+        user_name TEXT,
+        min_bid INTEGER,
+        step INTEGER,
+        duration_days INTEGER,
+        hour INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (chat_id, message_id)
+    );
+
     CREATE TABLE IF NOT EXISTS support_messages
     (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -383,9 +399,10 @@ export const q = {
   /**
    * Atomically claims a user's restart *request* so that only the first admin who
    * approves or rejects it succeeds. Returns `changes === 1` for the winning claim
-   * and `changes === 0` when another admin already settled it. A rejected request
-   * keeps the claim for good, so this must not be used to guard the admin-panel
-   * restart — that uses {@link lockRestart}.
+   * and `changes === 0` when another admin already settled it. The claim outlives
+   * the request it settled — {@link reopenRestartRequest} clears it when the user
+   * sends a fresh one — so this must not be used to guard the admin-panel restart:
+   * that uses {@link lockRestart}.
    * @type {import('better-sqlite3').Statement}
    */
   claimRestart: db.prepare(`UPDATE auctions SET restart_handled=1 WHERE chat_id=? AND message_id=? AND restart_handled=0`),
@@ -411,6 +428,17 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   releaseRestart: db.prepare(`UPDATE auctions SET restart_handled=0 WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * Clears the settled-request claim when the user sends a *new* restart request
+   * for the same auction, so the fresh request can be approved or rejected. Without
+   * it the claim left behind by an earlier settled request — a rejection, above all —
+   * would make every later request for that auction answer "already processed".
+   * Skipped while a restart of this auction is being posted, so a request fired
+   * mid-approval can't hand a second admin a claim on the post already going out.
+   * @type {import('better-sqlite3').Statement}
+   */
+  reopenRestartRequest: db.prepare(`UPDATE auctions SET restart_handled=0 WHERE chat_id=? AND message_id=? AND restart_in_progress=0`),
 
   /**
    * Takes the in-flight lock for posting a restart of this auction. Returns
@@ -778,6 +806,32 @@ export const q = {
       (SELECT '@' || username FROM participants WHERE user_id = ? AND username IS NOT NULL LIMIT 1)
     ) as name
   `),
+
+  // Restart requests
+  /**
+   * Records a user's restart request, replacing an earlier one for the same auction.
+   * @type {import('better-sqlite3').Statement}
+   */
+  upsertRestartRequest: db.prepare(`
+    INSERT OR REPLACE INTO restart_requests (chat_id, message_id, user_id, user_name, min_bid, step, duration_days, hour)
+    VALUES (@chat_id, @message_id, @user_id, @user_name, @min_bid, @step, @duration_days, @hour)
+  `),
+  /**
+   * Open restart requests, oldest first. Joined to auctions so a request whose
+   * auction was restarted or deleted some other way drops out of the queue.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getRestartRequests: db.prepare(`
+    SELECT r.*, a.title FROM restart_requests r
+      JOIN auctions a ON a.chat_id = r.chat_id AND a.message_id = r.message_id
+     ORDER BY r.created_at ASC
+  `),
+  getRestartRequest: db.prepare(`
+    SELECT r.*, a.title FROM restart_requests r
+      JOIN auctions a ON a.chat_id = r.chat_id AND a.message_id = r.message_id
+     WHERE r.chat_id = ? AND r.message_id = ?
+  `),
+  deleteRestartRequest: db.prepare(`DELETE FROM restart_requests WHERE chat_id=? AND message_id=?`),
 
   // Pending Auctions
   getPendingAuctions: db.prepare("SELECT * FROM pending_auctions WHERE status = 'pending' ORDER BY created_at DESC"),

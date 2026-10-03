@@ -505,12 +505,31 @@ export function registerUserCommands(bot) {
             const { data: d } = session;
             restartSessions.delete(userId);
 
+            // Drop the claim an earlier settled request left on this auction —
+            // a rejection keeps it for good — so admins can act on this new one
+            // instead of being told it was "already processed".
+            q.reopenRestartRequest.run(d.chatId, d.msgId);
+
+            const userName = from.first_name + (from.last_name ? ' ' + from.last_name : '');
+
+            // Keep it for the admin-panel restart queue until an admin settles it.
+            q.upsertRestartRequest.run({
+                chat_id: d.chatId,
+                message_id: d.msgId,
+                user_id: userId,
+                user_name: userName,
+                min_bid: d.min_bid,
+                step: d.step,
+                duration_days: d.duration_days,
+                hour: d.hour
+            });
+
             // Send request to admins
             const admins = q.getAllAdmins.all();
             const link = getAuctionLink(d.chatId, d.msgId);
             const restartText = t('admin.post_restart_request', {
                 user_id: userId,
-                name: from.first_name + (from.last_name ? ' ' + from.last_name : ''),
+                name: userName,
                 link: link,
                 title: d.title,
                 price: d.min_bid,
