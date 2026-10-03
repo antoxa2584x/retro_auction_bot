@@ -112,6 +112,17 @@ export function registerBidHandlers(bot) {
 
             const user = from;
 
+            // An account with no @username gives the seller no handle to reach
+            // the winner by once the auction closes. A tg://user?id= link can
+            // still resolve for someone who has interacted with the bot, so the
+            // forward-link probe below won't catch this on its own — check the
+            // username explicitly and keep these bids out.
+            if (!user.username) {
+                await bot.answerCallbackQuery(query.id, { text: t('bid.no_username_alert'), show_alert: true }).catch(() => {});
+                await bot.sendMessage(chatId, t('bid.no_username_text'), { parse_mode: 'HTML' }).catch(() => {});
+                return;
+            }
+
             // A hidden profile (Telegram privacy: "Forwarded Messages" set to
             // Nobody) can't be linked to, so the seller would have no way to
             // reach the winner once the auction closes. Keep those bids out

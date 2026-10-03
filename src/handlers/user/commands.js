@@ -193,14 +193,17 @@ export function registerUserCommands(bot) {
                     await closeAuction(bot, targetChatId, targetMessageId).catch(e => console.error('closeAuction (bid deep-link) failed:', e.message));
                     return bot.sendMessage(chatId, t('bid.finished'), { parse_mode: 'HTML' }).catch(() => {});
                 }
+                // No @username means the seller would have no handle to reach
+                // the winner once the auction closes. Block it here rather than
+                // offer a confirm button that the confbid handler will reject.
+                if (!msg.from.username) {
+                    return bot.sendMessage(chatId, t('bid.no_username_text'), { parse_mode: 'HTML' }).catch(() => {});
+                }
                 const newPrice = row.leader_id ? row.current_price + row.step : row.current_price;
-                let messageText = t('bid.confirm_text', {
+                const messageText = t('bid.confirm_text', {
                     title: row.full_text || row.title,
                     price: newPrice
                 });
-                if (!msg.from.username) {
-                    messageText += `\n\n${t('admin.privacy_warning')}`;
-                }
                 const replyMarkup = confirmBidKb(targetChatId, targetMessageId, newPrice);
                 if (row.photo_id) {
                     await bot.sendPhoto(chatId, row.photo_id, {
