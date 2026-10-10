@@ -178,7 +178,12 @@ export function startWebServer(bot) {
     const channelId = getChannelId();
     if (channelId) {
         bot.getChat(channelId)
-            .then((chat) => { channelUsername = chat.username || null; listCache.at = 0; })
+            .then((chat) => {
+                channelUsername = chat.username || null;
+                // Both lists may already hold t.me/c/ links built before this resolved.
+                listCache.at = 0;
+                soldCache.at = 0;
+            })
             .catch((err) => logError('web_channel_lookup_failed', { error: err }));
     }
 
