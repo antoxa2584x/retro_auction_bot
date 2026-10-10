@@ -9,6 +9,7 @@ import { registerCallbackHandler } from './handlers/callbacks.js';
 import { registerChannelPostHandler } from './handlers/channelPost.js';
 import { registerAdminHandlers } from './handlers/admin.js';
 import { restoreJobs } from './services/scheduler.js';
+import { startWebServer } from './services/web.js';
 import { q } from './services/db.js';
 import { setLocale, setCurrency } from './services/i18n.js';
 import { syncBotCommands } from './services/commands.js';
@@ -70,6 +71,9 @@ schedule.scheduleJob('log-prune', '30 4 * * *', () => pruneOldLogs());
 
 // Restore scheduled jobs
 restoreJobs(bot);
+
+// Read-only API for the website's /auctions page
+startWebServer(bot);
 
 console.log('Auction bot started. Timezone:', TZ);
 logInfo('bot_started', { timezone: TZ, pid: process.pid, log_retention_days: LOG_RETENTION_DAYS });

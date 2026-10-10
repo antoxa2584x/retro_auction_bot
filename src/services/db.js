@@ -504,6 +504,25 @@ export const q = {
   selectActive: db.prepare(`SELECT chat_id, message_id, end_at FROM auctions WHERE status='active' ORDER BY message_id DESC`),
 
   /**
+   * Active auctions for the public website list. Deliberately leaves out the
+   * leader and creator: the page is open to anyone.
+   * @type {import('better-sqlite3').Statement}
+   */
+  selectActiveForWeb: db.prepare(`
+    SELECT chat_id, message_id, title, min_bid, step, current_price, end_at,
+           participants_count, is_continuous, photo_id
+      FROM auctions
+     WHERE status='active'
+     ORDER BY end_at ASC, message_id DESC
+  `),
+
+  /**
+   * Main photo of one active auction, for the website's image proxy.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getActivePhotoId: db.prepare(`SELECT photo_id FROM auctions WHERE message_id=? AND status='active'`),
+
+  /**
    * Inserts a new training example for AI.
    * @type {import('better-sqlite3').Statement}
    */
