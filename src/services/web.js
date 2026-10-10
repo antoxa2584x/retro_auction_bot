@@ -8,7 +8,7 @@
 import http from 'node:http';
 import sharp from 'sharp';
 import { q } from './db.js';
-import { getChannelId, BOT_USERNAME } from '../config/env.js';
+import { getChannelId, BOT_USERNAME, isUserPostEnabled } from '../config/env.js';
 import { getCurrency } from './i18n.js';
 import { getAuctionLink } from '../utils/utils.js';
 import { logInfo, logError } from './logger.js';
@@ -41,6 +41,7 @@ function buildList() {
         endAt: a.end_at,
         participants: a.participants_count || 0,
         continuous: !!a.is_continuous,
+        byAdmin: !!a.by_admin,
         hasPhoto: !!a.photo_id,
         postUrl: channelUsername
             ? `https://t.me/${channelUsername}/${a.message_id}`
@@ -51,6 +52,8 @@ function buildList() {
     const body = JSON.stringify({
         currency: getCurrency(),
         channelUrl: channelUsername ? `https://t.me/${channelUsername}` : null,
+        // Same flow as the bot menu's "submit auction"; null while users can't post.
+        addUrl: isUserPostEnabled() ? `https://t.me/${botName}?start=post` : null,
         updatedAt: new Date(now).toISOString(),
         auctions,
     });

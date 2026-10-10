@@ -15,7 +15,7 @@ import {
     makeUserRestartDurationKb,
     makeUserRestartTimeKb
 } from '../../utils/keyboards.js';
-import { registerUserPostHandlers, handleUserPostInput } from './post.js';
+import { registerUserPostHandlers, handleUserPostInput, beginUserPost } from './post.js';
 import { registerSupportHandlers, handleSupportInput } from './support.js';
 import fs from 'fs';
 import path from 'path';
@@ -251,6 +251,9 @@ export function registerUserCommands(bot) {
                     reply_markup: makeNotifyKb(targetChatId, targetMessageId, !!existing)
                 });
             }
+        } else if (payload === 'post' && msg.chat.type === 'private') {
+            // "Add auction" button on the website's /auctions page.
+            await beginUserPost(bot, chatId, msg.from);
         } else {
             await bot.sendMessage(chatId, t('bid.welcome'), { parse_mode: 'HTML' });
         }

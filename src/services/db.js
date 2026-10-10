@@ -505,12 +505,16 @@ export const q = {
 
   /**
    * Active auctions for the public website list. Deliberately leaves out the
-   * leader and creator: the page is open to anyone.
+   * leader and creator: the page is open to anyone. Only whether an admin
+   * posted the lot is exposed, for the page's filter.
    * @type {import('better-sqlite3').Statement}
    */
   selectActiveForWeb: db.prepare(`
     SELECT chat_id, message_id, title, min_bid, step, current_price, end_at,
-           participants_count, is_continuous, photo_id
+           participants_count, is_continuous, photo_id,
+           -- Posted from the admin panel (an admin's id) or typed straight into
+           -- the channel (NULL); approved user submissions carry the user's id.
+           (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins)) AS by_admin
       FROM auctions
      WHERE status='active'
      ORDER BY end_at ASC, message_id DESC

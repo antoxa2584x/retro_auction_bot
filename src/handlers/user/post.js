@@ -72,25 +72,37 @@ const USER_POST_VIEWS = {
     })
 };
 
+/**
+ * Entry point of a user submission: the menu's "submit" button and the
+ * website's /start post deep link both land here. Checks the limits, then
+ * either asks to accept the rules or opens the first step.
+ *
+ * @param {import('node-telegram-bot-api')} bot
+ * @param {number} chatId - Private chat with the user.
+ * @param {import('node-telegram-bot-api').User} from
+ */
+export async function beginUserPost(bot, chatId, from) {
+    if (await refusePosting(bot, chatId, from.id)) return;
+
+    const rulesLink = q.getSetting.get('RULES_LINK')?.value;
+    if (rulesLink) {
+        await bot.sendMessage(chatId, t('user.rules_title') + '\n\n' + t('user.rules_text'), {
+            parse_mode: 'HTML',
+            reply_markup: makeUserRulesKb(rulesLink)
+        });
+        return;
+    }
+
+    await startSession(bot, chatId, from);
+}
+
 export function registerUserPostHandlers(bot) {
     bot.on('callback_query', async (query) => {
         const { data, message, from } = query;
         const chatId = message.chat.id;
         if (data === 'user_post') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
-
-            if (await refusePosting(bot, chatId, from.id)) return;
-
-            const rulesLink = q.getSetting.get('RULES_LINK')?.value;
-            if (rulesLink) {
-                await bot.sendMessage(chatId, t('user.rules_title') + '\n\n' + t('user.rules_text'), {
-                    parse_mode: 'HTML',
-                    reply_markup: makeUserRulesKb(rulesLink)
-                });
-                return;
-            }
-
-            await startSession(bot, chatId, from);
+            await beginUserPost(bot, chatId, from);
         }
 
         if (data === 'user_rules_confirm') {
