@@ -16,8 +16,8 @@ import { logInfo, logError } from './logger.js';
 const PORT = Number(process.env.WEB_PORT) || 3010;
 const HOST = process.env.WEB_HOST || '127.0.0.1';
 
-/** The list is cheap to build but polled by every open page. */
-const LIST_TTL_MS = 15 * 1000;
+/** The list is cheap to build but polled by every open page (every 10s). */
+const LIST_TTL_MS = 5 * 1000;
 /** file_ids never change for an auction, so resized photos can be kept a while. */
 const PHOTO_CACHE_MAX = 200;
 const PHOTO_WIDTH = 640;
@@ -120,7 +120,7 @@ export function startWebServer(bot) {
             if (url.pathname === '/api/auctions') {
                 return send(res, 200, buildList(), {
                     'Content-Type': 'application/json; charset=utf-8',
-                    'Cache-Control': 'public, max-age=15',
+                    'Cache-Control': 'public, max-age=5',
                 });
             }
 
