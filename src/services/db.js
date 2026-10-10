@@ -514,17 +514,34 @@ export const q = {
            participants_count, is_continuous, photo_id,
            -- Posted from the admin panel (an admin's id) or typed straight into
            -- the channel (NULL); approved user submissions carry the user's id.
-           (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins)) AS by_admin
+           -- A row with an otp_code is only a pending /admin login request, not
+           -- an admin (same rule as isAdmin / getAllAdmins).
+           (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
       FROM auctions
      WHERE status='active'
      ORDER BY end_at ASC, message_id DESC
   `),
 
   /**
-   * Main photo of one active auction, for the website's image proxy.
+   * Sold lots of one channel for the website's "finished" tab, newest post
+   * first. Lots that closed without a bid are left out: the tab is about
+   * winning prices. Same privacy rule as above: no leader or creator.
    * @type {import('better-sqlite3').Statement}
    */
-  getActivePhotoId: db.prepare(`SELECT photo_id FROM auctions WHERE message_id=? AND status='active'`),
+  selectSoldForWeb: db.prepare(`
+    SELECT message_id, title, current_price, participants_count, end_at, photo_id,
+           (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
+      FROM auctions
+     WHERE status='finished' AND leader_id IS NOT NULL AND chat_id=?
+     ORDER BY message_id DESC
+  `),
+
+  /**
+   * Main photo of one channel auction (active or finished), for the website's
+   * image proxy.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getWebPhotoId: db.prepare(`SELECT photo_id FROM auctions WHERE chat_id=? AND message_id=?`),
 
   /**
    * Inserts a new training example for AI.
