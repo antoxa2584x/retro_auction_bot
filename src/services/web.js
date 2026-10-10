@@ -63,8 +63,9 @@ function getSoldRows() {
                 price: a.current_price,
                 participants: a.participants_count || 0,
                 // Lots finished early from the admin panel keep their planned,
-                // still-future end date, which would read as nonsense here.
-                endedAt: Date.parse(a.end_at) <= now ? a.end_at : null,
+                // still-future end date; their last bid is the closest thing
+                // to when they actually ended.
+                endedAt: Date.parse(a.end_at) <= now ? a.end_at : a.last_bid_at,
                 byAdmin: !!a.by_admin,
                 hasPhoto: !!a.photo_id,
                 postUrl: postUrl(channelId, a.message_id),
@@ -72,6 +73,8 @@ function getSoldRows() {
             };
         })
         : [];
+    // Most recently ended first; the few lots with no known end time go last.
+    rows.sort((a, b) => (b.endedAt || '').localeCompare(a.endedAt || '') || b.id - a.id);
     soldCache = { at: now, rows };
     return rows;
 }

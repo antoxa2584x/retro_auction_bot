@@ -523,13 +523,16 @@ export const q = {
   `),
 
   /**
-   * Sold lots of one channel for the website's "finished" tab, newest post
-   * first. Lots that closed without a bid are left out: the tab is about
-   * winning prices. Same privacy rule as above: no leader or creator.
+   * Sold lots of one channel for the website's "finished" tab. Lots that closed
+   * without a bid are left out: the tab is about winning prices. Same privacy
+   * rule as above: no leader or creator. last_bid_at stands in for the end time
+   * of lots an admin finished early, whose end_at is still the planned one.
    * @type {import('better-sqlite3').Statement}
    */
   selectSoldForWeb: db.prepare(`
     SELECT message_id, title, current_price, participants_count, end_at, photo_id,
+           (SELECT MAX(ts) FROM bids b
+             WHERE b.chat_id=auctions.chat_id AND b.message_id=auctions.message_id) AS last_bid_at,
            (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
       FROM auctions
      WHERE status='finished' AND leader_id IS NOT NULL AND chat_id=?
