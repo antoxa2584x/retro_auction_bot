@@ -29,7 +29,8 @@ import {
     safeEditMessage,
     stripHtml,
     truncateCaption,
-    setStatusTag
+    setStatusTag,
+    escapeHtml
 } from '../../utils/utils.js';
 import { t, getCurrency } from '../../services/i18n.js';
 import { attachAuctionKeyboard } from '../../utils/publish.js';
@@ -264,7 +265,8 @@ export function registerManageHandlers(bot) {
                     end_at: newEnd.toISOString(),
                     is_continuous: a.is_continuous,
                     continuous_minutes: a.continuous_minutes,
-                    creator_id: a.creator_id
+                    creator_id: a.creator_id,
+                    category: a.category || null
                 });
 
                 verifyAuctionStored('restart_request_approval', targetChatId, newMsg.message_id, {
@@ -443,7 +445,8 @@ export function registerManageHandlers(bot) {
             await cleanupReview(bot, chatId, from.id, { keepMsgId: messageId });
 
             const userContact = formatUserLinkById(p.user_id);
-            const headerText = t('admin.pending_auction_view_header', { contact: userContact });
+            let headerText = t('admin.pending_auction_view_header', { contact: userContact });
+            if (p.category) headerText += '\n' + t('admin.category_line', { category: escapeHtml(p.category) });
 
             const text = headerText + '\n\n' + buildAuctionText(p, true, false);
 
@@ -557,7 +560,8 @@ export function registerManageHandlers(bot) {
                     end_at: new Date(p.end_at).toISOString(),
                     is_continuous: p.is_continuous,
                     continuous_minutes: p.continuous_minutes,
-                    creator_id: p.user_id
+                    creator_id: p.user_id,
+                    category: p.category || null
                 });
                 posted = true;
 
@@ -903,7 +907,8 @@ export function registerManageHandlers(bot) {
                     end_at: newEnd.toISOString(),
                     is_continuous: a.is_continuous,
                     continuous_minutes: a.continuous_minutes,
-                    creator_id: a.creator_id
+                    creator_id: a.creator_id,
+                    category: a.category || null
                 });
 
                 verifyAuctionStored('admin_restart', targetChatId, newMsg.message_id, {

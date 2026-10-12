@@ -72,7 +72,8 @@ export function registerChannelPostHandler(bot) {
             end_at: end.toISOString(),
             is_continuous: isContinuous,
             continuous_minutes: continuousMinutes,
-            creator_id: null
+            creator_id: null,
+            category: null
         });
 
         verifyAuctionStored('channel_post', post.chat.id, post.message_id, { creator_id: null });

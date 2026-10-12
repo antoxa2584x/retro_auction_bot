@@ -7,13 +7,15 @@ import {
     makeUserRulesKb,
     makeUserPostDurationKb,
     makeUserPostTimeKb,
+    makeCategoryKb,
     withBackButton
 } from '../../utils/keyboards.js';
 import { TZ, getMaxUserAuctions, isUserPostEnabled } from "../../config/env.js";
 import { formatInTimeZone } from 'date-fns-tz';
 import { addDays, set } from 'date-fns';
 import { t } from '../../services/i18n.js';
-import { buildAuctionText, sanitizeHtml, deriveTitle, truncateCaption, formatPosterLink } from '../../utils/utils.js';
+import { buildAuctionText, sanitizeHtml, deriveTitle, truncateCaption, formatPosterLink, escapeHtml } from '../../utils/utils.js';
+import { getCategories } from '../../services/categories.js';
 
 /** @type {Map<number, {step: string, data: any, views: string[], viewMsgId: ?number}>} */
 const userSessions = new Map();
@@ -37,6 +39,10 @@ const USER_POST_VIEWS = {
     TITLE: () => ({
         text: t('admin.post_step_title'),
         kb: makeAdminPostCancelKb(false, true)
+    }),
+    CATEGORY: (session) => ({
+        text: t('admin.post_step_category'),
+        kb: makeCategoryKb(session.data.category_options, 'user_post_cat', 'user_post_cancel')
     }),
     MIN_BID: () => ({
         text: t('admin.post_step_min_bid'),
@@ -145,6 +151,17 @@ export function registerUserPostHandlers(bot) {
             await goToView(bot, chatId, session, 'CONTINUOUS');
         }
 
+        if (data.startsWith('user_post_cat:')) {
+            await bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = userSessions.get(from.id);
+            if (!session || session.step !== 'CATEGORY') return;
+
+            const category = session.data.category_options?.[parseInt(data.split(':')[1], 10)];
+            if (!category) return;
+            session.data.category = category;
+            await goToView(bot, chatId, session, 'MIN_BID');
+        }
+
         if (data === 'user_post_skip' || data === 'user_post_continue') {
             await bot.answerCallbackQuery(query.id).catch(() => {});
             const session = userSessions.get(from.id);
@@ -215,7 +232,8 @@ export function registerUserPostHandlers(bot) {
                 step: sessionData.step,
                 end_at: sessionData.end_at.toISOString(),
                 is_continuous: sessionData.is_continuous || 0,
-                continuous_minutes: sessionData.continuous_minutes || 5
+                continuous_minutes: sessionData.continuous_minutes || 5,
+                category: sessionData.category || null
             });
 
             // Notify admins
@@ -292,7 +310,7 @@ export async function handleUserPostInput(bot, msg) {
                 }
                 session.data.full_text = sanitizedText;
                 session.data.title = deriveTitle(sanitizedText);
-                await goToView(bot, chatId, session, 'MIN_BID');
+                await goToCategoryOrMinBid(bot, chatId, session);
                 return true;
             }
             break;
@@ -406,6 +424,10 @@ function buildConfirmText(data) {
         cur: q.getSetting.get('CURRENCY')?.value || '₴'
     });
 
+    if (data.category) {
+        confirmText += '\n' + t('admin.category_line', { category: escapeHtml(data.category) });
+    }
+
     // Only users without an @username depend on a tg://user?id= link — for
     // everyone else the post and the winner banner link to t.me/<nick>, which
     // no privacy setting can hide.
@@ -438,6 +460,24 @@ async function startSession(bot, chatId, from) {
     const session = { step: 'IMAGE', data, views: [], viewMsgId: null };
     userSessions.set(from.id, session);
     await goToView(bot, chatId, session, 'IMAGE');
+}
+
+/**
+ * Leaves the title step: to the category picker when the admin has configured
+ * categories, straight to the minimum bid when not.
+ *
+ * The list is snapshotted onto the session because the buttons carry indexes
+ * into it — an admin editing CATEGORIES mid-wizard mustn't shift what they mean.
+ */
+async function goToCategoryOrMinBid(bot, chatId, session) {
+    const options = getCategories();
+    if (options.length === 0) {
+        delete session.data.category;
+        await goToView(bot, chatId, session, 'MIN_BID');
+        return;
+    }
+    session.data.category_options = options;
+    await goToView(bot, chatId, session, 'CATEGORY');
 }
 
 /**

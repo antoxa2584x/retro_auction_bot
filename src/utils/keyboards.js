@@ -552,6 +552,7 @@ export function makeAdminSettingsDefaultsKb() {
             [{text: `⏳ ${t('admin.def_continuous')}`, callback_data: 'set_conf:CONTINUOUS_MINUTES'}],
             [{text: `👤 ${t('admin.def_max_user_auctions')}`, callback_data: 'set_conf:MAX_USER_AUCTIONS'}],
             [{text: `📜 ${t('admin.def_rules_link')}`, callback_data: 'set_conf:RULES_LINK'}],
+            [{text: `🏷 ${t('admin.def_categories')}`, callback_data: 'set_conf:CATEGORIES'}],
             [{text: `📝 ${t('admin.def_user_post_enabled')}`, callback_data: 'set_conf:USER_POST_ENABLED'}],
             [{text: t('common.back'), callback_data: 'adm_settings', style: 'primary'}]
         ]
@@ -836,6 +837,30 @@ export function makeAdminPostContactKb(currentAdminId) {
  * @param {string} callbackData - Callback data for the back button.
  * @returns {Object} New inline keyboard object with the back row appended.
  */
+/**
+ * Category picker for both posting wizards: two names per row, then cancel.
+ *
+ * Buttons carry the category's index rather than its name — Cyrillic names
+ * quickly outgrow Telegram's 64-byte callback_data limit — so the wizard keeps
+ * the list it showed and resolves the index against that, not the live setting.
+ *
+ * @param {string[]} categories - Names, as returned by getCategories().
+ * @param {string} prefix - Callback prefix; buttons send `${prefix}:${index}`.
+ * @param {string} cancelData - Callback for the cancel button.
+ * @returns {Object} Inline keyboard object.
+ */
+export function makeCategoryKb(categories, prefix, cancelData) {
+    const rows = [];
+    for (let i = 0; i < categories.length; i += 2) {
+        rows.push(categories.slice(i, i + 2).map((name, j) => ({
+            text: name,
+            callback_data: `${prefix}:${i + j}`
+        })));
+    }
+    rows.push([{ text: t('common.cancel'), callback_data: cancelData, style: 'danger' }]);
+    return { inline_keyboard: rows };
+}
+
 export function withBackButton(kb, callbackData) {
     return {
         inline_keyboard: [

@@ -12,6 +12,7 @@ import { getChannelId, BOT_USERNAME, isUserPostEnabled } from '../config/env.js'
 import { getCurrency } from './i18n.js';
 import { getAuctionLink } from '../utils/utils.js';
 import { logInfo, logError } from './logger.js';
+import { getCategories } from './categories.js';
 
 const PORT = Number(process.env.WEB_PORT) || 3010;
 const HOST = process.env.WEB_HOST || '127.0.0.1';
@@ -67,6 +68,7 @@ function getSoldRows() {
                 // to when they actually ended.
                 endedAt: Date.parse(a.end_at) <= now ? a.end_at : a.last_bid_at,
                 byAdmin: !!a.by_admin,
+                category: a.category || null,
                 hasPhoto: !!a.photo_id,
                 postUrl: postUrl(channelId, a.message_id),
                 search: (title || '').toLocaleLowerCase(),
@@ -86,12 +88,14 @@ function getSoldRows() {
 function buildSoldPage(params) {
     const words = (params.get('q') || '').toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const by = params.get('by');
+    const category = params.get('cat');
     const offset = Math.max(0, parseInt(params.get('offset'), 10) || 0);
     const limit = Math.min(SOLD_PAGE_MAX, Math.max(1, parseInt(params.get('limit'), 10) || 24));
 
     let rows = getSoldRows().filter((a) =>
         (by !== 'admin' || a.byAdmin) &&
         (by !== 'users' || !a.byAdmin) &&
+        (!category || a.category === category) &&
         words.every((w) => a.search.includes(w)));
     if (params.get('sort') === 'price') rows = [...rows].sort((a, b) => b.price - a.price);
 
@@ -118,6 +122,7 @@ function buildList() {
         participants: a.participants_count || 0,
         continuous: !!a.is_continuous,
         byAdmin: !!a.by_admin,
+        category: a.category || null,
         hasPhoto: !!a.photo_id,
         postUrl: postUrl(a.chat_id, a.message_id),
         bidUrl: `https://t.me/${botName}?start=bid_${Math.abs(a.chat_id)}_${a.message_id}`,
@@ -130,6 +135,8 @@ function buildList() {
         addUrl: isUserPostEnabled() ? `https://t.me/${botName}?start=post` : null,
         updatedAt: new Date(now).toISOString(),
         soldTotal: getSoldRows().length,
+        // The admin's list, in their order, for the page's category filter.
+        categories: getCategories(),
         auctions,
     });
     listCache = { at: now, body };

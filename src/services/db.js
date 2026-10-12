@@ -199,7 +199,10 @@ const migrations = [
     // separate from status because the row is marked finished before the post
     // edits run: a close that dies on a rate-limited edit is retried, and the
     // retry would otherwise see 'finished' and skip the notifications forever.
-    { name: 'close_notified', type: 'INTEGER DEFAULT 0' }
+    { name: 'close_notified', type: 'INTEGER DEFAULT 0' },
+    // One of the CATEGORIES setting's names, picked in the posting wizard; the
+    // website filters on it. NULL for lots posted before categories existed.
+    { name: 'category', type: 'TEXT' }
 ];
 
 const supportColumns = db.prepare("PRAGMA table_info(support_messages)").all();
@@ -243,7 +246,9 @@ const pendingMigrations = [
     // back to a lookup by id.
     { name: 'username', type: 'TEXT' },
     { name: 'first_name', type: 'TEXT' },
-    { name: 'last_name', type: 'TEXT' }
+    { name: 'last_name', type: 'TEXT' },
+    // Carried onto the auction when the submission is approved.
+    { name: 'category', type: 'TEXT' }
 ];
 
 for (const m of pendingMigrations) {
@@ -355,8 +360,8 @@ export const q = {
    */
   insertAuction: db.prepare(`
     INSERT OR REPLACE INTO auctions
-      (chat_id, message_id, title, full_text, photo_id, photo_ids, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes, creator_id)
-    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @photo_ids, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes, @creator_id)
+      (chat_id, message_id, title, full_text, photo_id, photo_ids, min_bid, step, current_price, leader_id, leader_name, admin_contact, end_at, status, participants_count, is_continuous, continuous_minutes, creator_id, category)
+    VALUES (@chat_id, @message_id, @title, @full_text, @photo_id, @photo_ids, @min_bid, @step, @current_price, NULL, NULL, @admin_contact, @end_at, 'active', 0, @is_continuous, @continuous_minutes, @creator_id, @category)
   `),
 
   /**
@@ -511,7 +516,7 @@ export const q = {
    */
   selectActiveForWeb: db.prepare(`
     SELECT chat_id, message_id, title, min_bid, step, current_price, end_at,
-           participants_count, is_continuous, photo_id,
+           participants_count, is_continuous, photo_id, category,
            -- Posted from the admin panel (an admin's id) or typed straight into
            -- the channel (NULL); approved user submissions carry the user's id.
            -- A row with an otp_code is only a pending /admin login request, not
@@ -530,7 +535,7 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   selectSoldForWeb: db.prepare(`
-    SELECT message_id, title, current_price, participants_count, end_at, photo_id,
+    SELECT message_id, title, current_price, participants_count, end_at, photo_id, category,
            (SELECT MAX(ts) FROM bids b
              WHERE b.chat_id=auctions.chat_id AND b.message_id=auctions.message_id) AS last_bid_at,
            (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
@@ -882,8 +887,8 @@ export const q = {
   countApprovedAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'approved'"),
   countPendingAuctionsByUser: db.prepare("SELECT COUNT(*) as count FROM pending_auctions WHERE user_id = ? AND status = 'pending'"),
   insertPendingAuction: db.prepare(`
-    INSERT INTO pending_auctions (user_id, username, first_name, last_name, title, full_text, photo_ids, min_bid, step, end_at, is_continuous, continuous_minutes)
-    VALUES (:user_id, :username, :first_name, :last_name, :title, :full_text, :photo_ids, :min_bid, :step, :end_at, :is_continuous, :continuous_minutes)
+    INSERT INTO pending_auctions (user_id, username, first_name, last_name, title, full_text, photo_ids, min_bid, step, end_at, is_continuous, continuous_minutes, category)
+    VALUES (:user_id, :username, :first_name, :last_name, :title, :full_text, :photo_ids, :min_bid, :step, :end_at, :is_continuous, :continuous_minutes, :category)
   `),
   updatePendingAuctionStatus: db.prepare("UPDATE pending_auctions SET status = ? WHERE id = ?"),
   deletePendingAuction: db.prepare("DELETE FROM pending_auctions WHERE id = ?"),

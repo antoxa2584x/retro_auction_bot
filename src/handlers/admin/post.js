@@ -8,6 +8,7 @@ import {
     makeAdminPostContinuousKb,
     makeAdminPostDurationKb,
     makeAdminPostStepKb,
+    makeCategoryKb,
     withBackButton
 } from '../../utils/keyboards.js';
 import {getChannelId, getContactNickname, TZ} from "../../config/env.js";
@@ -28,8 +29,10 @@ import {
     sanitizeHtml,
     sendAuctionGallery,
     truncateCaption,
-    adminContactValue
+    adminContactValue,
+    escapeHtml
 } from '../../utils/utils.js';
+import {getCategories} from '../../services/categories.js';
 import fs from 'fs';
 import os from 'os';
 
@@ -70,6 +73,10 @@ const POST_VIEWS = {
     TITLE: () => ({
         text: t('admin.post_step_title'),
         kb: makeAdminPostCancelKb()
+    }),
+    CATEGORY: (session) => ({
+        text: t('admin.post_step_category'),
+        kb: makeCategoryKb(session.data.category_options, 'post_cat', 'post_cancel')
     }),
     MIN_BID: () => ({
         text: t('admin.post_step_min_bid'),
@@ -231,7 +238,7 @@ export function registerPostHandlers(bot) {
                 q.insertAiTrainingData.run(session.data.image_hash, session.data.full_text, getLocale());
             }
 
-            await goToView(bot, chatId, session, 'MIN_BID');
+            await goToCategoryOrMinBid(bot, chatId, session);
         }
 
         if (data === 'post_ai_edit') {
@@ -287,6 +294,18 @@ export function registerPostHandlers(bot) {
             } else {
                 await goToView(bot, chatId, session, 'CONTACT_MANUAL');
             }
+        }
+
+        if (data.startsWith('post_cat:')) {
+            if (!isAdmin(from.id)) return bot.answerCallbackQuery(query.id, { text: t('admin.insufficient_permissions'), show_alert: true }).catch(() => {});
+            bot.answerCallbackQuery(query.id).catch(() => {});
+            const session = postSessions.get(from.id);
+            if (!session || session.step !== 'CATEGORY') return;
+
+            const category = session.data.category_options?.[parseInt(data.split(':')[1], 10)];
+            if (!category) return;
+            session.data.category = category;
+            await goToView(bot, chatId, session, 'MIN_BID');
         }
 
         if (data.startsWith('post_dur:')) {
@@ -389,7 +408,8 @@ export function registerPostHandlers(bot) {
                     end_at: sessionData.end_at.toISOString(),
                     is_continuous: sessionData.is_continuous || 0,
                     continuous_minutes: sessionData.continuous_minutes || 5,
-                    creator_id: from.id
+                    creator_id: from.id,
+                    category: sessionData.category || null
                 });
                 posted = true;
 
@@ -516,7 +536,7 @@ export async function handlePostInput(bot, msg) {
 
                 session.data.full_text = sanitizedText;
                 session.data.title = deriveTitle(sanitizedText);
-                await goToView(bot, chatId, session, 'MIN_BID');
+                await goToCategoryOrMinBid(bot, chatId, session);
                 return true;
             }
             break;
@@ -648,7 +668,7 @@ export async function handleDateSkip(bot, chatId, userId) {
 }
 
 function buildConfirmText(data) {
-    return t('admin.post_confirm', {
+    const text = t('admin.post_confirm', {
         full_text: buildAuctionText(data, false, false),
         min_bid: data.min_bid,
         step: data.step,
@@ -657,6 +677,25 @@ function buildConfirmText(data) {
         contact: data.admin_contact,
         cur: getCurrency()
     });
+    return data.category
+        ? text + '\n' + t('admin.category_line', { category: escapeHtml(data.category) })
+        : text;
+}
+
+/**
+ * Leaves the title step: to the category picker when categories are configured,
+ * straight to the minimum bid when not. The list is snapshotted onto the
+ * session because the buttons carry indexes into it.
+ */
+async function goToCategoryOrMinBid(bot, chatId, session) {
+    const options = getCategories();
+    if (options.length === 0) {
+        delete session.data.category;
+        await goToView(bot, chatId, session, 'MIN_BID');
+        return;
+    }
+    session.data.category_options = options;
+    await goToView(bot, chatId, session, 'CATEGORY');
 }
 
 /**

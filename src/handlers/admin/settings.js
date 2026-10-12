@@ -11,7 +11,8 @@ import {
     makeAdminListKb
 } from '../../utils/keyboards.js';
 import { getChannelId, getContactNickname } from "../../config/env.js";
-import { formatUserLink, sanitizeHtml } from '../../utils/utils.js';
+import { formatUserLink, sanitizeHtml, escapeHtml } from '../../utils/utils.js';
+import { getCategories, parseCategories } from '../../services/categories.js';
 import { t, setLocale, getLocale, setCurrency, getCurrency } from '../../services/i18n.js';
 import { clearAdminCommands, syncBotCommands } from '../../services/commands.js';
 import {
@@ -297,7 +298,10 @@ export function registerSettingsHandlers(bot) {
 
             userSessions.set(from.id, key);
 
-            await bot.sendMessage(chatId, t('admin.enter_new_value', { key }), { 
+            let prompt = t('admin.enter_new_value', { key });
+            if (key === 'CATEGORIES') prompt += '\n\n' + t('admin.categories_hint');
+
+            await bot.sendMessage(chatId, prompt, { 
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'cancel_settings' }]]
@@ -352,6 +356,12 @@ export async function handleSettingsInput(bot, msg, text) {
             finalValue = sanitizeHtml(text);
         }
 
+        if (settingKey === 'CATEGORIES') {
+            // Stored normalized so the wizards, the panel and the website all see
+            // the same list; "-" clears it, which switches the wizard step off.
+            finalValue = text.trim() === '-' ? '' : parseCategories(text).join(', ');
+        }
+
         if (settingKey === 'MAX_USER_AUCTIONS') {
             const val = parseInt(text);
             if (isNaN(val) || val < 0) {
@@ -380,7 +390,8 @@ export async function handleSettingsInput(bot, msg, text) {
         }
         q.setSetting.run(settingKey, finalValue);
         userSessions.delete(userId);
-        await bot.sendMessage(chatId, t('admin.setting_updated', { key: settingKey, value: finalValue }), { parse_mode: 'HTML' });
+        const shownValue = settingKey === 'CATEGORIES' ? escapeHtml(finalValue) : finalValue;
+        await bot.sendMessage(chatId, t('admin.setting_updated', { key: settingKey, value: shownValue }), { parse_mode: 'HTML' });
 
         await sendLastPanel(bot, chatId, userId);
     } catch (e) {
@@ -586,6 +597,7 @@ export async function sendSettingsDefaultsPanel(bot, chatId, userId, isEdit = fa
         t('admin.panel_settings_defaults_continuous', { value: q.getSetting.get('CONTINUOUS_MINUTES')?.value || '5' }) + '\n' +
         t('admin.panel_settings_defaults_max_user_auctions', { value: q.getSetting.get('MAX_USER_AUCTIONS')?.value || '3' }) + '\n' +
         t('admin.panel_settings_defaults_rules_link', { value: q.getSetting.get('RULES_LINK')?.value || t('admin.not_set') }) + '\n' +
+        t('admin.panel_settings_defaults_categories', { value: escapeHtml(getCategories().join(', ')) || t('admin.not_set') }) + '\n' +
         t('admin.panel_settings_defaults_user_post_enabled', { value: q.getSetting.get('USER_POST_ENABLED')?.value || 'true' }) + '\n\n' +
         t('admin.click_below_to_change');
 
