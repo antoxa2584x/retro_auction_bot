@@ -187,6 +187,10 @@ export const REJECT_REASONS = [
     {
         label: 'admin.pending_auction_reject_reason_5',
         details: 'admin.pending_auction_reject_reason_5_details'
+    },
+    {
+        label: 'admin.pending_auction_reject_reason_6',
+        details: 'admin.pending_auction_reject_reason_6_details'
     }
 ];
 
