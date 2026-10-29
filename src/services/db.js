@@ -516,7 +516,7 @@ export const q = {
    */
   selectActiveForWeb: db.prepare(`
     SELECT chat_id, message_id, title, min_bid, step, current_price, end_at,
-           participants_count, is_continuous, photo_id, category,
+           participants_count, is_continuous, photo_id, photo_ids, category,
            -- Posted from the admin panel (an admin's id) or typed straight into
            -- the channel (NULL); approved user submissions carry the user's id.
            -- A row with an otp_code is only a pending /admin login request, not
@@ -535,7 +535,7 @@ export const q = {
    * @type {import('better-sqlite3').Statement}
    */
   selectSoldForWeb: db.prepare(`
-    SELECT message_id, title, current_price, participants_count, end_at, photo_id, category,
+    SELECT message_id, title, current_price, participants_count, end_at, photo_id, photo_ids, category,
            (SELECT MAX(ts) FROM bids b
              WHERE b.chat_id=auctions.chat_id AND b.message_id=auctions.message_id) AS last_bid_at,
            (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
@@ -545,11 +545,27 @@ export const q = {
   `),
 
   /**
-   * Main photo of one channel auction (active or finished), for the website's
+   * Photos of one channel auction (active or finished), for the website's
    * image proxy.
    * @type {import('better-sqlite3').Statement}
    */
-  getWebPhotoId: db.prepare(`SELECT photo_id FROM auctions WHERE chat_id=? AND message_id=?`),
+  getWebPhotoId: db.prepare(`SELECT photo_id, photo_ids FROM auctions WHERE chat_id=? AND message_id=?`),
+
+  /**
+   * One channel auction with its post text, for the website's lot page. Same
+   * privacy rule as the lists: no leader or creator, only whether it was won.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getWebAuction: db.prepare(`
+    SELECT message_id, title, full_text, min_bid, step, current_price, end_at, status,
+           participants_count, is_continuous, photo_id, photo_ids, category,
+           leader_id IS NOT NULL AS has_winner,
+           (SELECT MAX(ts) FROM bids b
+             WHERE b.chat_id=auctions.chat_id AND b.message_id=auctions.message_id) AS last_bid_at,
+           (creator_id IS NULL OR creator_id IN (SELECT user_id FROM admins WHERE otp_code IS NULL)) AS by_admin
+      FROM auctions
+     WHERE chat_id=? AND message_id=?
+  `),
 
   /**
    * Inserts a new training example for AI.

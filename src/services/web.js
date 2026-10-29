@@ -25,6 +25,8 @@ const SOLD_PAGE_MAX = 60;
 /** file_ids never change for an auction, so resized photos can be kept a while. */
 const PHOTO_CACHE_MAX = 400;
 const PHOTO_WIDTH = 640;
+/** The lot page's gallery (and search engines) get a larger copy. */
+const PHOTO_WIDTH_LARGE = 1280;
 
 /**
  * Old channel posts were saved with the post header ("🎮 Аукціон!") as their
@@ -36,6 +38,76 @@ const GENERIC_TITLE = /^[^\p{L}\p{N}]*(аукціон|аукцион|auction)[^\
 const STATUS_TAG = /#(активний|завершений|active|finished)(?=\s|$)/giu;
 
 const cleanTitle = (title) => (title || '').replace(STATUS_TAG, '').replace(/\s+/g, ' ').trim();
+
+/** A lot's name for the website, or null for the old posts that have none. */
+function lotTitle(title) {
+    const cleaned = cleanTitle(title);
+    return cleaned && !GENERIC_TITLE.test(cleaned) ? cleaned : null;
+}
+
+/**
+ * Every photo of a lot, main one first. Lots posted before photo_ids was
+ * tracked only have their main photo.
+ */
+function photoList(a) {
+    const ids = (a.photo_ids || '').split(',').filter(Boolean);
+    if (a.photo_id && !ids.includes(a.photo_id)) ids.unshift(a.photo_id);
+    return ids;
+}
+
+// Ukrainian national transliteration (plus the few Russian letters that show up).
+// Same as tg-store's slugify, which renders these pages for search engines.
+const TRANSLIT = {
+    а: 'a', б: 'b', в: 'v', г: 'h', ґ: 'g', д: 'd', е: 'e', є: 'ie', ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'i', й: 'i',
+    к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch',
+    ш: 'sh', щ: 'shch', ь: '', ю: 'iu', я: 'ia', ы: 'y', э: 'e', ё: 'e', ъ: '',
+};
+
+/** The lot's page on the site, e.g. /auctions/9363-ps3-call-of-duty-ghosts. */
+function lotPath(id, title) {
+    const slug = (title || '')
+        .toLowerCase()
+        .replace(/[ʼ'’`"«»]/g, '')
+        .replace(/./g, (c) => TRANSLIT[c] ?? c)
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        // Cut long titles at a whole word.
+        .replace(/^(.{0,70})(-.*)?$/, '$1')
+        .slice(0, 90) || 'lot';
+    return `/auctions/${id}-${slug}`;
+}
+
+/**
+ * Lines of the post that come after the lot's own text: the seller credit, the
+ * bid terms (🟢/🔵/🔸, 🕘, ♻️) and the channel's footer links.
+ */
+const POST_FOOTER = /^(?:лот від|🟢|🔵|🔸|🕘|♻|🏆|мінімальна ставка|крок ставки|завершення аукціону|виставити свій лот|всі активні аукціони|зробити ставку|щоб зробити ставку)/iu;
+
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
+
+/**
+ * The seller's description from the channel post: the text between the lot's
+ * name and the bid terms, without the "🎮 Аукціон!" header or the HTML.
+ */
+function lotDescription(fullText, title) {
+    const lines = (fullText || '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, e) => ENTITIES[e])
+        .split('\n')
+        .map((l) => l.trim());
+    const flat = (s) => s.replace(STATUS_TAG, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+    let i = 0;
+    const skipBlank = () => { while (i < lines.length && !lines[i]) i++; };
+    skipBlank();
+    if (i < lines.length && GENERIC_TITLE.test(cleanTitle(lines[i]))) i++;
+    skipBlank();
+    if (i < lines.length && title && flat(lines[i]) === flat(title)) i++;
+    const out = [];
+    for (; i < lines.length && !POST_FOOTER.test(lines[i]); i++) out.push(lines[i]);
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
 
 let listCache = { at: 0, body: null };
 let soldCache = { at: 0, rows: [] };
@@ -49,6 +121,62 @@ function postUrl(chatId, messageId) {
         : getAuctionLink(chatId, messageId);
 }
 
+function bidUrl(chatId, messageId) {
+    return `https://t.me/${BOT_USERNAME || 'retro_auction_bot'}?start=bid_${Math.abs(chatId)}_${messageId}`;
+}
+
+/**
+ * One lot for its page on the site: the list fields plus the seller's
+ * description. Lots that closed without a bid aren't shown anywhere, so they
+ * count as missing.
+ */
+function buildLot(id) {
+    const channelId = getChannelId();
+    const a = channelId && q.getWebAuction.get(channelId, id);
+    if (!a || (a.status !== 'active' && !a.has_winner)) return null;
+    const active = a.status === 'active';
+    const title = active ? cleanTitle(a.title) : lotTitle(a.title);
+    const now = Date.now();
+    return JSON.stringify({
+        currency: getCurrency(),
+        id: a.message_id,
+        title,
+        path: lotPath(a.message_id, title),
+        description: lotDescription(a.full_text, a.title),
+        status: active ? 'active' : 'sold',
+        price: a.current_price ?? a.min_bid,
+        minBid: a.min_bid,
+        step: a.step,
+        endAt: a.end_at,
+        // Same rule as the sold list: lots finished early ended at their last bid.
+        endedAt: active ? null : Date.parse(a.end_at) <= now ? a.end_at : a.last_bid_at,
+        participants: a.participants_count || 0,
+        continuous: !!a.is_continuous,
+        byAdmin: !!a.by_admin,
+        category: a.category || null,
+        photos: photoList(a).length,
+        postUrl: postUrl(channelId, a.message_id),
+        bidUrl: active ? bidUrl(channelId, a.message_id) : null,
+    });
+}
+
+/** Every lot that has a page, for the site's sitemap: active ones, then sold. */
+function buildIndex() {
+    const active = q.selectActiveForWeb.all()
+        .filter((a) => a.chat_id === getChannelId())
+        .map((a) => ({
+            id: a.message_id,
+            title: cleanTitle(a.title),
+            path: lotPath(a.message_id, cleanTitle(a.title)),
+            status: 'active',
+            photos: photoList(a).length,
+        }));
+    const sold = getSoldRows()
+        .filter((a) => a.title)
+        .map((a) => ({ id: a.id, title: a.title, path: a.path, status: 'sold', photos: a.photos, endedAt: a.endedAt }));
+    return JSON.stringify({ lots: [...active, ...sold] });
+}
+
 function getSoldRows() {
     const now = Date.now();
     if (now - soldCache.at < SOLD_TTL_MS) return soldCache.rows;
@@ -56,11 +184,11 @@ function getSoldRows() {
     const channelId = getChannelId();
     const rows = channelId
         ? q.selectSoldForWeb.all(channelId).map((a) => {
-            const cleaned = cleanTitle(a.title);
-            const title = cleaned && !GENERIC_TITLE.test(cleaned) ? cleaned : null;
+            const title = lotTitle(a.title);
             return {
                 id: a.message_id,
                 title,
+                path: lotPath(a.message_id, title),
                 price: a.current_price,
                 participants: a.participants_count || 0,
                 // Lots finished early from the admin panel keep their planned,
@@ -70,6 +198,7 @@ function getSoldRows() {
                 byAdmin: !!a.by_admin,
                 category: a.category || null,
                 hasPhoto: !!a.photo_id,
+                photos: photoList(a).length,
                 postUrl: postUrl(channelId, a.message_id),
                 search: (title || '').toLocaleLowerCase(),
             };
@@ -111,10 +240,10 @@ function buildList() {
     const now = Date.now();
     if (listCache.body && now - listCache.at < LIST_TTL_MS) return listCache.body;
 
-    const botName = BOT_USERNAME || 'retro_auction_bot';
     const auctions = q.selectActiveForWeb.all().map((a) => ({
         id: a.message_id,
         title: cleanTitle(a.title),
+        path: lotPath(a.message_id, cleanTitle(a.title)),
         price: a.current_price ?? a.min_bid,
         minBid: a.min_bid,
         step: a.step,
@@ -124,10 +253,12 @@ function buildList() {
         byAdmin: !!a.by_admin,
         category: a.category || null,
         hasPhoto: !!a.photo_id,
+        photos: photoList(a).length,
         postUrl: postUrl(a.chat_id, a.message_id),
-        bidUrl: `https://t.me/${botName}?start=bid_${Math.abs(a.chat_id)}_${a.message_id}`,
+        bidUrl: bidUrl(a.chat_id, a.message_id),
     }));
 
+    const botName = BOT_USERNAME || 'retro_auction_bot';
     const body = JSON.stringify({
         currency: getCurrency(),
         channelUrl: channelUsername ? `https://t.me/${channelUsername}` : null,
@@ -143,14 +274,15 @@ function buildList() {
     return body;
 }
 
-async function fetchPhoto(bot, fileId) {
-    const cached = photoCache.get(fileId);
+async function fetchPhoto(bot, fileId, width = PHOTO_WIDTH) {
+    const key = `${fileId}:${width}`;
+    const cached = photoCache.get(key);
     if (cached) {
-        photoCache.delete(fileId);
-        photoCache.set(fileId, cached);
+        photoCache.delete(key);
+        photoCache.set(key, cached);
         return cached;
     }
-    if (photoInFlight.has(fileId)) return photoInFlight.get(fileId);
+    if (photoInFlight.has(key)) return photoInFlight.get(key);
 
     const job = (async () => {
         const link = await bot.getFileLink(fileId);
@@ -158,18 +290,18 @@ async function fetchPhoto(bot, fileId) {
         if (!res.ok) throw new Error(`Telegram file fetch failed: ${res.status}`);
         const input = Buffer.from(await res.arrayBuffer());
         const out = await sharp(input)
-            .resize({ width: PHOTO_WIDTH, withoutEnlargement: true })
+            .resize({ width, withoutEnlargement: true })
             .jpeg({ quality: 78, mozjpeg: true })
             .toBuffer();
-        photoCache.set(fileId, out);
+        photoCache.set(key, out);
         if (photoCache.size > PHOTO_CACHE_MAX) photoCache.delete(photoCache.keys().next().value);
         return out;
     })();
-    photoInFlight.set(fileId, job);
+    photoInFlight.set(key, job);
     try {
         return await job;
     } finally {
-        photoInFlight.delete(fileId);
+        photoInFlight.delete(key);
     }
 }
 
@@ -218,11 +350,34 @@ export function startWebServer(bot) {
                 });
             }
 
-            const photoMatch = url.pathname.match(/^\/api\/auctions\/(\d+)\/photo$/);
+            if (url.pathname === '/api/auctions/index') {
+                return send(res, 200, buildIndex(), {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Cache-Control': 'public, max-age=60',
+                });
+            }
+
+            const lotMatch = url.pathname.match(/^\/api\/auctions\/item\/(\d+)$/);
+            if (lotMatch) {
+                const body = buildLot(Number(lotMatch[1]));
+                if (!body) return send(res, 404, 'Not Found');
+                return send(res, 200, body, {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Cache-Control': 'public, max-age=5',
+                });
+            }
+
+            // The list's main photo (/api/auctions/:id/photo), and every photo of
+            // a lot in the larger size: /api/auctions/:id/photo/:n, or
+            // /auction-photos/:id/:n.jpg outside /api/ so search engines may index it.
+            const photoMatch = url.pathname.match(/^\/api\/auctions\/(\d+)\/photo(?:\/(\d+))?$/) ||
+                url.pathname.match(/^\/auction-photos\/(\d+)\/(\d+)\.jpg$/);
             if (photoMatch) {
                 const row = q.getWebPhotoId.get(getChannelId(), Number(photoMatch[1]));
-                if (!row?.photo_id) return send(res, 404, 'Not Found');
-                const img = await fetchPhoto(bot, row.photo_id);
+                const n = photoMatch[2] === undefined ? 0 : Number(photoMatch[2]);
+                const fileId = row && photoList(row)[n];
+                if (!fileId) return send(res, 404, 'Not Found');
+                const img = await fetchPhoto(bot, fileId, photoMatch[2] === undefined ? PHOTO_WIDTH : PHOTO_WIDTH_LARGE);
                 return send(res, 200, img, {
                     'Content-Type': 'image/jpeg',
                     'Cache-Control': 'public, max-age=86400',
