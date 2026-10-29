@@ -2,8 +2,67 @@ import schedule from 'node-schedule';
 import { q } from './db.js';
 import { makeEmptyFinishKb, winnerKeyboard } from '../utils/keyboards.js';
 import { getContactNickname, CHANNEL_USERNAME } from "../config/env.js";
-import { getAuctionLink, escapeHtml, formatUserLink, formatContactLink, truncateCaption, setStatusTag } from '../utils/utils.js';
+import { getAuctionLink, escapeHtml, formatUserLink, formatContactLink, truncateCaption, setStatusTag, userHref } from '../utils/utils.js';
 import { t, getCurrency } from './i18n.js';
+
+/**
+ * A one-button keyboard opening a user's profile, for users we only know by id.
+ *
+ * Their text mention is a tg://user?id= link, which only opens for readers whose
+ * client already knows the user. A tg://user?id= inline button — the same kind
+ * the channel winner banner uses — is resolved by Telegram and always opens.
+ * Users with a known @username get a working t.me link in the text instead, so
+ * they need no button.
+ *
+ * @param {number} userId - User whose profile to open.
+ * @param {string} label - Button caption.
+ * @returns {Object|undefined} Inline keyboard, or undefined when not needed.
+ */
+function profileButtonKb(userId, label) {
+    if (!userId || !userHref(userId).startsWith('tg://')) return undefined;
+    return { inline_keyboard: [[{ text: label, url: `tg://user?id=${userId}` }]] };
+}
+
+/**
+ * Sends a notification with an optional profile button, resending it without
+ * the button when the user's privacy settings forbid linking to them —
+ * Telegram rejects the whole message in that case.
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number} chatId - Recipient.
+ * @param {string} text - HTML text (used as the caption when a photo is given).
+ * @param {Object} [replyMarkup] - Keyboard from profileButtonKb.
+ * @param {string} [photoId] - Photo to send the text as a caption of.
+ */
+async function sendWithProfileButton(bot, chatId, text, replyMarkup, photoId) {
+    const send = (markup) => {
+        const opts = { parse_mode: 'HTML', ...(markup ? { reply_markup: markup } : {}) };
+        return photoId
+            ? bot.sendPhoto(chatId, photoId, { caption: truncateCaption(text), ...opts })
+            : bot.sendMessage(chatId, text, opts);
+    };
+    try {
+        return await send(replyMarkup);
+    } catch (err) {
+        if (replyMarkup && err.message?.includes('BUTTON_USER_PRIVACY_RESTRICTED')) return send();
+        throw err;
+    }
+}
+
+/**
+ * Sends the "you won" message, with a button to the seller when the auction's
+ * contact is a user known only by id (see profileButtonKb).
+ *
+ * @param {TelegramBot} bot - Telegram bot instance.
+ * @param {number} winnerId - Recipient.
+ * @param {string} text - Rendered scheduler.winner_notify text.
+ * @param {string} contact - The auction's contact: "@nick" or "tg://user?id=...".
+ * @param {string} [photoId] - Auction photo to send the text as a caption of.
+ */
+export function sendWinnerNotification(bot, winnerId, text, contact, photoId) {
+    const sellerId = Number(String(contact || '').match(/^tg:\/\/user\?id=(\d+)/)?.[1]);
+    return sendWithProfileButton(bot, winnerId, text, profileButtonKb(sellerId, t('scheduler.kb.contact_seller')), photoId);
+}
 
 /**
  * Schedules the automatic closing of an auction and related reminders.
@@ -376,14 +435,7 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                     admin_link: adminLink
                 });
                 try {
-                    if (freshRow.photo_id) {
-                        await bot.sendPhoto(freshRow.leader_id, freshRow.photo_id, {
-                            caption: truncateCaption(winnerText),
-                            parse_mode: 'HTML'
-                        });
-                    } else {
-                        await bot.sendMessage(freshRow.leader_id, winnerText, { parse_mode: 'HTML' });
-                    }
+                    await sendWinnerNotification(bot, freshRow.leader_id, winnerText, nickname, freshRow.photo_id);
                 } catch (err) {
                     console.error(`Failed to notify winner ${freshRow.leader_id}:`, err.message);
                 }
@@ -406,11 +458,13 @@ export async function closeAuction(bot, chat_id, message_id, force = false) {
                 };
                 const ownerNotifyText = t('scheduler.admin_finished_notify', notifyVars);
                 const otherNotifyText = t('scheduler.admin_finished_notify_other', notifyVars);
+                const winnerKb = profileButtonKb(freshRow.leader_id, t('scheduler.kb.open_winner'));
                 await Promise.allSettled(admins.map(admin =>
-                    bot.sendMessage(
+                    sendWithProfileButton(
+                        bot,
                         admin.user_id,
                         freshRow.creator_id === admin.user_id ? ownerNotifyText : otherNotifyText,
-                        { parse_mode: 'HTML' }
+                        winnerKb
                     ).catch(e => console.error(`Failed to notify admin ${admin.user_id}:`, e.message))
                 ));
             }

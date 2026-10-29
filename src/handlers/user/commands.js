@@ -1,5 +1,5 @@
 import { q } from '../../services/db.js';
-import { getAuctionLink, truncateCaption, formatUserLinkById } from '../../utils/utils.js';
+import { getAuctionLink, truncateCaption, formatUserLinkById, userHref } from '../../utils/utils.js';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TZ } from "../../config/env.js";
 import { closeAuction } from "../../services/scheduler.js";
@@ -535,6 +535,7 @@ export function registerUserCommands(bot) {
             const link = getAuctionLink(d.chatId, d.msgId);
             const restartText = t('admin.post_restart_request', {
                 user_id: userId,
+                user_href: userHref(userId, from.username),
                 name: userName,
                 link: link,
                 title: d.title,

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
-import { escapeHtml } from '../../utils/utils.js';
+import { escapeHtml, userHref } from '../../utils/utils.js';
 import { applyAdminCommands } from '../../services/commands.js';
 
 // In-memory failed-verification counter (user_id -> count). Caps brute-force
@@ -120,8 +120,10 @@ export function handleOtpInput(bot, msg, text) {
                 if (admin.user_id !== msg.from.id) {
                     bot.sendMessage(admin.user_id, t('admin.new_admin_notify', {
                         user_id: msg.from.id,
+                        user_href: userHref(msg.from.id, msg.from.username),
                         name: escapeHtml(newAdminName),
                         added_by_id: msg.from.id,
+                        added_by_href: userHref(msg.from.id, msg.from.username),
                         added_by_name: escapeHtml(newAdminName)
                     }), { parse_mode: 'HTML' }).catch(() => {});
                 }

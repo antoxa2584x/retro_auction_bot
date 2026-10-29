@@ -1,7 +1,7 @@
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
 import { makeAdminSupportHistoryKb, makeAdminSupportViewKb, SUPPORT_HISTORY_PAGE_SIZE } from '../../utils/keyboards.js';
-import { safeEditMessage, escapeHtml, parsePhotoIds, sendMessageWithPhotos } from '../../utils/utils.js';
+import { safeEditMessage, escapeHtml, parsePhotoIds, sendMessageWithPhotos, userHref } from '../../utils/utils.js';
 
 export const adminSupportSessions = new Map();
 
@@ -52,7 +52,7 @@ export function registerAdminSupportHandlers(bot) {
 
             adminSupportSessions.set(query.from.id, { supportId, photo_ids: [], text: '' });
 
-            await bot.sendMessage(query.from.id, t('support.reply_prompt', { name: escapeHtml(String(supportMsg.user_name)), user_id: supportMsg.user_id }), {
+            await bot.sendMessage(query.from.id, t('support.reply_prompt', { name: escapeHtml(String(supportMsg.user_name)), user_id: supportMsg.user_id, user_href: userHref(supportMsg.user_id) }), {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[{ text: t('common.cancel'), callback_data: 'admin_support_cancel' }]]
@@ -191,6 +191,7 @@ export function registerAdminSupportHandlers(bot) {
             let text = t('support.message_view', {
                 name: escapeHtml(String(supportMsg.user_name)),
                 user_id: supportMsg.user_id,
+                user_href: userHref(supportMsg.user_id),
                 date: date,
                 message: messageBody,
                 reply: replyBody

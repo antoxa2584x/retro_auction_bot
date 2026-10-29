@@ -1,6 +1,6 @@
 import { q } from '../../services/db.js';
 import { t } from '../../services/i18n.js';
-import { escapeHtml, sendMessageWithPhotos } from '../../utils/utils.js';
+import { escapeHtml, sendMessageWithPhotos, userHref } from '../../utils/utils.js';
 
 const supportSessions = new Map();
 
@@ -86,6 +86,7 @@ async function submitSupport(bot, chatId, from, session) {
     const adminText = t('support.new_message', {
         name: escapeHtml(userName),
         user_id: userId,
+        user_href: userHref(userId),
         message: text ? escapeHtml(text) : t('support.photo_only')
     });
 

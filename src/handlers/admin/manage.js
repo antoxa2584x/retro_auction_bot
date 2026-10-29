@@ -18,11 +18,12 @@ import { getChannelId, TZ, getContactNickname } from "../../config/env.js";
 import { logError, logWarn } from '../../services/logger.js';
 import { verifyAuctionStored, logAuctionNotFound } from '../../services/diagnostics.js';
 import { formatInTimeZone } from 'date-fns-tz';
-import { scheduleClose, closeAuction, cancelAuctionJobs } from '../../services/scheduler.js';
+import { scheduleClose, closeAuction, cancelAuctionJobs, sendWinnerNotification } from '../../services/scheduler.js';
 import { 
     getAuctionLink, 
     formatUserLink, 
     formatUserLinkById,
+    userHref,
     formatContactLink, 
     buildAuctionText,
     sendAuctionGallery,
@@ -419,6 +420,7 @@ export function registerManageHandlers(bot) {
 
             const text = t('admin.post_restart_request', {
                 user_id: r.user_id,
+                user_href: userHref(r.user_id),
                 name: r.user_name || r.user_id,
                 link: getAuctionLink(r.chat_id, r.message_id),
                 title: r.title,
@@ -1081,11 +1083,7 @@ export function registerManageHandlers(bot) {
                             admin_link: adminLink
                         });
                         try {
-                            if (a.photo_id) {
-                                await bot.sendPhoto(res.newLeaderId, a.photo_id, { caption: truncateCaption(winnerText), parse_mode: 'HTML' });
-                            } else {
-                                await bot.sendMessage(res.newLeaderId, truncateCaption(winnerText), { parse_mode: 'HTML' });
-                            }
+                            await sendWinnerNotification(bot, res.newLeaderId, winnerText, nickname, a.photo_id);
                         } catch (err) {
                             console.error(`Failed to notify new winner ${res.newLeaderId}:`, err.message);
                         }

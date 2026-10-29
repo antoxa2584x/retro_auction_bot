@@ -855,6 +855,19 @@ export const q = {
     ) as name
   `),
 
+  /**
+   * The latest @username we have seen for a user, from any table that records
+   * it — newest bid or submission first, since handles can change.
+   * @type {import('better-sqlite3').Statement}
+   */
+  getUsernameFromAnywhere: db.prepare(`
+    SELECT COALESCE(
+      (SELECT username FROM participants WHERE user_id = @id AND username IS NOT NULL ORDER BY rowid DESC LIMIT 1),
+      (SELECT username FROM pending_auctions WHERE user_id = @id AND username IS NOT NULL ORDER BY id DESC LIMIT 1),
+      (SELECT username FROM admins WHERE user_id = @id AND username IS NOT NULL)
+    ) as username
+  `),
+
   // Restart requests
   /**
    * Records a user's restart request, replacing an earlier one for the same auction.

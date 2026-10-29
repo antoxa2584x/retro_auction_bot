@@ -22,35 +22,56 @@ export function getAuctionLink(chatId, messageId) {
 }
 
 /**
+ * The href to put on a user mention in message text.
+ *
+ * Prefers a public t.me/<nick> link: a tg://user?id= text link only opens for
+ * readers whose client already knows the user and is otherwise dead, unlike a
+ * tg://user?id= inline button, which Telegram resolves server-side. Users with
+ * no known @username still get the id link as a best effort.
+ *
+ * @param {number} userId - Telegram user ID.
+ * @param {string} [username] - Known @username; looked up when omitted.
+ * @returns {string} URL.
+ */
+export function userHref(userId, username) {
+    const nick = username || q.getUsernameFromAnywhere.get({ id: userId })?.username;
+    if (nick) return `https://t.me/${String(nick).replace('@', '')}`;
+    return `tg://user?id=${userId}`;
+}
+
+/**
  * Formats a user mention link based on available information.
- * 
+ *
  * @param {number} userId - Telegram user ID.
  * @param {string} [name] - User's name to display.
  * @param {string} [username] - Telegram @username.
  * @returns {string} HTML-formatted link.
  */
 export function formatUserLink(userId, name, username) {
+    const href = userHref(userId, username);
     if (name) {
-        return `<a href="tg://user?id=${userId}">${escapeHtml(String(name))}</a>`;
+        return `<a href="${href}">${escapeHtml(String(name))}</a>`;
     }
-    if (username) {
-        const cleanNick = String(username).replace('@', '');
-        return `<a href="https://t.me/${cleanNick}">@${escapeHtml(cleanNick)}</a>`;
+    if (href.startsWith('https://')) {
+        const cleanNick = href.slice('https://t.me/'.length);
+        return `<a href="${href}">@${escapeHtml(cleanNick)}</a>`;
     }
-    return `<a href="tg://user?id=${userId}">ID ${userId}</a>`;
+    return `<a href="${href}">ID ${userId}</a>`;
 }
 
 /**
  * Formats a user link by looking up the user in the database.
- * 
+ *
  * @param {number} userId - Telegram user ID.
+ * @param {{name?: string}} [opts] - Display name to use instead of the looked-up one.
  * @returns {string} HTML-formatted link.
  */
-export function formatUserLinkById(userId) {
+export function formatUserLinkById(userId, opts = {}) {
     if (!userId) return t('admin.not_set');
-    const user = q.getUserFromAnywhere.get(userId, userId, userId, userId);
-    const displayName = user?.name || `ID ${userId}`;
-    return `<a href="tg://user?id=${userId}">${escapeHtml(String(displayName))}</a>`;
+    const href = userHref(userId);
+    const nickLabel = href.startsWith('https://') ? '@' + href.slice('https://t.me/'.length) : null;
+    const displayName = opts.name || q.getUserFromAnywhere.get(userId, userId, userId, userId)?.name || nickLabel || `ID ${userId}`;
+    return `<a href="${href}">${escapeHtml(String(displayName))}</a>`;
 }
 
 /**
@@ -70,7 +91,7 @@ export function formatPosterLink(data) {
         return `<a href="https://t.me/${cleanNick}">@${escapeHtml(cleanNick)}</a>`;
     }
     const name = [data.first_name, data.last_name].filter(Boolean).join(' ');
-    if (name) return `<a href="tg://user?id=${data.user_id}">${escapeHtml(name)}</a>`;
+    if (name) return `<a href="${userHref(data.user_id)}">${escapeHtml(name)}</a>`;
     return formatUserLinkById(data.user_id);
 }
 
