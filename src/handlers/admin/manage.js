@@ -517,6 +517,25 @@ export function registerManageHandlers(bot) {
             if (p.status !== 'pending') {
                 return bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_already_handled'), show_alert: true }).catch(() => {});
             }
+
+            // The end time was picked at submission; if review took longer, it
+            // is already gone. Posting it would put a lot in the channel that
+            // node-schedule never closes (it skips past dates), so reject it and
+            // tell the owner to resubmit with a later time.
+            if (new Date(p.end_at) <= new Date()) {
+                q.updatePendingAuctionStatus.run('rejected', id);
+                const endAt = formatInTimeZone(new Date(p.end_at), TZ, 'dd.MM.yyyy HH:mm');
+                const notification = t('admin.pending_auction_rejected_reason', { reason: t('admin.pending_auction_reject_reason_expired') })
+                    + '\n\n' + t('admin.pending_auction_reject_reason_expired_details', { end_at: endAt });
+
+                await cleanupReview(bot, chatId, from.id);
+                adminSessions.delete(from.id);
+                await bot.answerCallbackQuery(query.id, { text: t('admin.pending_auction_expired_alert', { end_at: endAt }), show_alert: true }).catch(() => {});
+                await bot.sendMessage(p.user_id, notification, { parse_mode: 'HTML' }).catch(() => {});
+                await sendAdminPanel(bot, chatId, false);
+                return;
+            }
+
             q.updatePendingAuctionStatus.run('approved', id);
 
             await cleanupReview(bot, chatId, from.id);
